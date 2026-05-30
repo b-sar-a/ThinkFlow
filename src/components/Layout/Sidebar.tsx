@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   LayoutGrid, 
   Brain, 
@@ -26,6 +26,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '../UI/Button';
+import { PaymentModal } from '../UI/PaymentModal';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -38,6 +39,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
   const { profile, signOut, geniusMode, setGeniusMode } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { t } = useLanguage();
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+
+  const handleGeniusClick = () => {
+    if (!profile?.isPremium) {
+      setIsPaymentOpen(true);
+    } else {
+      setGeniusMode(!geniusMode);
+    }
+  };
 
   const menuItems = [
     { id: 'genius_lab', label: t.geniusLab, icon: Brain },
@@ -99,11 +109,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
         <div className="p-6 mt-auto border-t border-[var(--border)] space-y-3">
           <Button 
             variant="ghost" 
-            className={`w-full justify-start gap-4 transition-all ${geniusMode ? 'text-indigo-400' : ''}`} 
-            onClick={() => setGeniusMode(!geniusMode)}
+            className={`w-full justify-start gap-4 transition-all ${geniusMode && profile?.isPremium ? 'text-indigo-400' : ''}`} 
+            onClick={handleGeniusClick}
           >
-            <Sparkles className={`w-5 h-5 ${geniusMode ? 'animate-pulse' : ''}`} />
-            <span className="text-[10px] font-black uppercase tracking-widest">{t.geniusMode}</span>
+            <Sparkles className={`w-5 h-5 ${geniusMode && profile?.isPremium ? 'animate-pulse' : ''}`} />
+            <span className="text-[10px] font-black uppercase tracking-widest">
+              {t.geniusMode} {profile?.isPremium ? '👑' : '🔒'}
+            </span>
           </Button>
 
           <Button 
@@ -148,6 +160,8 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
           onClick={onToggle} 
         />
       )}
+
+      <PaymentModal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} />
     </>
   );
 };

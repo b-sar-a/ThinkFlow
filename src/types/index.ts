@@ -31,6 +31,7 @@ export interface UserProfile {
   role: 'student' | 'admin';
   theme: 'light' | 'dark';
   geniusMode?: boolean;
+  isPremium?: boolean;
   learningDepth?: 'Surface' | 'Deep' | 'Architect';
   explanationStyle?: 'Metaphorical' | 'Technical' | 'Simple';
 }

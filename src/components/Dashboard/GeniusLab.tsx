@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, Sparkles, Target, Zap, ArrowRight, Loader2, CheckCircle2, ChevronRight, MessageSquare, Star, AlertCircle } from 'lucide-react';
+import { Brain, Sparkles, Target, Zap, ArrowRight, Loader2, CheckCircle2, ChevronRight, MessageSquare, Star, AlertCircle, Play } from 'lucide-react';
 import { generateKnowledgeTree, verifyTask } from '../../services/gemini';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -9,6 +9,149 @@ import { KnowledgeTree, KnowledgeNode } from '../../types';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
 import { Chat } from './Chat';
+import { collection, addDoc } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
+
+const presetTemplates = [
+  {
+    id: 'physics_ege',
+    title: 'Подготовка к ЕГЭ по физике',
+    titleEn: 'Physics USE Prep',
+    icon: '⚡',
+    theme: 'border-amber-500/30 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500 bg-amber-500/5',
+    tree: {
+      topic: 'Подготовка к ЕГЭ по физике',
+      nodes: [
+        {
+          id: 'p1',
+          label: 'Кинематика и Динамика',
+          description: 'Основы физики механического движения, законы Ньютона, силы упругости, трения и гравитации.',
+          metaphor: 'Космический буксир: рассчитываем траекторию стыковки с орбитальной станцией.',
+          challenge: 'Определите ускорение тела массой 5 кг под действием силы 20 Н (ответ числом в м/с²).',
+          points: 100,
+          type: 'core',
+          completed: false
+        },
+        {
+          id: 'p2',
+          label: 'Электромагнетизм',
+          description: 'Электростатика, закон Кулона, магнитное поле, сила Лоренца и электромагнитная индукция.',
+          metaphor: 'Энергетический щит звездолета: настройка напряженности поля для отражения плазмы.',
+          challenge: 'Чему равна работа поля по переносу заряда 2 Кл при разности потенциалов 10 В? (в Дж)',
+          points: 150,
+          type: 'branch',
+          completed: false
+        },
+        {
+          id: 'p3',
+          label: 'Квантовая Физика',
+          description: 'Фотоэффект, уравнение Эйнштейна, квантовые уровни энергии атомов и излучение.',
+          metaphor: 'Фотонные пушки: калибровка длины волны луча для преодоления кристаллических экранов.',
+          challenge: 'Какой ученый предложил уравнение фотоэффекта, за что получил Нобелевскую премию?',
+          points: 200,
+          type: 'leaf',
+          completed: false
+        }
+      ],
+      connections: [
+        { from: 'p1', to: 'p2' },
+        { from: 'p2', to: 'p3' }
+      ]
+    }
+  },
+  {
+    id: 'python_basics',
+    title: 'Основы Python',
+    titleEn: 'Python Basics',
+    icon: '🐍',
+    theme: 'border-emerald-500/30 text-emerald-500 hover:bg-emerald-500/10 hover:border-emerald-500 bg-emerald-500/5',
+    tree: {
+      topic: 'Основы Python',
+      nodes: [
+        {
+          id: 'py1',
+          label: 'Переменные и Циклы',
+          description: 'Объявление переменных, базовые типы данных, циклы for/while и структуры ветвления.',
+          metaphor: 'Автоматическая сборочная линия: коробки с материалами и повторяющиеся конвейеры.',
+          challenge: 'Как называется функция, выводящая данные в консоль в Python?',
+          points: 100,
+          type: 'core',
+          completed: false
+        },
+        {
+          id: 'py2',
+          label: 'Функции и ООП',
+          description: 'Функции как строительные блоки, классы, наследование, полиморфизм и инкапсуляция.',
+          metaphor: 'Конструктор роботов: создание чертежей (классов) и запуск уникальных робо-ботов (экземпляров).',
+          challenge: 'Какое ключевое слово используется для объявления функции в Python?',
+          points: 150,
+          type: 'branch',
+          completed: false
+        },
+        {
+          id: 'py3',
+          label: 'Работа с JSON и API',
+          description: 'Импорт модулей, обработка исключений, отправка HTTP и парсинг JSON объектов.',
+          metaphor: 'Межгалактический почтовый хаб: получение кодированных капсул и отправка ответов адресатам.',
+          challenge: 'Какой метод объекта dict возвращает значение по ключу, не вызывая ошибку KeyError?',
+          points: 200,
+          type: 'leaf',
+          completed: false
+        }
+      ],
+      connections: [
+        { from: 'py1', to: 'py2' },
+        { from: 'py2', to: 'py3' }
+      ]
+    }
+  },
+  {
+    id: 'history_19',
+    title: 'История 19 века',
+    titleEn: '19th Century History',
+    icon: '📜',
+    theme: 'border-indigo-500/30 text-indigo-500 hover:bg-indigo-500/10 hover:border-indigo-500 bg-indigo-500/5',
+    tree: {
+      topic: 'История 19 века',
+      nodes: [
+        {
+          id: 'h1',
+          label: 'Эпоха Наполеоновских войн',
+          description: 'Расцвет и падение Французской империи, Отечественная война 1812 года, Бородинское сражение.',
+          metaphor: 'Великая шахматная партия Европы: рокировки монархов и тактические марш-броски.',
+          challenge: 'В какой стране Наполеон Бонапарт потерпел свое окончательное крушение в бою при Ватерлоо?',
+          points: 100,
+          type: 'core',
+          completed: false
+        },
+        {
+          id: 'h2',
+          label: 'Промышленный Переворот',
+          description: 'Переход от ручного труда к машинному, появление паровых двигателей, железных дорог, капитализм.',
+          metaphor: 'Паровой гигант: запуск шестеренок новой цивилизации и уход от аграрной тишины.',
+          challenge: 'Какое ископаемое топливо стало основным двигателем промышленной революции 19 века?',
+          points: 150,
+          type: 'branch',
+          completed: false
+        },
+        {
+          id: 'h3',
+          label: 'Реформы Александра II',
+          description: 'Отмена крепостного права в 1861 году, земская, судебная и военная государственные реформы.',
+          metaphor: 'Разрушение оков: освобождение крестьянского потенциала и запуск модернизации империи.',
+          challenge: 'Какое прозвище получил в народе император Александр II за отмену крепостничества?',
+          points: 200,
+          type: 'leaf',
+          completed: false
+        }
+      ],
+      connections: [
+        { from: 'h1', to: 'h2' },
+        { from: 'h2', to: 'h3' }
+      ]
+    }
+  }
+];
 
 export const GeniusLab: React.FC = () => {
   const { profile, updateProfileData, user } = useAuth();
@@ -24,6 +167,51 @@ export const GeniusLab: React.FC = () => {
   const [challengeAnswer, setChallengeAnswer] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyFeedback, setVerifyFeedback] = useState<{ isCorrect: boolean; text: string } | null>(null);
+
+  const logActivity = async () => {
+    if (!user || !profile) return;
+    try {
+      await addDoc(collection(db, 'genius_lab_activities'), {
+        userId: user.uid,
+        userName: profile.name || user.displayName || 'Anonymous Student',
+        email: user.email || '',
+        timestamp: Date.now(),
+        dateString: new Date().toISOString().split('T')[0]
+      });
+    } catch (e) {
+      console.warn("Could not write daily activity log to cloud storage:", e);
+    }
+  };
+
+  const handleLaunchPreset = async (presetId: string) => {
+    const template = presetTemplates.find(p => p.id === presetId);
+    if (!template || !profile) return;
+    
+    setIsLoading(true);
+    setError(null);
+    setDebugInfo(null);
+    setVerifyFeedback(null);
+    setChallengeAnswer('');
+    
+    try {
+      // Sci-fi immersive buffer sequence
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      const currentLabel = profile?.language === 'ru' ? template.title : template.titleEn;
+      setTopic(currentLabel);
+      
+      // Inject preset tree
+      const copyTree = JSON.parse(JSON.stringify(template.tree));
+      setTree(copyTree);
+      setSelectedNode(copyTree.nodes[0]);
+      await addXPAction(25);
+      await logActivity();
+    } catch (err) {
+      setError("Failed to open preset course.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Particle Explosion Effect for XP
   const [xpParticles, setXpParticles] = useState<{ id: number; x: number; y: number; color: string }[]>([]);
@@ -69,6 +257,7 @@ export const GeniusLab: React.FC = () => {
         setTree(generatedTree);
         setSelectedNode(generatedTree.nodes[0]);
         addXPAction(25);
+        await logActivity();
       } else {
         throw new Error("Invalid structure: AI returned empty tree.");
       }
@@ -371,6 +560,41 @@ export const GeniusLab: React.FC = () => {
               </div>
             </Card>
           </div>
+
+          {/* Quick-Start Preset Courses Section */}
+          <div className="space-y-6 max-w-4xl mx-auto pt-6">
+            <span className="text-[11px] font-black uppercase tracking-[0.25em] text-gray-500 block text-center">
+              {profile?.language === 'ru' ? '⚡️ ГОТОВЫЕ КУРСЫ-ШАБЛОНЫ ДЛЯ КРУТОЙ ДОРОЖНОЙ КАРТЫ' : '⚡️ READY-MADE TEMPLATES FOR INSTANT ROADMAPS'}
+            </span>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {presetTemplates.map((tmpl) => (
+                <motion.div
+                  key={tmpl.id}
+                  whileHover={{ scale: 1.05, y: -4 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => handleLaunchPreset(tmpl.id)}
+                  className={`p-6 rounded-[2rem] border min-h-[160px] text-left cursor-pointer transition-all flex flex-col justify-between relative overflow-hidden group ${tmpl.theme}`}
+                >
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-colors" />
+                  <div className="flex justify-between items-start">
+                    <span className="text-3xl filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.2)]">{tmpl.icon}</span>
+                    <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-current opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all">
+                      <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5 z-10">
+                    <h4 className="font-black text-sm uppercase tracking-tight text-white leading-tight">
+                      {profile?.language === 'ru' ? tmpl.title : tmpl.titleEn}
+                    </h4>
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
+                      {tmpl.tree.nodes.length} {profile?.language === 'ru' ? 'модуля' : 'modules'} • {tmpl.tree.nodes.reduce((acc, current) => acc + (current.points || 0), 0)} XP
+                    </p>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
 
           {error && (
             <motion.div 

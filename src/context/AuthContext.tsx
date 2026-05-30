@@ -85,6 +85,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         role: 'student',
         language: 'en',
         theme: 'dark',
+        geniusMode: true,
+        isPremium: true,
         bio: 'Exploring the ThinkFlow universe in Genius Mode.'
       });
       setLoading(false);
@@ -125,7 +127,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         language: 'en',
         theme: 'light',
         bio: '',
-        geniusMode: true,
+        geniusMode: false,
+        isPremium: false,
         learningDepth: 'Deep',
         explanationStyle: 'Metaphorical'
       };
@@ -174,11 +177,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (docSnap.exists()) {
           const data = docSnap.data();
           // Ensure critical fields exist for leaderboard and genius mode
-          if (data.xp === undefined || data.level === undefined || data.geniusMode === undefined) {
+          if (data.xp === undefined || data.level === undefined || data.geniusMode === undefined || data.isPremium === undefined) {
             const updates: Partial<UserProfile> = {};
             if (data.xp === undefined) updates.xp = 0;
             if (data.level === undefined) updates.level = 1;
-            if (data.geniusMode === undefined) updates.geniusMode = true;
+            if (data.geniusMode === undefined) updates.geniusMode = false;
+            if (data.isPremium === undefined) updates.isPremium = false;
             
             setDoc(userDocRef, updates, { merge: true }).catch(err => {
               console.warn("Could not patch profile with missing fields:", err);
@@ -202,7 +206,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             language: 'en',
             theme: 'light',
             bio: '',
-            geniusMode: true,
+            geniusMode: false,
+            isPremium: false,
             learningDepth: 'Deep',
             explanationStyle: 'Metaphorical'
           };
