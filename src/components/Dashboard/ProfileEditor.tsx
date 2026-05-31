@@ -4,8 +4,8 @@ import { User, Camera, Save, Loader2, CheckCircle2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { INTERESTS, CLASSES } from '../../constants';
-import { StudentClass, UserProfile } from '../../types';
+import { INTERESTS } from '../../constants';
+import { UserProfile } from '../../types';
 import { db } from '../../lib/firebase';
 import { doc, updateDoc } from 'firebase/firestore';
 import { Button } from '../UI/Button';
@@ -86,7 +86,6 @@ export const ProfileEditor: React.FC = () => {
     const updatedProfile: Partial<UserProfile> = {
       name: fd.get('name') as string,
       bio: fd.get('bio') as string,
-      studentClass: (fd.get('class') as StudentClass) || profile.studentClass,
       interests: selectedInterests,
       age: ageVal ? parseInt(ageVal) : profile.age,
       photoURL: photoURL
@@ -191,17 +190,6 @@ export const ProfileEditor: React.FC = () => {
                   defaultValue={profile.age} 
                   className={`w-full bg-[var(--input)] border border-[var(--border)] rounded-2xl p-5 text-[var(--text)] outline-none focus:border-indigo-500 transition-all`} 
                 />
-              </div>
-              <div className="group space-y-2">
-                <label className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest group-focus-within:text-indigo-500 transition-colors">Class</label>
-                <motion.select 
-                  whileFocus={{ scale: 1.01 }}
-                  name="class" 
-                  defaultValue={profile.studentClass} 
-                  className={`w-full bg-[var(--input)] border border-[var(--border)] rounded-2xl p-5 text-[var(--text)] outline-none focus:border-indigo-500 transition-all appearance-none cursor-pointer`}
-                >
-                  {CLASSES.map(c => <option key={c} value={c}>{c}</option>)}
-                </motion.select>
               </div>
             </motion.div>
 

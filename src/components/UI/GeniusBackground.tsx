@@ -57,11 +57,15 @@ export const GeniusBackground: React.FC = () => {
   if (!geniusMode) return <div className="fixed inset-0 bg-[var(--bg)] z-0" />;
   
   return (
-    <div className="fixed inset-0 z-0 overflow-hidden bg-[#020205] transition-colors duration-1000">
+    <div className={`fixed inset-0 z-0 overflow-hidden ${theme === 'light' ? 'bg-[#f4f6fa]' : 'bg-[#020205]'} transition-colors duration-1000`}>
       {/* Dynamic Color Aura - Shifts between Indigo and Deep Violet */}
       <motion.div
         animate={{
-          background: [
+          background: theme === 'light' ? [
+            'radial-gradient(circle at 50% 40%, rgba(99, 102, 241, 0.08) 0%, transparent 70%)',
+            'radial-gradient(circle at 50% 40%, rgba(167, 139, 250, 0.08) 0%, transparent 70%)',
+            'radial-gradient(circle at 50% 40%, rgba(99, 102, 241, 0.08) 0%, transparent 70%)',
+          ] : [
             'radial-gradient(circle at 50% 40%, rgba(79, 70, 229, 0.15) 0%, transparent 70%)',
             'radial-gradient(circle at 50% 40%, rgba(139, 92, 246, 0.15) 0%, transparent 70%)',
             'radial-gradient(circle at 50% 40%, rgba(79, 70, 229, 0.15) 0%, transparent 70%)',
@@ -86,12 +90,12 @@ export const GeniusBackground: React.FC = () => {
           style={{
             position: 'absolute',
             left: s.left,
-            opacity: s.opacity,
+            opacity: theme === 'light' ? s.opacity * 0.5 : s.opacity,
             fontSize: s.fontSize,
             writingMode: 'vertical-rl',
             textOrientation: 'upright',
           }}
-          className="font-mono text-indigo-400/40 font-bold select-none pointer-events-none z-0"
+          className={`font-mono ${theme === 'light' ? 'text-indigo-600/15' : 'text-indigo-400/40'} font-bold select-none pointer-events-none z-0`}
         >
           {s.content}
         </motion.div>
@@ -100,7 +104,7 @@ export const GeniusBackground: React.FC = () => {
       {/* Dynamic Parallax Atmosphere */}
       <motion.div 
         style={{ x: springX, y: springY }}
-        className="absolute inset-[-15%] bg-[radial-gradient(circle_at_50%_40%,_#1a1b4b_0%,_transparent_75%)] opacity-70 blur-[80px] pointer-events-none"
+        className={`absolute inset-[-15%] ${theme === 'light' ? 'bg-[radial-gradient(circle_at_50%_40%,_rgba(99,102,241,0.06)_0%,_transparent_75%)]' : 'bg-[radial-gradient(circle_at_50%_40%,_#1a1b4b_0%,_transparent_75%)]'} opacity-70 blur-[80px] pointer-events-none`}
       />
 
       {/* 3D Holographic Rings */}
@@ -122,9 +126,9 @@ export const GeniusBackground: React.FC = () => {
               position: 'absolute',
               width: ring.size,
               height: ring.size,
-              border: `1px solid rgba(99, 102, 241, ${ring.opacity})`,
+              border: `1px solid ${theme === 'light' ? `rgba(99, 102, 241, ${ring.opacity * 0.4})` : `rgba(99, 102, 241, ${ring.opacity})`}`,
               borderRadius: '50%',
-              boxShadow: `inset 0 0 40px rgba(99, 102, 241, ${ring.opacity / 2})`,
+              boxShadow: `inset 0 0 40px ${theme === 'light' ? `rgba(99, 102, 241, ${ring.opacity * 0.15})` : `rgba(99, 102, 241, ${ring.opacity / 2})`}`,
             }}
           />
         ))}
@@ -146,7 +150,7 @@ export const GeniusBackground: React.FC = () => {
           ease: "easeInOut",
         }}
         style={{ x: springX, y: springY }}
-        className="absolute top-[5%] left-[5%] w-[70vw] h-[70vw] rounded-full blur-[150px] bg-indigo-600/10 mix-blend-screen pointer-events-none"
+        className={`absolute top-[5%] left-[5%] w-[70vw] h-[70vw] rounded-full blur-[150px] ${theme === 'light' ? 'bg-indigo-500/5' : 'bg-indigo-600/10'} pointer-events-none`}
       />
       
       <motion.div
@@ -162,14 +166,14 @@ export const GeniusBackground: React.FC = () => {
           ease: "easeInOut",
         }}
         style={{ x: springX, y: springY }}
-        className="absolute bottom-[-10%] right-[-10%] w-[60vw] h-[60vw] rounded-full blur-[150px] bg-purple-600/10 mix-blend-screen pointer-events-none"
+        className={`absolute bottom-[-10%] right-[-10%] w-[60vw] h-[60vw] rounded-full blur-[150px] ${theme === 'light' ? 'bg-purple-500/5' : 'bg-purple-600/10'} pointer-events-none`}
       />
 
       {/* Hexagon Grid Overlay - Subltle & Technical */}
       <div 
         className="absolute inset-0 opacity-[0.03] pointer-events-none"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='104' viewBox='0 0 60 104' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 104V86.6025M0 86.6025L15 77.9423M60 86.6025L45 77.9423M0 17.3205L15 26.0603M60 17.3205L45 26.0603M30 0V17.3205M15 26.0603V43.3408L0 52L15 60.6592V77.9423L30 86.6025L45 77.9423V60.6592L60 52L45 43.3408V26.0603L30 17.3205L15 26.0603Z' fill='none' stroke='%23ffffff' stroke-width='1'/%3E%3C/svg%3E")`,
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='104' viewBox='0 0 60 104' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M30 104V86.6025M0 86.6025L15 77.9423M60 86.6025L45 77.9423M0 17.3205L15 26.0603M60 17.3205L45 26.0603M30 0V17.3205M15 26.0603V43.3408L0 52L15 60.6592V77.9423L30 86.6025L45 77.9423V60.6592L60 52L45 43.3408V26.0603L30 17.3205L15 26.0603Z' fill='none' stroke='${theme === 'light' ? '%234f46e5' : '%23ffffff'}' stroke-width='1' stroke-opacity='${theme === 'light' ? '0.025' : '0.08'}'/%3E%3C/svg%3E")`,
           backgroundSize: '120px 208px'
         }}
       />
@@ -187,47 +191,50 @@ export const GeniusBackground: React.FC = () => {
           style={{
             x: springX, 
             y: springY,
-            backgroundImage: `
+            backgroundImage: theme === 'light' ? `
+              linear-gradient(to right, rgba(99, 102, 241, 0.05) 1.5px, transparent 1.5px),
+              linear-gradient(to bottom, rgba(99, 102, 241, 0.05) 1.5px, transparent 1.5px)
+            ` : `
               linear-gradient(to right, rgba(79, 70, 229, 0.15) 1.5px, transparent 1.5px),
               linear-gradient(to bottom, rgba(79, 70, 229, 0.15) 1.5px, transparent 1.5px)
             `,
             backgroundSize: '80px 80px',
             transform: 'rotateX(75deg) translateY(-25%) translateZ(-150px)',
             height: '250%',
-            maskImage: 'linear-gradient(to bottom, transparent, black 15%, black 65%, transparent)'
+            maskImage: theme === 'light' ? 'linear-gradient(to bottom, transparent, white 15%, white 65%, transparent)' : 'linear-gradient(to bottom, transparent, black 15%, black 65%, transparent)'
           }}
         />
 
         {/* Cyber Horizon Glow */}
-        <div className="absolute inset-x-0 top-1/2 h-[2px] bg-indigo-500 shadow-[0_0_60px_5px_rgba(99,102,241,0.6)] opacity-50 translate-z-0" />
+        <div className={`absolute inset-x-0 top-1/2 h-[2px] ${theme === 'light' ? 'bg-indigo-300 shadow-[0_0_40px_3px_rgba(99,102,241,0.25)] opacity-40' : 'bg-indigo-500 shadow-[0_0_60px_5px_rgba(99,102,241,0.6)] opacity-50'} translate-z-0`} />
       </div>
 
       {/* Floating Data Artifacts (Digital Stars) */}
       {particles.map((p) => (
-        <motion.div
-          key={p.id}
-          initial={{ opacity: 0 }}
-          animate={{ 
-            opacity: [0, 1, 0],
-            scale: [0, 1.2, 0],
-            translateY: [0, -150]
-          }}
-          transition={{
-            duration: p.duration,
-            repeat: Infinity,
-            delay: p.delay,
-            ease: "easeInOut"
-          }}
-          style={{
-            position: 'absolute',
-            left: p.left,
-            top: p.top,
-            width: p.size,
-            height: p.size,
-          }}
-          className="bg-indigo-200 rounded-full blur-[0.5px] shadow-[0_0_12px_rgba(165,180,252,0.9)]"
-        />
-      ))}
+         <motion.div
+           key={p.id}
+           initial={{ opacity: 0 }}
+           animate={{ 
+             opacity: [0, 1, 0],
+             scale: [0, 1.2, 0],
+             translateY: [0, -150]
+           }}
+           transition={{
+             duration: p.duration,
+             repeat: Infinity,
+             delay: p.delay,
+             ease: "easeInOut"
+           }}
+           style={{
+             position: 'absolute',
+             left: p.left,
+             top: p.top,
+             width: p.size,
+             height: p.size,
+           }}
+           className={`${theme === 'light' ? 'bg-indigo-400 opacity-60' : 'bg-indigo-200'} rounded-full blur-[0.5px] shadow-[0_0_12px_rgba(165,180,252,0.9)]`}
+         />
+       ))}
 
       {/* Pulsing Neural Nodes */}
       {[...Array(3)].map((_, i) => (
@@ -247,15 +254,15 @@ export const GeniusBackground: React.FC = () => {
             left: `${20 + i * 30}%`,
             top: `${30 + i * 20}%`,
           }}
-          className="absolute w-32 h-32 rounded-full border border-indigo-500/20 blur-xl"
+          className={`absolute w-32 h-32 rounded-full border ${theme === 'light' ? 'border-indigo-500/10' : 'border-indigo-500/20'} blur-xl`}
         />
       ))}
 
       {/* CRT Scanline Overlay */}
-      <div className="absolute inset-0 pointer-events-none opacity-[0.04] bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-10 bg-[length:100%_3px,3px_100%]" />
+      <div className={`absolute inset-0 pointer-events-none ${theme === 'light' ? 'opacity-0' : 'opacity-[0.04]'} bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-10 bg-[length:100%_3px,3px_100%]`} />
 
       {/* Final Texture & Grain */}
-      <div className="absolute inset-0 opacity-[0.05] pointer-events-none mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]" />
+      <div className={`absolute inset-0 ${theme === 'light' ? 'opacity-[0.015]' : 'opacity-[0.05]'} pointer-events-none mix-blend-overlay bg-[url('https://grainy-gradients.vercel.app/noise.svg')]`} />
     </div>
   );
 };

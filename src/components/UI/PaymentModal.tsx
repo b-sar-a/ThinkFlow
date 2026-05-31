@@ -11,10 +11,93 @@ interface PaymentModalProps {
   onClose: () => void;
 }
 
+interface Plan {
+  id: string;
+  tagEn: string;
+  tagRu: string;
+  titleEn: string;
+  titleRu: string;
+  descEn: string;
+  descRu: string;
+  usdPrice: number;
+  rubPrice: number;
+  badgeEn?: string;
+  badgeRu?: string;
+}
+
+const PLANS: Plan[] = [
+  {
+    id: 'monthly',
+    tagEn: 'ESSENTIAL',
+    tagRu: 'БАЗОВЫЙ',
+    titleEn: 'Monthly Genius',
+    titleRu: 'Месячный Наставник',
+    descEn: 'Flexible entry plan. Perfect to test all advanced AI roadmaps and interactive modes.',
+    descRu: 'Гибкий старт для тестирования. Полный доступ к генерации тем и метафор на 30 дней.',
+    usdPrice: 9.99,
+    rubPrice: 790,
+  },
+  {
+    id: 'annual',
+    tagEn: 'BEST PROPOSAL',
+    tagRu: 'САМЫЙ ВЫГОДНЫЙ',
+    titleEn: 'Annual Pro Expert',
+    titleRu: 'Годовой Интеллект',
+    descEn: 'Best value recommendation. Maximum prompt speed & custom template kits included.',
+    descRu: 'Рекомендация наставников! Максимальная скорость ИИ, эксклюзивные шаблоны и VIP чат.',
+    usdPrice: 59.90,
+    rubPrice: 4990,
+    badgeEn: 'SAVE 50%',
+    badgeRu: 'ВЫГОДА 50%',
+  },
+  {
+    id: 'lifetime',
+    tagEn: 'UNLIMITED FOREVER',
+    tagRu: 'ПОЖИЗНЕННЫЙ БЕЗЛИМИТ',
+    titleEn: 'Lifetime Legend',
+    titleRu: 'Вечный Лидер',
+    descEn: 'One single payment of permanent premium access. Special developer & science master badge.',
+    descRu: 'Абсолютная свобода. Разовая оплата навсегда, все будущие функции и статус Легенды.',
+    usdPrice: 129.99,
+    rubPrice: 9990,
+    badgeEn: 'LEGACY',
+    badgeRu: 'НАВСЕГДА',
+  }
+];
+
 export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) => {
   const { profile, updateProfileData } = useAuth();
   const { t } = useLanguage();
   const [gateway, setGateway] = useState<'stripe' | 'robokassa'>('stripe');
+  const [selectedPlanId, setSelectedPlanId] = useState<string>('annual');
+  const [timeLeft, setTimeLeft] = useState(() => {
+    try {
+      const stored = localStorage.getItem('tf_payment_countdown');
+      if (stored) return parseInt(stored, 10);
+    } catch {}
+    return 882; 
+  });
+
+  React.useEffect(() => {
+    if (!isOpen) return;
+    const interval = setInterval(() => {
+      setTimeLeft((prev) => {
+        const next = prev <= 1 ? 882 : prev - 1;
+        try {
+          localStorage.setItem('tf_payment_countdown', next.toString());
+        } catch {}
+        return next;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isOpen]);
+
+  const formatTime = (seconds: number) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
   const [cardNumber, setCardNumber] = useState('');
   const [expiry, setExpiry] = useState('');
   const [cvc, setCvc] = useState('');
@@ -69,13 +152,18 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
     
     setPaymentStep('verifying');
     try {
+      const chosenPlan = PLANS.find(p => p.id === selectedPlanId) || PLANS[1];
+      const amount = gateway === 'stripe' ? chosenPlan.usdPrice : chosenPlan.rubPrice;
+      const currency = gateway === 'stripe' ? 'USD' : 'RUB';
       const endpoint = gateway === 'stripe' ? '/api/payment/stripe' : '/api/payment/robokassa';
+      
       const response = await fetch(endpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amount: gateway === 'stripe' ? 9.99 : 790,
-          currency: gateway === 'stripe' ? 'USD' : 'RUB',
+          amount,
+          currency,
+          planId: chosenPlan.id,
           cardName,
           gateway,
           email: profile?.email
@@ -88,14 +176,14 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
       setPaymentStep('finalizing');
       
       // Update Premium state in user profile database
-      await updateProfileData({ geniusMode: true });
+      await updateProfileData({ geniusMode: true, isPremium: true });
       await new Promise(resolve => setTimeout(resolve, 800));
       
       setPaymentStep('success');
     } catch (err) {
       console.error("Payment registration failed, falling back to simulated authorization:", err);
       // Fallback
-      await updateProfileData({ geniusMode: true });
+      await updateProfileData({ geniusMode: true, isPremium: true });
       setPaymentStep('success');
     } finally {
       setIsProcessing(false);
@@ -154,6 +242,20 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
               )}
             </p>
 
+            {/* Urgent Conversion Ticker */}
+            <div className="flex items-center justify-between text-rose-400 bg-rose-500/10 rounded-2xl p-3.5 border border-rose-500/20 text-xs font-black uppercase tracking-wide">
+              <span className="flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
+                </span>
+                {currentThemeText("LIMITED 75% OFF OFFER", "АКЦИЯ: СКИДКА 75%")}
+              </span>
+              <span className="font-mono text-xs bg-rose-500 text-black px-2 py-0.5 rounded-full shadow">
+                {formatTime(timeLeft)}
+              </span>
+            </div>
+
             <div className="space-y-4 pt-4">
               {[
                 { icon: Sparkles, text: currentThemeText("Unlimited Depth Knowledge Mapping", "Неограниченная глубина карт знаний") },
@@ -170,17 +272,54 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({ isOpen, onClose }) =
             </div>
           </div>
 
-          <div className="pt-8 md:pt-0">
-            <div className="p-5 rounded-2xl bg-white/5 border border-white/5 text-center">
-              <span className="text-[10px] font-black uppercase tracking-widest text-gray-500 block mb-1">
-                {currentThemeText("CHOOSE BILLING PLAN", "ВЫБЕРИТЕ ТАРИФНЫЙ ПЛАН")}
-              </span>
-              <div className="flex items-baseline justify-center gap-2">
-                <span className="text-3xl font-black text-white italic">
-                  {gateway === 'stripe' ? '$9.99' : '790 ₽'}
-                </span>
-                <span className="text-xs font-semibold text-gray-500">/ {currentThemeText("month", "месяц")}</span>
-              </div>
+          <div className="pt-6 space-y-3">
+            <span className="text-[10px] font-black uppercase tracking-widest text-indigo-400 block">
+              {currentThemeText("SELECT PREMIUM TIER", "ВЫБЕРИТЕ ТАРИФНЫЙ ПЛАН")}
+            </span>
+            <div className="space-y-2.5">
+              {PLANS.map((plan) => {
+                const isSelected = selectedPlanId === plan.id;
+                const priceStr = gateway === 'stripe' ? `$${plan.usdPrice}` : `${plan.rubPrice} ₽`;
+                const freqStr = plan.id === 'monthly' ? currentThemeText("mo", "мес") : plan.id === 'annual' ? currentThemeText("yr", "год") : currentThemeText("once", "вечно");
+                return (
+                  <motion.div
+                    key={plan.id}
+                    whileHover={{ scale: 1.01 }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => setSelectedPlanId(plan.id)}
+                    className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer flex items-center justify-between gap-3 relative ${
+                      isSelected 
+                        ? 'border-indigo-500 bg-indigo-500/10 shadow-lg shadow-indigo-500/5' 
+                        : 'border-white/5 bg-white/5 hover:bg-white/10'
+                    }`}
+                  >
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-black uppercase tracking-wider text-white truncate">
+                          {currentThemeText(plan.titleEn, plan.titleRu)}
+                        </span>
+                        {plan.badgeEn && (
+                          <span className="bg-emerald-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase scale-90 leading-none">
+                            {currentThemeText(plan.badgeEn, plan.badgeRu)}
+                          </span>
+                        )}
+                        {plan.id === 'annual' && !plan.badgeEn && (
+                          <span className="bg-indigo-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded-full uppercase scale-90 leading-none">
+                            {currentThemeText("POPULAR", "СОВЕТ")}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-gray-400 leading-snug">
+                        {currentThemeText(plan.descEn, plan.descRu)}
+                      </p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <div className="text-sm font-black text-white italic">{priceStr}</div>
+                      <div className="text-[8px] font-bold text-gray-500 uppercase">/{freqStr}</div>
+                    </div>
+                  </motion.div>
+                );
+              })}
             </div>
           </div>
         </div>

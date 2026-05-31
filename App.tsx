@@ -7,7 +7,7 @@ import { Sidebar } from './src/components/Layout/Sidebar';
 import { Navbar } from './src/components/Layout/Navbar';
 import { Chat } from './src/components/Dashboard/Chat';
 import { Tasks } from './src/components/Dashboard/Tasks';
-import { Leaderboard } from './src/components/Dashboard/Leaderboard';
+import { PromoHub } from './src/components/Dashboard/PromoHub';
 import { Articles } from './src/components/Dashboard/Articles';
 import { Tips } from './src/components/Dashboard/Tips';
 import { Reviews } from './src/components/Dashboard/Reviews';
@@ -83,7 +83,7 @@ const App: React.FC = () => {
       case 'community': return <Community />;
       case 'messages': return <Messages />;
       case 'tasks': return <Tasks />;
-      case 'leaderboard': return <Leaderboard />;
+      case 'leaderboard': return <PromoHub />;
       case 'articles': return <Articles />;
       case 'tips': return <Tips />;
       case 'reviews': return <Reviews />;

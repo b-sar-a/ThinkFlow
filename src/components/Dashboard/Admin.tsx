@@ -68,36 +68,15 @@ export const Admin: React.FC = () => {
   };
 
   const computeRetention = () => {
-    const defaultMockActivities = [
-      { userId: 'u1', userName: 'Александр Козлов', email: 'alex.kozlov@gmail.com', dateString: '2026-05-28' },
-      { userId: 'u1', userName: 'Александр Козлов', email: 'alex.kozlov@gmail.com', dateString: '2026-05-29' },
-      { userId: 'u1', userName: 'Александр Козлов', email: 'alex.kozlov@gmail.com', dateString: '2026-05-30' },
-      
-      { userId: 'u2', userName: 'Мария Смирнова', email: 'maria_sm@yandex.ru', dateString: '2026-05-27' },
-      { userId: 'u2', userName: 'Мария Смирнова', email: 'maria_sm@yandex.ru', dateString: '2026-05-28' },
-      { userId: 'u2', userName: 'Мария Смирнова', email: 'maria_sm@yandex.ru', dateString: '2026-05-29' },
-      { userId: 'u2', userName: 'Мария Смирнова', email: 'maria_sm@yandex.ru', dateString: '2026-05-30' },
-
-      { userId: 'u3', userName: 'Илья Петров', email: 'ilya.petrov@outlook.com', dateString: '2026-05-29' },
-      { userId: 'u3', userName: 'Илья Петров', email: 'ilya.petrov@outlook.com', dateString: '2026-05-30' },
-
-      { userId: 'u4', userName: 'Елена Кузнецова', email: 'elena.k@gmail.com', dateString: '2026-05-28' },
-      { userId: 'u4', userName: 'Елена Кузнецова', email: 'elena.k@gmail.com', dateString: '2026-05-30' },
-
-      { userId: 'u5', userName: 'Дмитрий Соколов', email: 'sokolov_d@mail.ru', dateString: '2026-05-26' },
-      { userId: 'u5', userName: 'Дмитрий Соколов', email: 'sokolov_d@mail.ru', dateString: '2026-05-27' },
-      { userId: 'u5', userName: 'Дмитрий Соколов', email: 'sokolov_d@mail.ru', dateString: '2026-05-28' },
-    ];
-
-    const activeDataList = activities.length > 0 ? activities : defaultMockActivities;
+    const activeDataList = activities;
 
     const userDates: Record<string, { name: string; email: string; dates: Set<string> }> = {};
     activeDataList.forEach(act => {
       if (!act.userId) return;
       if (!userDates[act.userId]) {
         userDates[act.userId] = {
-          name: act.userName || 'Student',
-          email: act.email || 'student@thinkflow.ai',
+          name: act.userName || 'User',
+          email: act.email || 'user@thinkflow.ai',
           dates: new Set<string>()
         };
       }
@@ -152,14 +131,36 @@ export const Admin: React.FC = () => {
     });
 
     const retentionRate = totalUsers > 0 ? Math.round((retainedCount / totalUsers) * 100) : 0;
+    
+    // SaaS Revenue KPIs based on real users
+    const premiumCount = users.filter(u => u.isPremium).length;
+    const totalUsersCount = users.length;
+    
+    // ARR: $14.99/month * 12 months * premium users
+    const arrProjection = premiumCount * 14.99 * 12;
+    const formattedARR = arrProjection > 0 
+      ? `$${Math.round(arrProjection).toLocaleString()}` 
+      : `$0`;
+
+    // LTV:CAC logic
+    const churn = Math.max(0.08, 1 - (retentionRate / 100));
+    const arpu = totalUsersCount > 0 ? (premiumCount * 14.99) / totalUsersCount : 0;
+    const ltv = arpu / churn;
+    const cac = totalUsersCount > 0 ? Math.max(1.5, 12 / totalUsersCount) : 3.0;
+    const ltvToCac = premiumCount > 0 ? `${(ltv / cac).toFixed(1)}x` : "0.0x";
+
     return {
       retentionRate,
       totalAuditedUsers: totalUsers,
       retainedUsers: retainedCount,
       activeRecords: activeDataList.length,
-      userStreaks: userStreaks.sort((a, b) => b.streak - a.streak)
+      userStreaks: userStreaks.sort((a, b) => b.streak - a.streak),
+      ltvToCacRatio: ltvToCac,
+      formattedARR
     };
   };
+
+  const retentionData = computeRetention();
 
   if (profile?.role !== 'admin') {
     return (
@@ -187,7 +188,7 @@ export const Admin: React.FC = () => {
             onClick={() => setActiveTab('users')}
             className={`px-8 h-14 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'users' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-505/20' : 'bg-[var(--input)] text-[var(--muted)]'}`}
           >
-            Students ({users.length})
+            Users ({users.length})
           </button>
           <button 
             onClick={() => setActiveTab('reviews')}
@@ -282,13 +283,13 @@ export const Admin: React.FC = () => {
                     strokeWidth="14" 
                     fill="transparent" 
                     strokeDasharray={2 * Math.PI * 76}
-                    strokeDashoffset={2 * Math.PI * 76 * (1 - computeRetention().retentionRate / 100)}
+                    strokeDashoffset={2 * Math.PI * 76 * (1 - retentionData.retentionRate / 100)}
                     strokeLinecap="round"
                     transform="rotate(-90 88 88)"
                   />
                 </svg>
                 <div className="absolute flex flex-col items-center">
-                  <span className="text-4xl font-black text-white italic leading-none">{computeRetention().retentionRate}%</span>
+                  <span className="text-4xl font-black text-white italic leading-none">{retentionData.retentionRate}%</span>
                   <span className="text-[8px] font-black tracking-widest text-emerald-400 uppercase mt-1">3-Day Retention</span>
                 </div>
               </div>
@@ -301,16 +302,16 @@ export const Admin: React.FC = () => {
                   Habitual Retention Metric
                 </h3>
                 <p className="text-xs text-gray-400 leading-relaxed max-w-md">
-                  Tracks the exact percentage of students who logged into Genius Lab for at least <b>3 consecutive days</b>. EdTech VCs buy this parameter because consecutive learning indicates a high habit formation index and near-zero churn rates.
+                  Tracks the exact percentage of users who logged into Genius Lab for at least <b>3 consecutive days</b>. EdTech VCs buy this parameter because consecutive learning indicates a high habit formation index and near-zero churn rates.
                 </p>
                 <div className="grid grid-cols-2 gap-4 pt-2">
                   <div className="p-3 bg-white/5 border border-white/5 rounded-2xl text-center">
                     <span className="text-[9px] font-black text-gray-500 block uppercase">Retained Kids</span>
-                    <span className="text-lg font-black text-white">{computeRetention().retainedUsers}</span>
+                    <span className="text-lg font-black text-white">{retentionData.retainedUsers}</span>
                   </div>
                   <div className="p-3 bg-white/5 border border-white/5 rounded-2xl text-center">
                     <span className="text-[9px] font-black text-gray-500 block uppercase">Audited Users</span>
-                    <span className="text-lg font-black text-white">{computeRetention().totalAuditedUsers}</span>
+                    <span className="text-lg font-black text-white">{retentionData.totalAuditedUsers}</span>
                   </div>
                 </div>
               </div>
@@ -324,7 +325,7 @@ export const Admin: React.FC = () => {
                   <DollarSign className="w-4 h-4 text-indigo-400" />
                 </div>
                 <div>
-                  <h4 className="text-3xl font-black text-white italic">7.4x</h4>
+                  <h4 className="text-3xl font-black text-white italic">{retentionData.ltvToCacRatio}</h4>
                   <p className="text-[10px] text-gray-400 mt-1">Premium subscription model yields extremely low client acquisition costs.</p>
                 </div>
               </Card>
@@ -335,7 +336,7 @@ export const Admin: React.FC = () => {
                   <Award className="w-4 h-4 text-amber-400" />
                 </div>
                 <div>
-                  <h4 className="text-3xl font-black text-white italic">$140K+</h4>
+                  <h4 className="text-3xl font-black text-white italic">{retentionData.formattedARR}</h4>
                   <p className="text-[10px] text-gray-400 mt-1">Estimated annual recurring revenue based on current active user growth.</p>
                 </div>
               </Card>
@@ -345,37 +346,45 @@ export const Admin: React.FC = () => {
           {/* Bottom Table - Cohort List and streaks */}
           <div className="space-y-4">
             <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest pl-2">
-              🔥 STUDENT DAILY ACTIVE STREAKS (GENIUS LAB)
+              🔥 USER DAILY ACTIVE STREAKS (GENIUS LAB)
             </h4>
             <div className="grid grid-cols-1 gap-4">
-              {computeRetention().userStreaks.map((u, i) => (
-                <Card key={i} className="p-5 rounded-[2rem] border border-white/5 flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${
-                      u.isRetained ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-white/5 text-gray-400'
-                    }`}>
-                      {u.name[0]}
-                    </div>
-                    <div>
-                      <h5 className="font-black uppercase text-xs text-white">{u.name}</h5>
-                      <p className="text-[9px] font-black uppercase text-gray-500 tracking-widest">{u.email}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="text-right">
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-black text-amber-400">
-                        <Flame className="w-3.5 h-3.5 fill-current animate-pulse" /> {u.streak} {profile?.language === 'ru' ? 'дн. подряд' : 'consecutive days'}
+              {retentionData.userStreaks.length > 0 ? (
+                retentionData.userStreaks.map((u, i) => (
+                  <Card key={i} className="p-5 rounded-[2rem] border border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${
+                        u.isRetained ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-white/5 text-gray-400'
+                      }`}>
+                        {u.name[0]?.toUpperCase() || 'U'}
+                      </div>
+                      <div>
+                        <h5 className="font-black uppercase text-xs text-white">{u.name}</h5>
+                        <p className="text-[9px] font-black uppercase text-gray-500 tracking-widest">{u.email}</p>
                       </div>
                     </div>
-                    <div className={`text-[9px] font-black uppercase px-3 py-1 rounded-full ${
-                      u.isRetained ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-gray-500'
-                    }`}>
-                      {u.isRetained ? 'RETAINED' : 'ACTIVE'}
+
+                    <div className="flex items-center gap-4">
+                      <div className="text-right">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-black text-amber-400">
+                          <Flame className="w-3.5 h-3.5 fill-current animate-pulse" /> {u.streak} {profile?.language === 'ru' ? 'дн. подряд' : 'consecutive days'}
+                        </div>
+                      </div>
+                      <div className={`text-[9px] font-black uppercase px-3 py-1 rounded-full ${
+                        u.isRetained ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-gray-500'
+                      }`}>
+                        {u.isRetained ? 'RETAINED' : 'ACTIVE'}
+                      </div>
                     </div>
-                  </div>
-                </Card>
-              ))}
+                  </Card>
+                ))
+              ) : (
+                <div className="text-center py-12 bg-white/5 border border-white/10 rounded-[2.5rem] text-[var(--muted)]">
+                  <Flame className="w-12 h-12 text-indigo-500/40 mx-auto mb-3" />
+                  <p className="text-sm font-semibold">No active student streaks recorded yet.</p>
+                  <p className="text-[10px] mt-1 max-w-sm mx-auto">Real-time daily active streaks will sync here automatically once students start launching presets and completing knowledge trees in the Genius Lab.</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

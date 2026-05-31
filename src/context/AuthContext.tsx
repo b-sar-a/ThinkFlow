@@ -53,7 +53,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return;
     try {
       const userDocRef = doc(db, 'users', user.uid);
-      await setDoc(userDocRef, data, { merge: true });
+      const updates = { ...data };
+      if (updates.isPremium === true) {
+        updates.aiTokenLimit = 1000000;
+      }
+      await setDoc(userDocRef, updates, { merge: true });
     } catch (error) {
       console.error("Update profile error:", error);
       throw error;
@@ -78,7 +82,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: 'Demo Genius',
         email: 'demo@thinkflow.ai',
         age: 15,
-        studentClass: '9B',
         interests: ['AI', 'Physics', 'Gaming'],
         xp: 1250,
         level: 12,
@@ -119,7 +122,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         name,
         age: 15,
-        studentClass: '9A',
         interests: [],
         xp: 0,
         level: 1,
@@ -177,12 +179,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (docSnap.exists()) {
           const data = docSnap.data();
           // Ensure critical fields exist for leaderboard and genius mode
-          if (data.xp === undefined || data.level === undefined || data.geniusMode === undefined || data.isPremium === undefined) {
-            const updates: Partial<UserProfile> = {};
+          const isOwner = data.email === "skwinskwinskwin@gmail.com";
+          if (
+            data.xp === undefined || 
+            data.level === undefined || 
+            data.geniusMode === undefined || 
+            data.isPremium === undefined || 
+            data.uid === undefined || 
+            data.aiTokensUsed === undefined ||
+            data.aiTokenLimit === undefined ||
+            (isOwner && (data.role !== "admin" || !data.geniusMode || !data.isPremium || data.aiTokenLimit !== 1000000))
+          ) {
+            const updates: Record<string, any> = {};
             if (data.xp === undefined) updates.xp = 0;
             if (data.level === undefined) updates.level = 1;
-            if (data.geniusMode === undefined) updates.geniusMode = false;
-            if (data.isPremium === undefined) updates.isPremium = false;
+            if (data.geniusMode === undefined) updates.geniusMode = isOwner ? true : false;
+            if (data.isPremium === undefined) updates.isPremium = isOwner ? true : false;
+            if (data.uid === undefined) updates.uid = user.uid;
+            
+            const currentlyPremium = isOwner || data.isPremium || updates.isPremium;
+            if (data.aiTokensUsed === undefined) updates.aiTokensUsed = 0;
+            if (data.aiTokenLimit === undefined) updates.aiTokenLimit = currentlyPremium ? 1000000 : 15000;
+            
+            if (isOwner) {
+              updates.role = "admin";
+              updates.geniusMode = true;
+              updates.isPremium = true;
+              updates.aiTokenLimit = 1000000;
+            }
             
             setDoc(userDocRef, updates, { merge: true }).catch(err => {
               console.warn("Could not patch profile with missing fields:", err);
@@ -193,21 +217,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } else {
           // Profile doesn't exist, create a fallback
+          const isOwner = user.email === "skwinskwinskwin@gmail.com";
           const newUser: UserProfile = {
             uid: user.uid,
             email: user.email || '',
             name: user.displayName || 'New User',
             age: 15,
-            studentClass: '9A',
             interests: [],
             xp: 0,
             level: 1,
-            role: 'student',
+            role: isOwner ? 'admin' : 'student',
             language: 'en',
             theme: 'light',
             bio: '',
-            geniusMode: false,
-            isPremium: false,
+            geniusMode: isOwner ? true : false,
+            isPremium: isOwner ? true : false,
+            aiTokensUsed: 0,
+            aiTokenLimit: isOwner ? 1000000 : 15000,
             learningDepth: 'Deep',
             explanationStyle: 'Metaphorical'
           };

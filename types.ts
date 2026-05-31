@@ -1,6 +1,5 @@
 
 export type Language = 'en' | 'ru' | 'uz';
-export type StudentClass = '7A' | '7B' | '8A' | '8B' | '9A' | '9B' | '10A' | '10B' | '11A' | '11B';
 export type AIModelType = 'teacher' | 'coach' | 'trainer';
 
 export interface Attachment {
@@ -22,7 +21,6 @@ export interface UserProfile {
   photo?: string;
   bio?: string;
   interests: string[];
-  studentClass: StudentClass;
   language: Language;
   xp: number;
   level: number;

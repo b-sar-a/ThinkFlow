@@ -65,7 +65,8 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
           (request.auth.token.email == "skwinskwinskwin@gmail.com" && request.auth.token.email_verified == true));
     }
 
@@ -86,8 +87,8 @@ service cloud.firestore {
     // ===============================================================
 
     function isValidUser(data) {
-      return hasRequiredFields(['uid', 'email', 'name']) &&
-             data.uid is string &&
+      return hasRequiredFields(['email', 'name']) &&
+             (!('uid' in data) || data.uid is string) &&
              data.email is string && isValidEmail(data.email) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
              (!('age' in data) || data.age is number) &&
@@ -98,7 +99,13 @@ service cloud.firestore {
              (!('role' in data) || data.role in ['student', 'admin']) &&
              (!('theme' in data) || data.theme in ['light', 'dark']) &&
              (!('bio' in data) || (data.bio is string && data.bio.size() < 1000)) &&
-             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 2000000));
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 2000000)) &&
+             (!('geniusMode' in data) || data.geniusMode is bool) &&
+             (!('isPremium' in data) || data.isPremium is bool) &&
+             (!('aiTokensUsed' in data) || data.aiTokensUsed is number) &&
+             (!('aiTokenLimit' in data) || data.aiTokenLimit is number) &&
+             (!('learningDepth' in data) || data.learningDepth in ['Surface', 'Deep', 'Architect']) &&
+             (!('explanationStyle' in data) || data.explanationStyle in ['Simple', 'Metaphorical', 'Technical']);
     }
 
     function isValidChatSession(data) {
@@ -219,6 +226,12 @@ service cloud.firestore {
         allow read: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
         allow create: if isAuthenticated() && request.auth.uid == request.resource.data.senderId;
       }
+    }
+
+    match /genius_lab_activities/{activityId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update, delete: if isAdmin();
     }
     
     match /{path=**} {

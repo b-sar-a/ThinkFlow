@@ -1,8 +1,7 @@
 
-import { Article, Language, StudentClass, Quote } from './types';
+import { Article, Language, Quote } from './types';
 
 export const INTERESTS = ['Sports', 'Football', 'Chess', 'Anime', 'Music', 'Design', 'Coding', 'Cooking', 'Cars', 'Business', 'Gaming', 'Movies', 'Art', 'Fitness', 'Science'];
-export const CLASSES: StudentClass[] = ['7A', '7B', '8A', '8B', '9A', '9B', '10A', '10B', '11A', '11B'];
 
 export const INITIAL_ARTICLES: Article[] = [
   { id: 'p1', subject: 'Physics', title: 'Momentum in Sports', content: 'Physics isn\'t just in books. When a player kicks a ball, the conservation of momentum is what makes it soar...', author: 'Dr. Newton', icon: '⚛️' },

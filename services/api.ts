@@ -58,7 +58,6 @@ export const MockBackend = {
           email: normalizedEmail,
           name: 'Sarvar (Admin)',
           password: pass,
-          studentClass: '9B',
           language: 'ru',
           interests: ['Coding', 'AI', 'Design'],
           xp: 1000,

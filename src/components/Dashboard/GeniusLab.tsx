@@ -173,7 +173,7 @@ export const GeniusLab: React.FC = () => {
     try {
       await addDoc(collection(db, 'genius_lab_activities'), {
         userId: user.uid,
-        userName: profile.name || user.displayName || 'Anonymous Student',
+        userName: profile.name || user.displayName || 'Anonymous User',
         email: user.email || '',
         timestamp: Date.now(),
         dateString: new Date().toISOString().split('T')[0]
@@ -261,9 +261,18 @@ export const GeniusLab: React.FC = () => {
       } else {
         throw new Error("Invalid structure: AI returned empty tree.");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Genius Lab Error:", err);
-      const msg = err instanceof Error ? err.message : "Failed to initialize lab";
+      let msg = err instanceof Error ? err.message : "Failed to initialize lab";
+      if (err?.message === "PRO_LIMIT_REACHED") {
+        if (profile?.language === 'ru') {
+          msg = "⚠️ Превышен бесплатный лимит токенов ИИ! Пожалуйста, перейдите на один из предложенных Премиум-тарифов, чтобы создавать бесконечные карты знаний.";
+        } else if (profile?.language === 'uz') {
+          msg = "⚠️ Bepul AI tokenlar limiti tugadi! Istalgancha yangi dars xaritalari yaratish uchun Premium tarifiga o'ting.";
+        } else {
+          msg = "⚠️ AI Token Quota Limit Reached! Please upgrade to Premium to generate unlimited interactive knowledge trees.";
+        }
+      }
       setError(msg);
     } finally {
       setIsLoading(false);
@@ -298,9 +307,19 @@ export const GeniusLab: React.FC = () => {
           });
         }
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Verification failed:", err);
-      setError("AI Verification failed. Try again.");
+      let msg = "AI Verification failed. Try again.";
+      if (err?.message === "PRO_LIMIT_REACHED") {
+        if (profile?.language === 'ru') {
+          msg = "⚠️ Превышен лимит токенов ИИ! Для проверки решений обновите тариф до Премиум.";
+        } else if (profile?.language === 'uz') {
+          msg = "⚠️ AI tokenlar limiti tugadi! Javoblarni cheksiz tekshirish uchun tarifni yangilang.";
+        } else {
+          msg = "⚠️ AI Token Quota Limit Reached! Please upgrade to Premium to verify challenges.";
+        }
+      }
+      setError(msg);
     } finally {
       setIsVerifying(false);
     }

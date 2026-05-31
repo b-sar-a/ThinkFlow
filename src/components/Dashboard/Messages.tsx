@@ -234,7 +234,6 @@ export const Messages: React.FC = () => {
                     </div>
                     <div className="text-left">
                       <p className="font-bold text-xs text-[var(--text)]">{u.name}</p>
-                      <p className="text-[10px] text-gray-500 uppercase font-black">{u.studentClass}</p>
                     </div>
                     <Plus className="w-4 h-4 ml-auto text-indigo-500" />
                   </button>

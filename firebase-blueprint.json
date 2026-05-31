@@ -17,9 +17,29 @@
         "language": { "type": "string", "enum": ["en", "ru", "uz"], "description": "Preferred language." },
         "theme": { "type": "string", "enum": ["light", "dark"], "description": "Preferred theme." },
         "bio": { "type": "string", "description": "User's short biography." },
-        "photoURL": { "type": "string", "description": "Base64 or URL of the user's avatar." }
+        "photoURL": { "type": "string", "description": "Base64 or URL of the user's avatar." },
+        "geniusMode": { "type": "boolean", "description": "Whether genius mode is enabled." },
+        "isPremium": { "type": "boolean", "description": "Whether premium is enabled." },
+        "aiTokensUsed": { "type": "number", "description": "Number of AI tokens used." },
+        "aiTokenLimit": { "type": "number", "description": "AI token quota limit." },
+        "learningDepth": { "type": "string", "enum": ["Surface", "Deep", "Architect"], "description": "Preferred depth of explanation." },
+        "explanationStyle": { "type": "string", "enum": ["Simple", "Metaphorical", "Technical"], "description": "Preferred explanation style." }
       },
       "required": ["uid", "email", "name"]
+    },
+    "GeniusLabActivity": {
+      "title": "GeniusLabActivity",
+      "description": "Log of a genius lab learning activity.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "email": { "type": "string" },
+        "timestamp": { "type": "number" },
+        "dateString": { "type": "string" }
+      },
+      "required": ["userId", "userName", "email", "timestamp", "dateString"]
     },
     "ChatSession": {
       "title": "ChatSession",
@@ -110,6 +130,10 @@
     "/users/{userId}": {
       "schema": "UserProfile",
       "description": "Collection of user profiles."
+    },
+    "/genius_lab_activities/{activityId}": {
+      "schema": "GeniusLabActivity",
+      "description": "Collection of learning logs."
     },
     "/sessions/{sessionId}": {
       "schema": "ChatSession",
