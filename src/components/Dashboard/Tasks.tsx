@@ -1,47 +1,22 @@
+
 import React, { useState, useEffect } from 'react';
-import { CheckCircle2, ListChecks, Plus, Trash2 } from 'lucide-react';
+import { Zap, CheckCircle2, Trophy, Clock, Plus, Loader2, Trash2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useLanguage, useTr } from '../../context/LanguageContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { Task } from '../../types';
 import { db } from '../../lib/firebase';
 import { collection, query, where, orderBy, onSnapshot, addDoc, updateDoc, doc, deleteDoc, getDocs } from 'firebase/firestore';
-import { Badge, Button, EmptyState, Field, Modal, Notice, PageHeader, Panel, SectionTitle, Spinner, TextArea } from '../ds';
+import { Button } from '../UI/Button';
+import { Card } from '../UI/Card';
 import { verifyTask } from '../../services/gemini';
-import { levelInfo } from '../../lib/progress';
-
-type Template = { title: string; desc: string; diff: 'Easy' | 'Medium' | 'Challenge'; xp: number };
-
-const TEMPLATES: Record<'ru' | 'en', Template[]> = {
-  en: [
-    { title: 'Kinetics: velocity', desc: 'Calculate the velocity (v) if an object travels 150 m (d) in 30 s (t). Formula: v = d / t. Result in m/s.', diff: 'Easy', xp: 30 },
-    { title: 'Algebra: solve for x', desc: 'Solve for x: 3x + 15 = 45. Give the numeric value.', diff: 'Easy', xp: 35 },
-    { title: "Ohm's law", desc: 'A circuit has 10 V (V) and 2 Ω resistance (R). Calculate the current (I). Formula: I = V / R. Result in amperes.', diff: 'Medium', xp: 60 },
-    { title: 'Geometry: area', desc: 'Calculate the area of a circle with radius r = 5 m. Use π = 3.14. Formula: A = πr². Result in m².', diff: 'Medium', xp: 65 },
-    { title: 'Chemistry: molar mass', desc: 'Calculate the molar mass of H₂O (H = 1, O = 16). Give the total in g/mol.', diff: 'Medium', xp: 70 },
-    { title: 'Logic: sequence', desc: 'Find the missing number: 1, 1, 2, 3, 5, 8, ? (Fibonacci sequence).', diff: 'Medium', xp: 50 },
-    { title: 'Physics: power', desc: 'Calculate power (P) if work (W) is 500 J and time (t) is 10 s. Formula: P = W / t. Result in watts.', diff: 'Challenge', xp: 125 },
-  ],
-  ru: [
-    { title: 'Кинематика: скорость', desc: 'Найди скорость (v), если тело проходит 150 м (d) за 30 с (t). Формула: v = d / t. Ответ в м/с.', diff: 'Easy', xp: 30 },
-    { title: 'Алгебра: найди x', desc: 'Реши уравнение: 3x + 15 = 45. Ответ — число.', diff: 'Easy', xp: 35 },
-    { title: 'Закон Ома', desc: 'В цепи напряжение 10 В (V) и сопротивление 2 Ом (R). Найди силу тока (I). Формула: I = V / R. Ответ в амперах.', diff: 'Medium', xp: 60 },
-    { title: 'Геометрия: площадь', desc: 'Найди площадь круга с радиусом r = 5 м. Возьми π = 3,14. Формула: A = πr². Ответ в м².', diff: 'Medium', xp: 65 },
-    { title: 'Химия: молярная масса', desc: 'Найди молярную массу H₂O (H = 1, O = 16). Ответ в г/моль.', diff: 'Medium', xp: 70 },
-    { title: 'Логика: последовательность', desc: 'Найди пропущенное число: 1, 1, 2, 3, 5, 8, ? (числа Фибоначчи).', diff: 'Medium', xp: 50 },
-    { title: 'Физика: мощность', desc: 'Найди мощность (P), если работа (W) равна 500 Дж, а время (t) — 10 с. Формула: P = W / t. Ответ в ваттах.', diff: 'Challenge', xp: 125 },
-  ],
-};
 
 export const Tasks: React.FC = () => {
-  const { user, profile, updateProfileData } = useAuth();
-  const { t, language } = useLanguage();
-  const tr = useTr();
+  const { user, profile } = useAuth();
+  const { t } = useLanguage();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
-  const [confirmClear, setConfirmClear] = useState(false);
   const [taskAnswers, setTaskAnswers] = useState<Record<string, string>>({});
   const [verifyingTaskId, setVerifyingTaskId] = useState<string | null>(null);
   const [taskFeedback, setTaskFeedback] = useState<Record<string, { isCorrect: boolean; text: string }>>({});
@@ -49,59 +24,74 @@ export const Tasks: React.FC = () => {
 
   useEffect(() => {
     if (!user) return;
-    const q = query(collection(db, 'tasks'), where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const tasksData = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Task));
+    
+    const tasksRef = collection(db, 'tasks');
+    const q = query(tasksRef, where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
 
-        // Auto-purge legacy vague tasks
-        const legacyTasks = tasksData.filter(
-          (item) =>
-            item.description?.includes('real-world scenario') ||
-            item.description?.includes('momentum works') ||
-            item.description?.includes('climate change')
-        );
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const tasksData = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Task));
+
+      // NEW TACTIC: Auto-purge legacy vague tasks
+      const legacyTasks = tasksData.filter(t => 
+        t.description?.includes('real-world scenario') || 
+        t.description?.includes('momentum works') ||
+        t.description?.includes('climate change')
+      );
+
+      if (legacyTasks.length > 0) {
         legacyTasks.forEach(async (lt) => {
           try {
             await deleteDoc(doc(db, 'tasks', lt.id));
           } catch (e) {
-            console.error('Auto-purge failed:', e);
+            console.error("Auto-purge failed:", e);
           }
         });
-
-        setTasks(tasksData.filter((item) => !legacyTasks.find((lt) => lt.id === item.id)));
-        setLoadError(false);
-        setLoading(false);
-      },
-      (error) => {
-        console.error('Tasks fetch error:', error);
-        setLoadError(true);
-        setLoading(false);
       }
-    );
+
+      setTasks(tasksData.filter(t => !legacyTasks.find(lt => lt.id === t.id)));
+      setLoading(false);
+    }, (error) => {
+      console.error("Tasks fetch error:", error);
+      setLoading(false);
+    });
+
     return () => unsubscribe();
   }, [user]);
 
   const clearAllTasks = async () => {
-    if (!user) return;
+    if (!user || !window.confirm('Delete all tasks and start fresh?')) return;
     setIsClearing(true);
     try {
-      const snapshot = await getDocs(query(collection(db, 'tasks'), where('userId', '==', user.uid)));
-      await Promise.all(snapshot.docs.map((d) => deleteDoc(doc(db, 'tasks', d.id))));
+      const q = query(collection(db, 'tasks'), where('userId', '==', user.uid));
+      const snapshot = await getDocs(q);
+      const deletePromises = snapshot.docs.map(d => deleteDoc(doc(db, 'tasks', d.id)));
+      await Promise.all(deletePromises);
     } catch (error) {
-      console.error('Clear tasks error:', error);
+      console.error("Clear tasks error:", error);
     } finally {
       setIsClearing(false);
-      setConfirmClear(false);
     }
   };
 
   const generateTask = async () => {
     if (!user || !profile) return;
     setIsGenerating(true);
-    const pool = TEMPLATES[language === 'ru' ? 'ru' : 'en'];
-    const template = pool[Math.floor(Math.random() * pool.length)];
+
+    const templates = [
+      { title: "Kinetics: Velocity", desc: "Calculate the velocity (v) if an object travels 150m (d) in 30s (t). Formula: v=d/t. Result in m/s.", diff: "Easy", xp: 30 },
+      { title: "Algebra: Simplify", desc: "Solve for x: 3x + 15 = 45. Give the numeric value.", diff: "Easy", xp: 35 },
+      { title: "Ohm's Law", desc: "A circuit has 10V (V) and 2Ω resistance (R). Calculate the current (I). Formula: I=V/R. Result in Amperes.", diff: "Medium", xp: 60 },
+      { title: "Geometry: Area", desc: "Calculate the area of a circle with radius r=5m. Use π=3.14. Formula: A=πr². Result in m².", diff: "Medium", xp: 65 },
+      { title: "Chemistry: Molar Mass", desc: "Calculate the molar mass of H₂O. (H=1, O=16). Give the total g/mol.", diff: "Medium", xp: 70 },
+      { title: "Logic: Sequence", desc: "Find the missing number: 1, 1, 2, 3, 5, 8, ?. (Fibonacci sequence)", diff: "Medium", xp: 50 },
+      { title: "Physics: Power", desc: "Calculate Power (P) if Work (W) is 500J and time (t) is 10s. Formula: P=W/t. Result in Watts.", diff: "Challenge", xp: 125 },
+    ];
+
+    const template = templates[Math.floor(Math.random() * templates.length)];
+
     try {
       await addDoc(collection(db, 'tasks'), {
         userId: user.uid,
@@ -110,10 +100,10 @@ export const Tasks: React.FC = () => {
         difficulty: template.diff,
         status: 'pending',
         xpReward: template.xp,
-        createdAt: Date.now(),
+        createdAt: Date.now()
       });
     } catch (error) {
-      console.error('Task generation error:', error);
+      console.error("Task generation error:", error);
     } finally {
       setIsGenerating(false);
     }
@@ -124,172 +114,173 @@ export const Tasks: React.FC = () => {
     if (!user || !profile || task.status === 'completed' || !answer?.trim()) return;
 
     setVerifyingTaskId(task.id);
-    setErrorStatus((prev) => ({ ...prev, [task.id]: null }));
+    setErrorStatus(prev => ({ ...prev, [task.id]: null }));
     try {
       const result = await verifyTask(task, answer, profile);
-      setTaskFeedback((prev) => ({ ...prev, [task.id]: { isCorrect: result.isCorrect, text: result.feedback } }));
+      
+      setTaskFeedback(prev => ({ 
+        ...prev, 
+        [task.id]: { isCorrect: result.isCorrect, text: result.feedback } 
+      }));
 
       if (result.isCorrect) {
-        const newXP = (profile.xp || 0) + task.xpReward + (result.bonusXP || 0);
+        const reward = task.xpReward + (result.bonusXP || 0);
         await updateDoc(doc(db, 'tasks', task.id), { status: 'completed' });
-        const level = levelInfo(newXP).level;
-        await updateProfileData({ xp: newXP, level: Math.max(level, profile.level) });
+        await updateDoc(doc(db, 'users', user.uid), { xp: (profile.xp || 0) + reward });
       }
     } catch (error: any) {
-      console.error('Task completion error:', error);
-      setErrorStatus((prev) => ({
-        ...prev,
-        [task.id]:
-          error?.message === 'PRO_LIMIT_REACHED'
-            ? tr('AI token limit reached. Get more in “Bonuses & codes”.', 'Лимит ИИ-токенов исчерпан. Получи ещё в разделе «Бонусы и коды».', 'AI token limiti tugadi. «Bonus va kodlar» bo‘limidan oling.')
-            : error?.message || tr('Could not check the answer. Try again.', 'Не удалось проверить ответ. Попробуй ещё раз.', 'Javobni tekshirib bo‘lmadi. Qayta urinib ko‘ring.'),
-      }));
+      console.error("Task completion error:", error);
+      setErrorStatus(prev => ({ ...prev, [task.id]: error.message || "Ошибка верификации. Попробуйте еще раз." }));
     } finally {
       setVerifyingTaskId(null);
     }
   };
 
-  const formatDate = (timestamp: number) =>
-    new Date(timestamp).toLocaleDateString(language === 'ru' ? 'ru-RU' : language === 'uz' ? 'uz-UZ' : 'en-GB', {
-      day: 'numeric',
-      month: 'short',
-      year: 'numeric',
+  const formatDate = (timestamp: number) => {
+    const date = new Date(timestamp);
+    return date.toLocaleDateString('ru-RU', { 
+      day: '2-digit', 
+      month: '2-digit', 
+      year: 'numeric'
     });
-
-  const difficulty = (value: string) =>
-    value === 'Easy'
-      ? { tone: 'ok' as const, label: tr('Easy', 'Лёгкое', 'Oson') }
-      : value === 'Medium'
-        ? { tone: 'warn' as const, label: tr('Medium', 'Среднее', 'O‘rta') }
-        : { tone: 'bad' as const, label: tr('Challenge', 'Сложное', 'Qiyin') };
-
-  if (loading) return <Spinner />;
-
-  const active = tasks.filter((task) => task.status !== 'completed');
-  const done = tasks.filter((task) => task.status === 'completed');
-
-  const renderTask = (task: Task) => {
-    const level = difficulty(task.difficulty);
-    const completed = task.status === 'completed';
-    const feedback = taskFeedback[task.id];
-    return (
-      <li key={task.id}>
-        <Panel className="p-5">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <h3 className="text-base font-semibold text-fg">{task.title}</h3>
-            <div className="flex items-center gap-2">
-              <Badge tone={level.tone}>{level.label}</Badge>
-              <Badge tone="hl">+{task.xpReward} XP</Badge>
-            </div>
-          </div>
-          <p className="mt-2 max-w-prose text-[15px] leading-relaxed text-fg-muted">{task.description}</p>
-
-          {!completed && (
-            <div className="mt-4 space-y-3">
-              <Field label={tr('Your answer', 'Твой ответ', 'Javobingiz')}>
-                <TextArea
-                  value={taskAnswers[task.id] || ''}
-                  onChange={(e) => setTaskAnswers((prev) => ({ ...prev, [task.id]: e.target.value }))}
-                  placeholder={t.taskAnswerPlaceholder}
-                  maxLength={1000}
-                  rows={2}
-                />
-              </Field>
-              {feedback && <Notice tone={feedback.isCorrect ? 'ok' : 'bad'}>{feedback.text}</Notice>}
-              {errorStatus[task.id] && <Notice tone="bad">{errorStatus[task.id]}</Notice>}
-              <Button
-                variant="secondary"
-                onClick={() => completeTask(task)}
-                disabled={!taskAnswers[task.id]?.trim()}
-                loading={verifyingTaskId === task.id}
-              >
-                {verifyingTaskId === task.id ? t.verifying : t.submitVerify}
-              </Button>
-            </div>
-          )}
-
-          <div className="mt-4 flex items-center justify-between border-t border-line pt-3 text-sm text-fg-muted">
-            <span>{formatDate(task.createdAt)}</span>
-            {completed && (
-              <span className="inline-flex items-center gap-1.5 font-medium text-ok">
-                <CheckCircle2 className="size-4" aria-hidden="true" />
-                {t.complete}
-              </span>
-            )}
-          </div>
-        </Panel>
-      </li>
-    );
   };
 
+  if (loading) {
+    return (
+      <div className="h-full flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+      </div>
+    );
+  }
+
   return (
-    <>
-      <PageHeader
-        title={t.tasks}
-        description={t.tasksSub}
-        actions={
-          <>
-            {tasks.length > 0 && (
-              <Button variant="ghost" onClick={() => setConfirmClear(true)}>
-                <Trash2 className="size-4" aria-hidden="true" />
-                {t.clearAll}
-              </Button>
-            )}
-            <Button onClick={generateTask} loading={isGenerating}>
-              {!isGenerating && <Plus className="size-4" aria-hidden="true" />}
-              {t.generateNewTask}
-            </Button>
-          </>
-        }
-      />
-
-      {loadError && (
-        <Notice tone="bad" className="mb-4">
-          {tr('Could not load your tasks. Check your connection and reload the page.', 'Не удалось загрузить задания. Проверь соединение и обнови страницу.', 'Vazifalarni yuklab bo‘lmadi. Internetni tekshirib, sahifani yangilang.')}
-        </Notice>
-      )}
-
-      {tasks.length === 0 && !loadError ? (
-        <EmptyState
-          icon={<ListChecks className="size-5" />}
-          title={t.noTasks}
-          text={tr('Get a short problem to practice, then enter your answer to earn XP.', 'Получи короткую задачу, введи ответ и заработай XP.', 'Qisqa masala oling, javobni kiriting va XP to‘plang.')}
-          action={
-            <Button onClick={generateTask} loading={isGenerating}>
-              {t.generateNewTask}
-            </Button>
-          }
-        />
-      ) : (
-        <div className="space-y-8">
-          {active.length > 0 && (
-            <section>
-              <SectionTitle>{tr('To do', 'Нужно решить', 'Bajarish kerak')} · {active.length}</SectionTitle>
-              <ul className="grid gap-4 lg:grid-cols-2">{active.map(renderTask)}</ul>
-            </section>
-          )}
-          {done.length > 0 && (
-            <section>
-              <SectionTitle>{tr('Completed', 'Выполнено', 'Bajarilgan')} · {done.length}</SectionTitle>
-              <ul className="grid gap-4 lg:grid-cols-2">{done.map(renderTask)}</ul>
-            </section>
-          )}
+    <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in duration-700">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <h2 className="text-5xl font-black uppercase tracking-tighter text-[var(--text)]">
+            {t.tasks}
+          </h2>
+          <p className="text-[var(--muted)] font-medium mt-2">
+            {t.tasksSub}
+          </p>
         </div>
-      )}
-
-      <Modal open={confirmClear} onClose={() => setConfirmClear(false)} title={tr('Delete all tasks?', 'Удалить все задания?', 'Barcha vazifalar o‘chirilsinmi?')}>
-        <p className="text-[15px] text-fg-muted">
-          {tr('All your tasks will be removed. XP you already earned stays.', 'Все задания будут удалены. Уже заработанный XP останется.', 'Barcha vazifalar o‘chiriladi. Yig‘ilgan XP saqlanadi.')}
-        </p>
-        <div className="mt-5 flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setConfirmClear(false)}>
-            {tr('Cancel', 'Отмена', 'Bekor qilish')}
-          </Button>
-          <Button variant="danger" onClick={clearAllTasks} loading={isClearing}>
-            {tr('Delete all', 'Удалить все', 'Hammasini o‘chirish')}
+        <div className="flex flex-wrap items-center gap-3">
+          {tasks.length > 0 && (
+            <Button 
+              variant="outline" 
+              onClick={clearAllTasks}
+              disabled={isClearing}
+              className="px-6 h-16 rounded-3xl border-rose-500/20 text-rose-500 hover:bg-rose-500 hover:text-white"
+            >
+              {isClearing ? <Loader2 className="w-5 h-5 animate-spin" /> : <Trash2 className="w-5 h-5" />}
+              <span className="ml-2 font-black uppercase text-[10px] tracking-widest">{t.clearAll}</span>
+            </Button>
+          )}
+          <Button 
+            onClick={generateTask} 
+            disabled={isGenerating}
+            className="gap-3 h-16 px-8 rounded-3xl bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_20px_rgba(79,70,229,0.3)]"
+          >
+            {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+            <span className="font-black uppercase text-[10px] tracking-widest">{t.generateNewTask}</span>
           </Button>
         </div>
-      </Modal>
-    </>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {tasks.length === 0 ? (
+          <div className="col-span-full py-20 text-center opacity-30">
+            <Zap className="w-20 h-20 mx-auto mb-6" />
+            <p className="text-xl font-black uppercase tracking-widest">{t.noTasks}</p>
+          </div>
+        ) : (
+          tasks.map((task) => (
+            <Card 
+              key={task.id} 
+              hover 
+              className={`
+                relative overflow-hidden group
+                ${task.status === 'completed' ? 'opacity-60 grayscale-[0.5]' : ''}
+              `}
+            >
+              <div className="flex justify-between items-start mb-6">
+                <div className={`
+                  px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest
+                  ${task.difficulty === 'Easy' ? 'bg-emerald-500/10 text-emerald-500' : 
+                    task.difficulty === 'Medium' ? 'bg-amber-500/10 text-amber-500' : 
+                    'bg-rose-500/10 text-rose-500'}
+                `}>
+                  {task.difficulty}
+                </div>
+                <div className="flex items-center gap-2 text-indigo-500 font-black">
+                  <Trophy className="w-4 h-4" />
+                  <span className="text-sm">{task.xpReward} XP</span>
+                </div>
+              </div>
+
+              <h3 className="text-2xl font-black mb-3 text-[var(--text)] group-hover:text-indigo-500 transition-colors">
+                {task.title}
+              </h3>
+              <p className="text-[var(--muted)] text-sm leading-relaxed mb-6">
+                {task.description}
+              </p>
+
+              {task.status !== 'completed' && (
+                <div className="space-y-4 mb-6">
+                  <textarea
+                    value={taskAnswers[task.id] || ''}
+                    onChange={(e) => setTaskAnswers(prev => ({ ...prev, [task.id]: e.target.value }))}
+                    placeholder={t.taskAnswerPlaceholder}
+                    className="w-full h-20 bg-[var(--input)] border border-[var(--border)] rounded-2xl p-4 text-sm text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:border-indigo-500/50 transition-colors custom-scrollbar resize-none font-bold"
+                  />
+                  
+                  {taskFeedback[task.id] && (
+                    <div className={`p-4 rounded-xl text-xs font-bold border ${taskFeedback[task.id].isCorrect ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600' : 'bg-rose-500/10 border-rose-500/20 text-rose-600'}`}>
+                      {taskFeedback[task.id].text}
+                    </div>
+                  )}
+
+                  {errorStatus[task.id] && (
+                    <div className="p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-xs font-bold flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" />
+                      {errorStatus[task.id]}
+                    </div>
+                  )}
+
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => completeTask(task)}
+                    disabled={verifyingTaskId === task.id || !taskAnswers[task.id]?.trim()}
+                    className="w-full h-12 gap-2 rounded-2xl border-indigo-500/20 text-indigo-500 hover:bg-indigo-500 hover:text-white"
+                  >
+                    {verifyingTaskId === task.id ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-5 h-5" />
+                    )}
+                    {verifyingTaskId === task.id ? t.verifying : t.submitVerify}
+                  </Button>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-6 border-t border-[var(--border)]">
+                <div className="flex items-center gap-2 text-[var(--muted)] text-[10px] font-black uppercase tracking-widest">
+                  <Clock className="w-4 h-4" />
+                  {formatDate(task.createdAt)}
+                </div>
+                
+                {task.status === 'completed' && (
+                  <div className="flex items-center gap-2 text-emerald-500 font-black uppercase text-[10px] tracking-widest">
+                    <CheckCircle2 className="w-5 h-5" />
+                    {t.complete}
+                  </div>
+                )}
+              </div>
+            </Card>
+          ))
+        )}
+      </div>
+    </div>
   );
 };

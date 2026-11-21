@@ -1,12 +1,11 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Lightbulb, Clock, BookOpen, CheckCircle2, ArrowRight, Star, Target, Zap, FileText, BarChart3, Quote, Sparkles, Users, Brain } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
-import { PageHeader, Panel, Tabs } from '../ds';
+import { Card } from '../UI/Card';
 
 export const Tips: React.FC = () => {
   const { t, language } = useLanguage();
-  const [tab, setTab] = useState<'sat' | 'ielts' | 'general'>('sat');
 
   const satTips = language === 'ru' ? [
     { title: "Техника Фейнмана", desc: "Объясните сложную задачу SAT 10-летнему ребенку. Если вы не можете — вы не понимаете ее до конца.", icon: Brain },
@@ -95,48 +94,126 @@ export const Tips: React.FC = () => {
     { title: "Ultradian Rhythms", desc: "Work for 90 mins, then rest for 20. This matches the brain's natural energy cycles.", icon: Users },
   ];
 
-  const groups = {
-    sat: { label: "SAT", title: t.sat, sub: t.satTips, tips: satTips },
-    ielts: { label: "IELTS", title: t.ielts, sub: t.ieltsTips, tips: ieltsTips },
-    general: { label: t.generalTips, title: t.generalTips, sub: t.generalTipsSub, tips: generalTips },
-  } as const;
-  const group = groups[tab];
-
   return (
-    <>
-      <PageHeader title={t.tips} description={t.tipsSub} />
-      <Tabs<'sat' | 'ielts' | 'general'>
-        label={t.tips}
-        value={tab}
-        onChange={setTab}
-        tabs={(Object.keys(groups) as (keyof typeof groups)[]).map((id) => ({ id, label: groups[id].label }))}
-      />
-      <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
-        <p className="mb-4 max-w-2xl text-[15px] text-fg-muted">{group.sub}</p>
-        <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {group.tips.map((tip) => (
-            <li key={tip.title}>
-              <Panel className="h-full p-4">
-                <span className="mb-3 flex size-8 items-center justify-center rounded-lg bg-brand-soft text-brand" aria-hidden="true">
-                  <tip.icon className="size-4" />
-                </span>
-                <h2 className="text-[15px] font-semibold text-fg">{tip.title}</h2>
-                <p className="mt-1 text-sm leading-relaxed text-fg-muted">{tip.desc}</p>
-              </Panel>
-            </li>
-          ))}
-        </ul>
+    <div className="max-w-6xl mx-auto space-y-16 animate-in fade-in duration-700">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+        <div className="space-y-4">
+          <h2 className="text-6xl font-black uppercase tracking-tighter text-[var(--text)]">
+            {t.tips}
+          </h2>
+          <p className="text-[var(--muted)] font-medium max-w-2xl text-lg">
+            {t.tipsSub}
+          </p>
+        </div>
+        <div className="w-24 h-24 bg-indigo-600/10 rounded-[2.5rem] flex items-center justify-center text-indigo-500 shadow-inner">
+          <Lightbulb className="w-12 h-12" />
+        </div>
       </div>
 
-      <Panel className="mt-8 flex max-w-3xl items-start gap-4 p-5">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-hl text-on-hl" aria-hidden="true">
-          <Lightbulb className="size-[18px]" />
-        </span>
-        <div>
-          <h2 className="text-base font-semibold text-fg">{t.proTipTitle}</h2>
-          <p className="mt-1 text-[15px] leading-relaxed text-fg-muted">{t.proTipDesc}</p>
+      <section className="space-y-10">
+        <div className="flex items-center gap-6">
+          <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
+            <span className="font-black text-2xl">SAT</span>
+          </div>
+          <div>
+            <h3 className="text-3xl font-black uppercase tracking-tight text-[var(--text)]">{t.sat}</h3>
+            <p className="text-[var(--muted)] text-sm font-medium">{t.satTips}</p>
+          </div>
         </div>
-      </Panel>
-    </>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {satTips.map((tip, i) => (
+            <Card key={i} hover className="p-8 rounded-[2.5rem] group cursor-pointer flex flex-col">
+              <div className="w-14 h-14 bg-[var(--input)] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <tip.icon className="w-6 h-6 text-indigo-500" />
+              </div>
+              <h4 className="text-xl font-black mb-3 text-[var(--text)] group-hover:text-indigo-500 transition-colors">{tip.title}</h4>
+              <p className="text-[var(--muted)] text-xs leading-relaxed mb-6 flex-1">{tip.desc}</p>
+              <ArrowRight className="w-4 h-4 text-indigo-500 group-hover:translate-x-2 transition-transform" />
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-10">
+        <div className="flex items-center gap-6">
+          <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
+            <span className="font-black text-2xl">IELTS</span>
+          </div>
+          <div>
+            <h3 className="text-3xl font-black uppercase tracking-tight text-[var(--text)]">{t.ielts}</h3>
+            <p className="text-[var(--muted)] text-sm font-medium">{t.ieltsTips}</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {ieltsTips.map((tip, i) => (
+            <Card key={i} hover className="p-8 rounded-[2.5rem] group cursor-pointer flex flex-col">
+              <div className="w-14 h-14 bg-[var(--input)] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <tip.icon className="w-6 h-6 text-emerald-500" />
+              </div>
+              <h4 className="text-xl font-black mb-3 text-[var(--text)] group-hover:text-emerald-500 transition-colors">{tip.title}</h4>
+              <p className="text-[var(--muted)] text-xs leading-relaxed mb-6 flex-1">{tip.desc}</p>
+              <ArrowRight className="w-4 h-4 text-emerald-500 group-hover:translate-x-2 transition-transform" />
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <section className="space-y-10">
+        <div className="flex items-center gap-6">
+          <div className="w-16 h-16 bg-purple-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
+            <span className="font-black text-2xl">GEN</span>
+          </div>
+          <div>
+            <h3 className="text-3xl font-black uppercase tracking-tight text-[var(--text)]">
+              {t.generalTips}
+            </h3>
+            <p className="text-[var(--muted)] text-sm font-medium">
+              {t.generalTipsSub}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {generalTips.map((tip, i) => (
+            <Card key={i} hover className="p-8 rounded-[2.5rem] group cursor-pointer flex flex-col">
+              <div className="w-14 h-14 bg-[var(--input)] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
+                <tip.icon className="w-6 h-6 text-purple-500" />
+              </div>
+              <h4 className="text-xl font-black mb-3 text-[var(--text)] group-hover:text-purple-500 transition-colors">{tip.title}</h4>
+              <p className="text-[var(--muted)] text-xs leading-relaxed mb-6 flex-1">{tip.desc}</p>
+              <ArrowRight className="w-4 h-4 text-purple-500 group-hover:translate-x-2 transition-transform" />
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-12 rounded-[4rem] flex flex-col md:flex-row items-center gap-12 text-white shadow-2xl shadow-indigo-500/20 relative overflow-hidden group">
+        <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="w-40 h-40 bg-white/10 rounded-[3rem] shrink-0 flex items-center justify-center text-6xl shadow-2xl relative z-10">
+          💡
+        </div>
+        <div className="space-y-6 relative z-10">
+          <h3 className="text-3xl font-black uppercase tracking-tighter">
+            {t.proTipTitle}
+          </h3>
+          <p className="text-white/80 leading-relaxed text-lg font-medium">
+            {t.proTipDesc}
+          </p>
+          <div className="flex gap-4">
+            <span className="px-4 py-2 bg-white/10 text-white rounded-full text-[10px] font-black uppercase tracking-widest">
+              {t.reasoning}
+            </span>
+            <span className="px-4 py-2 bg-white/10 text-white rounded-full text-[10px] font-black uppercase tracking-widest">
+              {t.logic}
+            </span>
+            <span className="px-4 py-2 bg-white/10 text-white rounded-full text-[10px] font-black uppercase tracking-widest">
+              {t.mastery}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };

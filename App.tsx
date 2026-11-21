@@ -1,88 +1,36 @@
 
 import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useAuth } from './src/context/AuthContext';
-import { useLanguage } from './src/context/LanguageContext';
 import { useTheme } from './src/context/ThemeContext';
+import { useLanguage } from './src/context/LanguageContext';
 import { Sidebar } from './src/components/Layout/Sidebar';
 import { Navbar } from './src/components/Layout/Navbar';
+const Chat = lazy(() => import('./src/components/Dashboard/Chat').then(m => ({ default: m.Chat })));
+const Tasks = lazy(() => import('./src/components/Dashboard/Tasks').then(m => ({ default: m.Tasks })));
+const PromoHub = lazy(() => import('./src/components/Dashboard/PromoHub').then(m => ({ default: m.PromoHub })));
+const Articles = lazy(() => import('./src/components/Dashboard/Articles').then(m => ({ default: m.Articles })));
+const Tips = lazy(() => import('./src/components/Dashboard/Tips').then(m => ({ default: m.Tips })));
+const Reviews = lazy(() => import('./src/components/Dashboard/Reviews').then(m => ({ default: m.Reviews })));
+const ProfileEditor = lazy(() => import('./src/components/Dashboard/ProfileEditor').then(m => ({ default: m.ProfileEditor })));
+const Progress = lazy(() => import('./src/components/Dashboard/Progress').then(m => ({ default: m.Progress })));
+const Community = lazy(() => import('./src/components/Dashboard/Community').then(m => ({ default: m.Community })));
+const Messages = lazy(() => import('./src/components/Dashboard/Messages').then(m => ({ default: m.Messages })));
+const Settings = lazy(() => import('./src/components/Dashboard/Settings').then(m => ({ default: m.Settings })));
+const Admin = lazy(() => import('./src/components/Dashboard/Admin').then(m => ({ default: m.Admin })));
+const GeniusLab = lazy(() => import('./src/components/Dashboard/GeniusLab').then(m => ({ default: m.GeniusLab })));
 import { Landing } from './src/components/Landing/Landing';
 import { AuthModal } from './src/components/Auth/AuthModal';
+import { GeniusBackground } from './src/components/UI/GeniusBackground';
 import { Onboarding } from './src/components/Onboarding/Onboarding';
-import { Spinner } from './src/components/ds';
-import { hashFor, viewFromHash, type ViewId } from './src/lib/nav';
-
-/**
- * Lazy view that survives a new deployment: if the browser still holds an old page and a
- * chunk it asks for no longer exists, reload once instead of showing an error.
- */
-const lazyView = <T extends React.ComponentType<any>>(load: () => Promise<{ default: T }>) =>
-  lazy(async () => {
-    try {
-      return await load();
-    } catch (error) {
-      const key = 'tf_chunk_reload';
-      try {
-        if (!sessionStorage.getItem(key)) {
-          sessionStorage.setItem(key, '1');
-          window.location.reload();
-          return new Promise<{ default: T }>(() => {});
-        }
-        sessionStorage.removeItem(key);
-      } catch { /* storage blocked: fall through to the error screen */ }
-      throw error;
-    }
-  });
-
-const Tasks = lazyView(() => import('./src/components/Dashboard/Tasks').then(m => ({ default: m.Tasks })));
-const PromoHub = lazyView(() => import('./src/components/Dashboard/PromoHub').then(m => ({ default: m.PromoHub })));
-const Articles = lazyView(() => import('./src/components/Dashboard/Articles').then(m => ({ default: m.Articles })));
-const Tips = lazyView(() => import('./src/components/Dashboard/Tips').then(m => ({ default: m.Tips })));
-const Reviews = lazyView(() => import('./src/components/Dashboard/Reviews').then(m => ({ default: m.Reviews })));
-const ProfileEditor = lazyView(() => import('./src/components/Dashboard/ProfileEditor').then(m => ({ default: m.ProfileEditor })));
-const Progress = lazyView(() => import('./src/components/Dashboard/Progress').then(m => ({ default: m.Progress })));
-const Community = lazyView(() => import('./src/components/Dashboard/Community').then(m => ({ default: m.Community })));
-const Messages = lazyView(() => import('./src/components/Dashboard/Messages').then(m => ({ default: m.Messages })));
-const Settings = lazyView(() => import('./src/components/Dashboard/Settings').then(m => ({ default: m.Settings })));
-const Admin = lazyView(() => import('./src/components/Dashboard/Admin').then(m => ({ default: m.Admin })));
-const GeniusLab = lazyView(() => import('./src/components/Dashboard/GeniusLab').then(m => ({ default: m.GeniusLab })));
+import { Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
   const { user, profile, loading, isAuthReady, updateProfileData } = useAuth();
-  const { t, language, setLanguage } = useLanguage();
-  const [currentView, setCurrentView] = useState<ViewId>(() => viewFromHash(window.location.hash) ?? 'genius_lab');
-  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const mainRef = useRef<HTMLElement>(null);
   const { theme } = useTheme();
-
-  // The browser toolbar takes the workspace colour while signed in (the landing page keeps its own).
-  useEffect(() => {
-    if (!user) return;
-    const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-    const previous = meta?.content;
-    if (meta) meta.content = theme === 'dark' ? '#151a21' : '#ffffff';
-    return () => { if (meta && previous) meta.content = previous; };
-  }, [user, theme]);
-
-  // Addresses like /#/progress: the browser Back button and shared links work.
-  useEffect(() => {
-    const onHashChange = () => setCurrentView(viewFromHash(window.location.hash) ?? 'genius_lab');
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
-
-  const changeView = (view: ViewId) => {
-    if (window.location.hash !== hashFor(view)) window.location.hash = hashFor(view);
-    setCurrentView(view);
-  };
-
-  // After a screen change, move focus to the content so keyboard and screen-reader users start there.
-  const firstRender = useRef(true);
-  useEffect(() => {
-    if (firstRender.current) { firstRender.current = false; return; }
-    mainRef.current?.scrollTo({ top: 0 });
-    mainRef.current?.focus({ preventScroll: true });
-  }, [currentView]);
+  const { t, language, setLanguage } = useLanguage();
+  const [currentView, setCurrentView] = useState('genius_lab');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
 
   // One source of truth for language: the saved profile wins at login, and later changes
   // made in the UI are written back (the AI answers in profile.language).
@@ -102,18 +50,29 @@ const App: React.FC = () => {
 
   // Close modal when user logs in
   useEffect(() => {
-    if (user) setIsAuthModalOpen(false);
+    if (user) {
+      setIsAuthModalOpen(false);
+    }
   }, [user]);
 
+  // If auth is not ready or loading, show a loader
   if (!isAuthReady || loading) {
     return (
-      <div className="app-shell flex min-h-dvh items-center justify-center">
-        <Spinner label={t.initializing} />
+      <div className="h-screen w-screen flex items-center justify-center bg-[var(--bg)]">
+        <div className="flex flex-col items-center gap-6">
+          <div className="w-20 h-20 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white font-black text-4xl animate-pulse shadow-2xl shadow-indigo-500/20">
+            T
+          </div>
+          <div className="flex items-center gap-3 text-[var(--muted)] font-black uppercase tracking-widest text-xs">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            {t.initializing}
+          </div>
+        </div>
       </div>
     );
   }
 
-  // Not signed in: the landing page and sign-in modal keep their own design.
+  // If not logged in, show landing page
   if (!user) {
     return (
       <>
@@ -123,10 +82,14 @@ const App: React.FC = () => {
     );
   }
 
+  // If logged in but no profile (shouldn't happen with our signUp), show a loader or setup
   if (!profile) {
     return (
-      <div className="app-shell flex min-h-dvh items-center justify-center">
-        <Spinner label={t.settingUpProfile} />
+      <div className="h-screen w-screen flex items-center justify-center bg-[var(--bg)]">
+        <div className="flex flex-col items-center gap-6">
+          <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
+          <p className="text-[var(--muted)] font-black uppercase tracking-widest text-xs">{t.settingUpProfile}</p>
+        </div>
       </div>
     );
   }
@@ -135,6 +98,7 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (currentView) {
+      case 'genius_lab': return <GeniusLab />;
       case 'community': return <Community />;
       case 'messages': return <Messages />;
       case 'tasks': return <Tasks />;
@@ -151,38 +115,35 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="app-shell flex h-dvh overflow-hidden">
-      <a
-        href="#main"
-        onClick={(event) => { event.preventDefault(); mainRef.current?.focus(); }}
-        className="sr-only z-50 rounded-lg bg-brand px-4 py-2 text-on-brand focus:not-sr-only focus:fixed focus:left-3 focus:top-3"
-      >
-        {language === 'ru' ? 'К содержимому' : language === 'uz' ? 'Kontentga o‘tish' : 'Skip to content'}
-      </a>
+    <div className="h-screen flex text-[var(--text)] transition-colors duration-500 relative overflow-hidden">
+      <GeniusBackground />
 
-      {needsOnboarding && <Onboarding onDone={() => changeView('genius_lab')} />}
-
-      <Sidebar
-        currentView={currentView}
-        onViewChange={changeView}
-        isOpen={menuOpen}
-        onClose={() => setMenuOpen(false)}
+      {needsOnboarding && <Onboarding onDone={() => setCurrentView('genius_lab')} />}
+      
+      <Sidebar 
+        currentView={currentView} 
+        onViewChange={setCurrentView} 
+        isOpen={isSidebarOpen}
+        onToggle={() => setIsSidebarOpen(!isSidebarOpen)}
       />
-
-      <div className="flex min-w-0 flex-1 flex-col">
-        <Navbar onMenuClick={() => setMenuOpen(true)} />
-
-        <main
-          id="main"
-          ref={mainRef}
-          tabIndex={-1}
-          className="scroll-area paper min-h-0 flex-1 overflow-y-auto outline-none"
-        >
-          <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-8 sm:py-8">
-            <Suspense fallback={<Spinner />}>{renderView()}</Suspense>
+      
+      <main className={`flex-1 flex flex-col min-w-0 transition-all duration-500 ${isSidebarOpen ? 'md:ml-0' : 'ml-0'} h-full relative z-10`}>
+        <Navbar onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
+        
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-10 scroll-smooth">
+          <div className="max-w-7xl mx-auto flex flex-col pb-24">
+            <Suspense
+              fallback={
+                <div className="flex justify-center py-32" role="status" aria-label="Loading">
+                  <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                </div>
+              }
+            >
+              {renderView()}
+            </Suspense>
           </div>
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
   );
 };

@@ -37,9 +37,3 @@ export const useLanguage = () => {
   }
   return context;
 };
-
-/** Pick a string by language: tr("Save", "Сохранить", "Saqlash"). */
-export const useTr = () => {
-  const { language } = useLanguage();
-  return (en: string, ru: string, uz: string) => (language === 'ru' ? ru : language === 'uz' ? uz : en);
-};

@@ -1,10 +1,8 @@
+
 import React from 'react';
-import { Flame, Menu, Moon, Sun, Zap } from 'lucide-react';
+import { Menu, Bell, Search } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useTheme } from '../../context/ThemeContext';
-import { useTr } from '../../context/LanguageContext';
-import { Badge, IconButton } from '../ds';
-import { levelInfo } from '../../lib/progress';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface NavbarProps {
   onMenuClick: () => void;
@@ -12,35 +10,49 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ onMenuClick }) => {
   const { profile } = useAuth();
-  const { theme, toggleTheme } = useTheme();
-  const tr = useTr();
-  const { level, total } = levelInfo(profile?.xp ?? 0);
-  const streak = profile?.streakDays ?? 0;
+  const { t } = useLanguage();
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between border-b border-line bg-panel px-3 sm:px-5">
-      <IconButton label={tr('Open menu', 'Открыть меню', 'Menyuni ochish')} onClick={onMenuClick} className="lg:hidden">
-        <Menu className="size-5" />
-      </IconButton>
-      <div className="hidden lg:block" />
-
-      <div className="flex items-center gap-1.5 sm:gap-2">
-        <Badge tone="neutral" className="h-8 gap-1.5 px-2.5 text-sm" title={tr('Daily streak', 'Серия дней', 'Kunlik seriya')}>
-          <Flame className="size-4" aria-hidden="true" />
-          <span className="tabular">{streak}</span>
-          <span className="sr-only">{tr('days in a row', 'дней подряд', 'kun ketma-ket')}</span>
-        </Badge>
-        <Badge tone="hl" className="h-8 gap-1.5 px-2.5 text-sm" title={tr('Experience points', 'Опыт', 'Tajriba')}>
-          <Zap className="size-4" aria-hidden="true" />
-          <span className="tabular">{total.toLocaleString()} XP</span>
-          <span className="hidden sm:inline">· {tr('Lv', 'Ур.', 'Dr.')} {level}</span>
-        </Badge>
-        <IconButton
-          label={theme === 'dark' ? tr('Light theme', 'Светлая тема', 'Yorug‘ mavzu') : tr('Dark theme', 'Тёмная тема', 'Qorong‘u mavzu')}
-          onClick={toggleTheme}
+    <header className="h-20 border-b border-[var(--border)] flex items-center justify-between px-8 md:px-12 bg-[var(--card)]/80 backdrop-blur-xl z-40 sticky top-0">
+      <div className="flex items-center gap-4">
+        <button 
+          onClick={onMenuClick} 
+          className="lg:hidden p-2 text-[var(--muted)] hover:bg-[var(--input)] rounded-xl transition-all"
         >
-          {theme === 'dark' ? <Sun className="size-5" /> : <Moon className="size-5" />}
-        </IconButton>
+          <Menu className="w-6 h-6" />
+        </button>
+      </div>
+
+      <div className="flex items-center gap-4 md:gap-8">
+        <div className="hidden md:flex items-center gap-2 bg-[var(--input)] px-4 py-2 rounded-xl border border-[var(--border)]">
+          <Search className="w-4 h-4 text-[var(--muted)]" />
+          <input 
+            type="text" 
+            placeholder={t.searchThoughts} 
+            className="bg-transparent border-none outline-none text-xs font-medium w-40 text-[var(--text)]"
+          />
+        </div>
+
+        <div className="flex items-center gap-6">
+          <button className="relative p-2 text-[var(--muted)] hover:bg-[var(--input)] rounded-xl transition-all">
+            <Bell className="w-5 h-5" />
+            <span className="absolute top-2 right-2 w-2 h-2 bg-indigo-500 rounded-full border-2 border-[var(--card)]" />
+          </button>
+
+          <div className="flex items-center gap-4">
+            <div className="text-right hidden sm:block">
+              <p className="text-[8px] font-black text-[var(--muted)] uppercase tracking-widest">{t.globalXP}</p>
+              <p className="text-lg font-black text-indigo-500 leading-none">{profile?.xp || 0}</p>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black shadow-lg shadow-indigo-500/20 overflow-hidden">
+              {profile?.photoURL ? (
+                <img src={profile.photoURL} alt={profile.name} className="w-full h-full object-cover" />
+              ) : (
+                profile?.name?.[0] || 'U'
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </header>
   );

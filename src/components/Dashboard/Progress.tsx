@@ -1,93 +1,129 @@
 
 import React, { useState, useEffect } from 'react';
+import { BarChart3, Trophy, Zap, Target, Star } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useLanguage, useTr } from '../../context/LanguageContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { Card } from '../UI/Card';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getCountFromServer } from 'firebase/firestore';
-import { PageHeader, Panel, ProgressBar, Skeleton } from '../ds';
-import { levelInfo } from '../../lib/progress';
 
 export const Progress: React.FC = () => {
   const { profile, user } = useAuth();
   const { t } = useLanguage();
-  const tr = useTr();
   const [completedTasksCount, setCompletedTasksCount] = useState<number | null>(null);
 
   useEffect(() => {
     if (!user) return;
+    
     async function fetchStats() {
       try {
-        const q = query(collection(db, 'tasks'), where('userId', '==', user!.uid), where('status', '==', 'completed'));
+        const tasksRef = collection(db, 'tasks');
+        const q = query(tasksRef, where('userId', '==', user.uid), where('status', '==', 'completed'));
         const snapshot = await getCountFromServer(q);
         setCompletedTasksCount(snapshot.data().count);
       } catch (err) {
-        console.error('Stats fetch error:', err);
+        console.error("Stats fetch error:", err);
         setCompletedTasksCount(0);
       }
     }
+    
     fetchStats();
   }, [user]);
 
   if (!profile) return null;
 
-  const { level, total, into, span, remaining, percent } = levelInfo(profile.xp);
-  const streak = profile.streakDays ?? 0;
-  const best = Math.max(profile.longestStreak ?? 0, streak);
+  // Calculate level progress
+  const progressPercent = (profile.xp % 1000) / 10;
+  const xpToNextLevel = profile.level * 1000;
 
-  const stats: { label: string; value: React.ReactNode; note?: string }[] = [
-    { label: t.totalXP, value: total.toLocaleString() },
-    { label: t.currentLevelLabel, value: level },
-    {
-      label: t.tasksDone,
-      value: completedTasksCount === null ? <Skeleton className="mt-1 h-7 w-10" /> : completedTasksCount,
-    },
-    {
-      label: t.dailyStreak,
-      value: `${streak} ${t.days}`,
-      note: best > streak ? `${tr('Best', 'Рекорд', 'Rekord')}: ${best}` : undefined,
-    },
+  const stats = [
+    { label: t.totalXP, value: profile.xp.toLocaleString(), icon: Zap, color: "text-indigo-500" },
+    { label: t.currentLevelLabel, value: profile.level, icon: Trophy, color: "text-yellow-500" },
+    { label: t.tasksDone, value: completedTasksCount !== null ? completedTasksCount : "...", icon: Target, color: "text-emerald-500" },
+    { label: t.dailyStreak, value: profile.streakDays ?? 0, icon: Star, color: "text-purple-500" },
   ];
 
   return (
-    <>
-      <PageHeader title={t.progress} description={t.progressSub} />
-
-      <Panel className="p-5 sm:p-6">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-          <div>
-            <p className="text-sm text-fg-muted">{tr('Your level', 'Твой уровень', 'Darajangiz')}</p>
-            <p className="tabular text-4xl font-semibold tracking-tight text-fg">{level}</p>
-          </div>
-          <p className="tabular text-sm text-fg-muted">
-            {into.toLocaleString()} / {span.toLocaleString()} XP
+    <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in duration-700">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-5xl font-black uppercase tracking-tighter text-[var(--text)]">
+            {t.progress}
+          </h2>
+          <p className="text-[var(--muted)] font-medium mt-2">
+            {t.progressSub}
           </p>
         </div>
-        <ProgressBar value={percent} label={tr('Progress to the next level', 'Прогресс до следующего уровня', 'Keyingi darajagacha')} className="mt-4 h-3" />
-        <p className="mt-3 text-sm text-fg-muted">
-          {tr('Next level in', 'До следующего уровня', 'Keyingi darajagacha')} <span className="tabular font-medium text-fg">{remaining.toLocaleString()} XP</span>
-        </p>
-      </Panel>
+        <div className="w-20 h-20 bg-indigo-600/10 rounded-[2rem] flex items-center justify-center text-indigo-500">
+          <BarChart3 className="w-10 h-10" />
+        </div>
+      </div>
 
-      <Panel className="mt-6">
-        <dl className="grid grid-cols-2 lg:grid-cols-4">
-          {stats.map((stat, i) => (
-            <div
-              key={stat.label}
-              className={`p-5 ${i % 2 === 1 ? 'border-l border-line' : ''} ${i >= 2 ? 'border-t border-line' : ''} lg:border-t-0 ${i > 0 ? 'lg:border-l' : 'lg:border-l-0'}`}
-            >
-              <dt className="text-sm text-fg-muted">{stat.label}</dt>
-              <dd className="tabular mt-1 text-2xl font-semibold text-fg">{stat.value}</dd>
-              {stat.note && <p className="mt-0.5 text-sm text-fg-muted">{stat.note}</p>}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {stats.map((stat, i) => (
+          <Card key={i} className="p-8 rounded-[2.5rem] border border-[var(--border)] flex flex-col items-center text-center">
+            <div className={`w-14 h-14 rounded-2xl bg-[var(--input)] flex items-center justify-center mb-4 ${stat.color}`}>
+              <stat.icon className="w-6 h-6" />
             </div>
-          ))}
-        </dl>
-      </Panel>
+            <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest mb-1">{stat.label}</p>
+            <p className="text-3xl font-black text-[var(--text)]">{stat.value}</p>
+          </Card>
+        ))}
+      </div>
 
-      {streak === 0 && (
-        <p className="mt-4 text-sm text-fg-muted">
-          {tr('Open ThinkFlow every day to build a streak.', 'Заходи каждый день, чтобы набрать серию.', 'Seriya yig‘ish uchun har kuni kiring.')}
-        </p>
-      )}
-    </>
+      <Card className="p-12 md:p-16 rounded-[4rem] border border-[var(--border)] overflow-hidden relative">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
+        
+        <div className="relative z-10 space-y-10">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <div className="space-y-2">
+              <h3 className="text-4xl font-black uppercase tracking-tighter text-[var(--text)]">{t.levelLabel} {profile.level}</h3>
+              <p className="text-[var(--muted)] font-medium">{t.nextLevel}: {profile.level + 1}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-5xl font-black text-indigo-500 font-mono tracking-tighter">{profile.xp % 1000} / 1000</p>
+              <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest mt-1">{t.xpNextLevel}</p>
+            </div>
+          </div>
+
+          <div className="h-6 bg-[var(--input)] rounded-full overflow-hidden border border-[var(--border)] p-1">
+            <div 
+              className="h-full bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full transition-all duration-1000 shadow-lg shadow-indigo-500/40"
+              style={{ width: `${progressPercent}%` }}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
+                <Zap className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase text-[var(--text)]">{t.dailyStreak}</p>
+                <p className="text-[var(--muted)] text-[10px] font-bold">{profile.streakDays ?? 0} {t.days}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                <Trophy className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase text-[var(--text)]">{t.xpNextLevel}</p>
+                <p className="text-[var(--muted)] text-[10px] font-bold">{1000 - (profile.xp % 1000)} XP</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-500">
+                <Target className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase text-[var(--text)]">{t.tasksDone}</p>
+                <p className="text-[var(--muted)] text-[10px] font-bold">{completedTasksCount ?? "…"}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Card>
+    </div>
   );
 };

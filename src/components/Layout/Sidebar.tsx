@@ -1,182 +1,195 @@
-import React, { useEffect } from 'react';
-import {
-  BarChart3,
-  BookOpen,
-  FlaskConical,
-  Gift,
-  LayoutList,
+
+import React, { useState } from 'react';
+import { 
+  LayoutGrid, 
+  Brain, 
+  MessageSquare, 
+  Zap, 
+  Gift, 
+  Settings, 
+  User, 
+  LogOut, 
+  Moon, 
+  Sun,
+  History,
+  FileText,
   Lightbulb,
-  LogOut,
-  MessageSquare,
-  Settings,
-  ShieldCheck,
-  Star,
-  Users,
+  Quote,
+  MessageCircle,
+  BarChart3,
   X,
-  type LucideIcon,
+  ShieldAlert,
+  Sparkles,
+  Users
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useLanguage, useTr } from '../../context/LanguageContext';
-import { Avatar, Button, IconButton, ProgressBar, cn } from '../ds';
-import { levelInfo } from '../../lib/progress';
-import { hashFor, type ViewId } from '../../lib/nav';
+import { useTheme } from '../../context/ThemeContext';
+import { useLanguage } from '../../context/LanguageContext';
+import { Button } from '../UI/Button';
 
 interface SidebarProps {
   isOpen: boolean;
-  onClose: () => void;
+  onToggle: () => void;
   currentView: string;
-  onViewChange: (view: ViewId) => void;
+  onViewChange: (view: string) => void;
 }
 
-type Item = { id: ViewId; label: string; icon: LucideIcon };
-
-export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, currentView, onViewChange }) => {
-  const { profile, signOut } = useAuth();
+export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView, onViewChange }) => {
+  const { profile, signOut, geniusMode, setGeniusMode } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const { t } = useLanguage();
-  const tr = useTr();
 
-  // Esc closes the drawer on small screens.
-  useEffect(() => {
-    if (!isOpen) return;
-    const onKey = (event: KeyboardEvent) => event.key === 'Escape' && onClose();
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [isOpen, onClose]);
+  const handleGeniusClick = () => {
+    setGeniusMode(!geniusMode);
+  };
 
-  const learn: Item[] = [
-    { id: 'genius_lab', label: t.geniusLab, icon: FlaskConical },
-    { id: 'tasks', label: t.tasks, icon: LayoutList },
-    { id: 'progress', label: t.progress, icon: BarChart3 },
-  ];
-  const people: Item[] = [
+  const menuItems = [
+    { id: 'genius_lab', label: t.geniusLab, icon: Brain },
     { id: 'community', label: t.community, icon: Users },
     { id: 'messages', label: t.messages, icon: MessageSquare },
-  ];
-  const library: Item[] = [
-    { id: 'articles', label: t.articles, icon: BookOpen },
+    { id: 'tasks', label: t.tasks, icon: LayoutGrid },
+    { id: 'progress', label: t.progress, icon: BarChart3 },
+    { id: 'articles', label: t.articles, icon: FileText },
     { id: 'tips', label: t.tips, icon: Lightbulb },
-    { id: 'reviews', label: t.reviews, icon: Star },
-    { id: 'leaderboard', label: tr('Bonuses & codes', 'Бонусы и коды', 'Bonus va kodlar'), icon: Gift },
+    { id: 'reviews', label: t.reviews, icon: MessageCircle },
+    { id: 'leaderboard', label: profile?.language === 'ru' ? 'Бонусы и Коды 🎁' : profile?.language === 'uz' ? 'Bonuslar & Kodlar 🎁' : 'Bonuses & Codes 🎁', icon: Gift },
+    { id: 'profile', label: t.profile, icon: User },
+    { id: 'settings', label: t.settings, icon: Settings },
   ];
-  if (profile?.role === 'admin') library.push({ id: 'admin', label: t.admin, icon: ShieldCheck });
 
-  const used = profile?.aiTokensUsed ?? 0;
-  const limit = profile?.aiTokenLimit ?? 15000;
-  const quotaPercent = Math.min(100, Math.round((used / limit) * 100));
-  const { level } = levelInfo(profile?.xp ?? 0);
-
-  const renderGroup = (title: string | null, items: Item[]) => (
-    <div className="space-y-0.5">
-      {title && <p className="px-3 pb-1 pt-3 text-xs font-medium text-fg-muted">{title}</p>}
-      {items.map(({ id, label, icon: Icon }) => {
-        const active = currentView === id;
-        return (
-          <a
-            key={id}
-            href={hashFor(id)}
-            onClick={onClose}
-            aria-current={active ? 'page' : undefined}
-            className={cn(
-              'flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-3 text-[15px] transition-colors duration-150 lg:min-h-10 lg:text-sm',
-              active ? 'bg-brand-soft font-medium text-brand' : 'text-fg-muted hover:bg-panel-2 hover:text-fg'
-            )}
-          >
-            <Icon className="size-[18px] shrink-0" aria-hidden="true" />
-            <span className="truncate">{label}</span>
-          </a>
-        );
-      })}
-    </div>
-  );
+  if (profile?.role === 'admin') {
+    menuItems.push({ id: 'admin', label: t.admin, icon: ShieldAlert });
+  }
 
   return (
     <>
-      {isOpen && <div className="fixed inset-0 z-30 bg-black/50 lg:hidden" onClick={onClose} aria-hidden="true" />}
-
-      <aside
-        aria-label={tr('Sidebar', 'Боковое меню', 'Yon menyu')}
-        className={cn(
-          'fixed inset-y-0 left-0 z-40 flex w-[272px] flex-col border-r border-line bg-panel transition-transform duration-200 lg:static lg:z-auto lg:w-[248px] lg:translate-x-0',
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        )}
-      >
-        <div className="flex h-14 shrink-0 items-center justify-between border-b border-line px-4">
-          <a href={hashFor('genius_lab')} onClick={onClose} className="flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg">
-            <span className="flex size-7 items-center justify-center rounded-md bg-brand text-sm font-bold text-on-brand" aria-hidden="true">
-              T
-            </span>
-            <span translate="no" className="text-base font-semibold text-fg">ThinkFlow</span>
-          </a>
-          <IconButton label={tr('Close menu', 'Закрыть меню', 'Menyuni yopish')} onClick={onClose} className="lg:hidden">
-            <X className="size-5" />
-          </IconButton>
+      <aside className={`
+        fixed lg:static inset-y-0 left-0 w-72 bg-[var(--card)] z-50 
+        transform ${isOpen ? 'translate-x-0' : '-translate-x-full'} lg:translate-x-0 
+        transition-transform duration-300 border-r border-[var(--border)] 
+        flex flex-col py-8 shadow-2xl overflow-hidden
+      `}>
+        <div className="px-8 mb-10 flex items-center justify-between">
+          <div className="flex items-center gap-3 cursor-pointer" onClick={() => onViewChange('learn')}>
+            <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center font-black text-white shadow-lg">TF</div>
+            <span className="font-black text-2xl tracking-tighter uppercase italic text-[var(--text)]">ThinkFlow</span>
+          </div>
+          <button onClick={onToggle} className="lg:hidden text-[var(--muted)]">
+            <X className="w-6 h-6" />
+          </button>
         </div>
 
-        <nav aria-label={tr('Main', 'Основное', 'Asosiy')} className="scroll-area min-h-0 flex-1 overflow-y-auto overscroll-contain p-3">
-          {renderGroup(null, learn)}
-          {renderGroup(tr('People', 'Люди', 'Odamlar'), people)}
-          {renderGroup(tr('Library', 'Материалы', 'Materiallar'), library)}
-        </nav>
-
-        <div className="shrink-0 space-y-3 border-t border-line p-3">
-          <div className="rounded-lg bg-panel-2 p-3">
-            <div className="flex items-baseline justify-between text-sm">
-              <span className="font-medium text-fg">{tr('AI tokens', 'ИИ-токены', 'AI tokenlar')}</span>
-              <span className="tabular text-fg-muted">
-                {used.toLocaleString()} / {limit >= 1_000_000 ? '∞' : limit.toLocaleString()}
-              </span>
-            </div>
-            <ProgressBar
-              value={quotaPercent}
-              tone={quotaPercent > 85 ? 'bad' : 'brand'}
-              label={tr('AI token usage', 'Расход ИИ-токенов', 'AI token sarfi')}
-              className="mt-2"
-            />
-            <a
-              href={hashFor('leaderboard')}
-              onClick={onClose}
-              className="mt-1 inline-flex min-h-10 cursor-pointer items-center text-sm font-medium text-brand hover:underline"
+        <div className="flex-1 px-4 space-y-1 overflow-y-auto custom-scrollbar">
+          {menuItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => {
+                onViewChange(item.id);
+                if (window.innerWidth < 1024) onToggle();
+              }}
+              className={`
+                w-full flex items-center gap-4 px-6 py-3.5 rounded-2xl transition-all group
+                ${currentView === item.id 
+                  ? 'bg-indigo-600 text-white font-bold shadow-lg shadow-indigo-500/20' 
+                  : 'text-[var(--muted)] hover:text-indigo-500 hover:bg-[var(--input)]'}
+              `}
             >
-              {tr('Get more tokens', 'Получить ещё токены', 'Ko‘proq token olish')}
-            </a>
-          </div>
+              <item.icon className={`w-5 h-5 ${currentView === item.id ? 'text-white' : 'group-hover:text-indigo-500'}`} />
+              <span className="text-[11px] font-black uppercase tracking-[0.2em]">{item.label}</span>
+            </button>
+          ))}
+        </div>
 
-          <a
-            href={hashFor('profile')}
-            onClick={onClose}
-            aria-current={currentView === 'profile' ? 'page' : undefined}
-            className={cn(
-              'flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-2 text-left transition-colors duration-150 lg:min-h-10',
-              currentView === 'profile' ? 'bg-brand-soft' : 'hover:bg-panel-2'
-            )}
+        <div className="p-6 mt-auto border-t border-[var(--border)] space-y-3">
+          {/* AI Quota Meter */}
+          {profile && (() => {
+            const dbUsed = profile.aiTokensUsed ?? 0;
+            const used = dbUsed;
+            const limit = profile.aiTokenLimit ?? 15000;
+            const percent = Math.min(100, Math.round((used / limit) * 100));
+            return (
+              <div className="p-3.5 rounded-2xl bg-[var(--input)] border border-[var(--border)] space-y-1.5 shadow-sm">
+                <div className="flex justify-between items-center text-[9px] font-black uppercase text-[var(--text)] tracking-wider">
+                  <span className="flex items-center gap-1">
+                    <Zap className="w-3.5 h-3.5 text-indigo-500" />
+                    {profile.language === 'ru' ? 'Расход ИИ' : 'AI QUOTA USAGE'}
+                  </span>
+                  <span className="text-[var(--muted)]">{percent + '%'}</span>
+                </div>
+
+                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${percent > 85 ? 'bg-rose-500' : 'bg-indigo-600'}`}
+                    style={{ width: `${percent}%` }}
+                  />
+                </div>
+                
+                <div className="flex justify-between items-center text-[8px] font-black text-[var(--muted)] uppercase tracking-wider">
+                  <span>{used.toLocaleString()} {profile.language === 'ru' ? 'ток.' : 'tok.'}</span>
+                  <span>{limit >= 1000000 ? '1,000,000' : limit.toLocaleString()}</span>
+                </div>
+                <button
+                  onClick={() => onViewChange('leaderboard')}
+                  className="w-full text-center text-[8px] font-black uppercase text-indigo-400 hover:text-indigo-300 transition-colors pt-1 block"
+                >
+                  {profile.language === 'ru' ? 'ПОЛУЧИТЬ БОНУСНУЮ КВОТУ ⚡' : profile.language === 'uz' ? 'BONUS KVOTA OLISH ⚡' : 'GET BONUS QUOTA ⚡'}
+                </button>
+              </div>
+            );
+          })()}
+
+          <Button 
+            variant="ghost" 
+            className={`w-full justify-start gap-4 transition-all ${geniusMode ? 'text-indigo-400' : ''}`}
+            onClick={handleGeniusClick}
           >
-            <Avatar name={profile?.name} src={profile?.photoURL} />
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-fg">{profile?.name}</span>
-              <span className="block text-xs text-fg-muted">{tr('Level', 'Уровень', 'Daraja')} {level}</span>
+            <Sparkles className={`w-5 h-5 ${geniusMode ? 'animate-pulse' : ''}`} />
+            <span className="text-[10px] font-black uppercase tracking-widest">
+              {t.geniusMode}
             </span>
-          </a>
+          </Button>
 
-          <div className="flex gap-2">
-            <a
-              href={hashFor('settings')}
-              onClick={onClose}
-              aria-current={currentView === 'settings' ? 'page' : undefined}
-              className={cn(
-                'inline-flex h-11 flex-1 cursor-pointer items-center justify-start gap-2 rounded-lg px-3 text-[15px] font-medium transition-colors duration-150 hover:bg-panel-2 hover:text-fg sm:h-9 sm:text-sm',
-                currentView === 'settings' ? 'bg-brand-soft text-brand' : 'text-fg-muted'
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start gap-4" 
+            onClick={toggleTheme}
+          >
+            {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            <span className="text-[10px] font-black uppercase tracking-widest">{t.theme}</span>
+          </Button>
+
+          <div 
+            className="p-4 bg-[var(--input)] rounded-2xl border border-[var(--border)] flex items-center gap-3 cursor-pointer hover:border-indigo-500/30 transition-all"
+            onClick={() => onViewChange('profile')}
+          >
+            <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black overflow-hidden">
+              {profile?.photoURL ? (
+                <img src={profile.photoURL} alt={profile.name} className="w-full h-full object-cover" />
+              ) : (
+                profile?.name?.[0] || 'U'
               )}
-            >
-              <Settings className="size-4" aria-hidden="true" />
-              {t.settings}
-            </a>
-            <Button variant="ghost" size="sm" className="flex-1 justify-start" onClick={() => signOut()}>
-              <LogOut className="size-4" aria-hidden="true" />
-              {t.logout}
-            </Button>
+            </div>
+            <div className="overflow-hidden">
+              <p className="font-bold text-xs truncate text-[var(--text)]">{profile?.name}</p>
+            </div>
           </div>
+
+          <button 
+            onClick={() => signOut()} 
+            className="w-full text-[var(--muted)] text-[10px] font-black uppercase text-left pl-4 hover:text-red-400 transition-colors flex items-center gap-2"
+          >
+            <LogOut className="w-4 h-4" />
+            {t.logout}
+          </button>
         </div>
       </aside>
+      
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden" 
+          onClick={onToggle} 
+        />
+      )}
     </>
   );
 };
