@@ -1,260 +1,156 @@
 
-import React from 'react';
-import { Settings as SettingsIcon, Moon, Sun, Globe, Shield, Bell, Trash2, LogOut, Zap } from 'lucide-react';
+import React, { useState } from 'react';
+import { Trash2 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
-import { useLanguage } from '../../context/LanguageContext';
+import { useLanguage, useTr } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
-import { Card } from '../UI/Card';
-import { Button } from '../UI/Button';
-import { useState } from 'react';
+import { Button, Modal, Notice, PageHeader, Panel, Segmented, SectionTitle } from '../ds';
+import type { Language, UserProfile } from '../../types';
+
+const Row = ({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) => (
+  <div className="flex flex-col gap-3 p-5 sm:flex-row sm:items-center sm:justify-between sm:gap-6">
+    <div className="min-w-0">
+      <p className="text-[15px] font-medium text-fg">{title}</p>
+      {hint && <p className="mt-0.5 max-w-md text-sm text-fg-muted">{hint}</p>}
+    </div>
+    <div className="shrink-0">{children}</div>
+  </div>
+);
 
 export const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
-  const { signOut, deleteAccount, geniusMode, setGeniusMode, profile, updateProfileData } = useAuth();
+  const { signOut, deleteAccount, profile, updateProfileData } = useAuth();
+  const tr = useTr();
   const [isDeleting, setIsDeleting] = useState(false);
-  const DEPTH_LABEL: Record<string, Record<string, string>> = {
-    Surface: { en: 'Surface', ru: 'Кратко', uz: 'Qisqa' },
-    Deep: { en: 'Deep', ru: 'Глубоко', uz: 'Chuqur' },
-    Architect: { en: 'Architect', ru: 'Эксперт', uz: 'Ekspert' },
-  };
-  const STYLE_LABEL: Record<string, Record<string, string>> = {
-    Metaphorical: { en: 'Metaphorical', ru: 'Через примеры', uz: 'Misollar orqali' },
-    Technical: { en: 'Technical', ru: 'Технически', uz: 'Texnik' },
-    Simple: { en: 'Simple', ru: 'Просто', uz: 'Oddiy' },
-  };
-  const tr = (en: string, ru: string, uz: string) => (language === 'ru' ? ru : language === 'uz' ? uz : en);
-
-  const handleGeniusToggle = () => {
-    setGeniusMode(!geniusMode);
-  };
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState(false);
 
   const handleDeleteAccount = async () => {
-    if (window.confirm(tr('Are you absolutely sure you want to delete your account? This action is irreversible.', 'Точно удалить аккаунт? Это действие необратимо.', 'Hisobni o‘chirishni xohlaysizmi? Bu amalni qaytarib bo‘lmaydi.'))) {
-      setIsDeleting(true);
-      try {
-        await deleteAccount();
-      } catch (error) {
-        alert('Failed to delete account. You may need to re-authenticate first.');
-      } finally {
-        setIsDeleting(false);
-      }
+    setIsDeleting(true);
+    setDeleteError(false);
+    try {
+      await deleteAccount();
+    } catch {
+      setDeleteError(true);
+      setIsDeleting(false);
     }
   };
 
-  const handleSignOutEverywhere = async () => {
-    // In standard Firebase, this is just a sign out
-    // For a real "everywhere" sign out, we'd need a backend to revoke tokens
-    await signOut();
-  };
-
   return (
-    <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-700">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-5xl font-black uppercase tracking-tighter text-[var(--text)]">
-            {t.settings}
-          </h2>
-          <p className="text-[var(--muted)] font-medium mt-2">
-            {tr("Configure your ThinkFlow experience.", "Настрой ThinkFlow под себя.", "ThinkFlow’ni o‘zingizga moslang.")}
-          </p>
-        </div>
-        <div className="w-20 h-20 bg-indigo-600/10 rounded-[2rem] flex items-center justify-center text-indigo-500">
-          <SettingsIcon className="w-10 h-10" />
-        </div>
-      </div>
+    <div className="max-w-3xl">
+      <PageHeader title={t.settings} description={tr('Appearance, language and how the AI explains things.', 'Внешний вид, язык и то, как ИИ объясняет темы.', 'Ko‘rinish, til va AI tushuntirish uslubi.')} />
 
-      <div className="space-y-8">
-        <Card className="p-10 rounded-[3.5rem] border border-[var(--border)] space-y-10">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="w-14 h-14 bg-indigo-600/10 rounded-2xl flex items-center justify-center text-indigo-500">
-                {theme === 'dark' ? <Moon className="w-6 h-6" /> : <Sun className="w-6 h-6" />}
-              </div>
-              <div>
-                <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">{t.theme}</h4>
-                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">{tr("Switch between light and dark mode", "Светлая или тёмная тема", "Yorug‘ yoki qorong‘u rejim")}</p>
-              </div>
-            </div>
-            <button 
-              onClick={toggleTheme}
-              className={`
-                w-16 h-8 rounded-full transition-all relative p-1
-                ${theme === 'dark' ? 'bg-indigo-600' : 'bg-slate-200'}
-              `}
-            >
-              <div className={`
-                w-6 h-6 bg-white rounded-full shadow-lg transition-transform
-                ${theme === 'dark' ? 'translate-x-8' : 'translate-x-0'}
-              `} />
-            </button>
-          </div>
+      <section className="mb-8" aria-labelledby="set-general">
+        <h2 id="set-general" className="mb-3 text-base font-semibold text-fg">{tr('General', 'Основное', 'Umumiy')}</h2>
+        <Panel className="divide-y divide-line">
+          <Row title={t.theme}>
+            <Segmented
+              label={t.theme}
+              value={theme}
+              onChange={(value) => value !== theme && toggleTheme()}
+              options={[
+                { value: 'light', label: tr('Light', 'Светлая', 'Yorug‘') },
+                { value: 'dark', label: tr('Dark', 'Тёмная', 'Qorong‘u') },
+              ]}
+            />
+          </Row>
+          <Row
+            title={t.language}
+            hint={tr('Used for the interface and for AI answers.', 'Для интерфейса и ответов ИИ.', 'Interfeys va AI javoblari uchun.')}
+          >
+            <Segmented<Language>
+              label={t.language}
+              value={language}
+              onChange={setLanguage}
+              options={[
+                { value: 'ru', label: 'Русский' },
+                { value: 'en', label: 'English' },
+                { value: 'uz', label: 'Oʻzbekcha' },
+              ]}
+            />
+          </Row>
+        </Panel>
+      </section>
 
-          <div className="h-px bg-[var(--border)]" />
+      <section className="mb-8" aria-labelledby="set-ai">
+        <h2 id="set-ai" className="mb-3 text-base font-semibold text-fg">{tr('How the AI explains', 'Как ИИ объясняет', 'AI qanday tushuntiradi')}</h2>
+        <Panel className="divide-y divide-line">
+          <Row
+            title={tr('Depth', 'Глубина', 'Chuqurlik')}
+            hint={tr('How far the AI goes into a concept.', 'Насколько подробно ИИ разбирает тему.', 'AI mavzuni qanchalik chuqur yoritadi.')}
+          >
+            <Segmented<NonNullable<UserProfile['learningDepth']>>
+              label={tr('Depth', 'Глубина', 'Chuqurlik')}
+              value={profile?.learningDepth}
+              onChange={(value) => updateProfileData({ learningDepth: value })}
+              options={[
+                { value: 'Surface', label: tr('Short', 'Кратко', 'Qisqa') },
+                { value: 'Deep', label: tr('Deep', 'Глубоко', 'Chuqur') },
+                { value: 'Architect', label: tr('Expert', 'Эксперт', 'Ekspert') },
+              ]}
+            />
+          </Row>
+          <Row
+            title={tr('Style', 'Стиль', 'Uslub')}
+            hint={tr('Examples from your interests, precise terms, or plain words.', 'Примеры из твоих интересов, точные термины или простые слова.', 'Qiziqishlaringizdan misollar, aniq atamalar yoki oddiy so‘zlar.')}
+          >
+            <Segmented<NonNullable<UserProfile['explanationStyle']>>
+              label={tr('Style', 'Стиль', 'Uslub')}
+              value={profile?.explanationStyle}
+              onChange={(value) => updateProfileData({ explanationStyle: value })}
+              options={[
+                { value: 'Metaphorical', label: tr('Examples', 'Примеры', 'Misollar') },
+                { value: 'Technical', label: tr('Technical', 'Технически', 'Texnik') },
+                { value: 'Simple', label: tr('Simple', 'Просто', 'Oddiy') },
+              ]}
+            />
+          </Row>
+        </Panel>
+      </section>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="w-14 h-14 bg-emerald-600/10 rounded-2xl flex items-center justify-center text-emerald-500">
-                <Globe className="w-6 h-6" />
-              </div>
-              <div>
-                <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">{t.language}</h4>
-                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">{tr("Select your preferred interface language", "Язык интерфейса и ответов ИИ", "Interfeys va AI javoblari tili")}</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              {['en', 'ru', 'uz'].map((l) => (
-                <button
-                  key={l}
-                  onClick={() => setLanguage(l as any)}
-                  className={`
-                    px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
-                    ${language === l 
-                      ? 'bg-indigo-600 text-white' 
-                      : 'bg-[var(--input)] text-[var(--muted)] hover:bg-[var(--border)]'}
-                  `}
-                >
-                  {l}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="h-px bg-[var(--border)]" />
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="w-14 h-14 bg-purple-600/10 rounded-2xl flex items-center justify-center text-purple-500">
-                <Bell className="w-6 h-6" />
-              </div>
-              <div>
-                <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">{tr("Notifications", "Уведомления", "Bildirishnomalar")}</h4>
-                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">{tr("Manage your learning alerts", "Напоминания об учёбе", "O‘qish eslatmalari")}</p>
-              </div>
-            </div>
-            <button className="w-16 h-8 bg-[var(--input)] rounded-full relative p-1 cursor-not-allowed opacity-50">
-              <div className="w-6 h-6 bg-white rounded-full shadow-lg" />
-            </button>
-          </div>
-
-          <div className="h-px bg-[var(--border)]" />
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="w-14 h-14 bg-amber-600/10 rounded-2xl flex items-center justify-center text-amber-500">
-                <Zap className="w-6 h-6" />
-              </div>
-              <div>
-                <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">{t.geniusMode}</h4>
-                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">{tr("Enable advanced AI reasoning and metaphors", "Глубокие рассуждения и метафоры ИИ", "AI’ning chuqur mulohazalari va metaforalari")}</p>
-              </div>
-            </div>
-            <button 
-              onClick={handleGeniusToggle}
-              className={`
-                w-16 h-8 rounded-full transition-all relative p-1
-                ${geniusMode ? 'bg-amber-500' : 'bg-slate-200'}
-              `}
-            >
-              <div className={`
-                w-6 h-6 bg-white rounded-full shadow-lg transition-transform
-                ${geniusMode ? 'translate-x-8' : 'translate-x-0'}
-              `} />
-            </button>
-          </div>
-
-          <div className="h-px bg-[var(--border)]" />
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="w-14 h-14 bg-indigo-600/10 rounded-2xl flex items-center justify-center text-indigo-500">
-                <Shield className="w-6 h-6" />
-              </div>
-              <div>
-                <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">{tr("Learning Depth", "Глубина объяснений", "Tushuntirish chuqurligi")}</h4>
-                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">{tr("How deep should the AI go into concepts?", "Насколько глубоко ИИ объясняет темы", "AI mavzularni qanchalik chuqur tushuntirsin")}</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              {['Surface', 'Deep', 'Architect'].map((d) => (
-                <button
-                  key={d}
-                  onClick={() => updateProfileData({ learningDepth: d as any })}
-                  className={`
-                    px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
-                    ${profile?.learningDepth === d 
-                      ? 'bg-indigo-600 text-white' 
-                      : 'bg-[var(--input)] text-[var(--muted)] hover:bg-[var(--border)]'}
-                  `}
-                >
-                  {DEPTH_LABEL[d]?.[language] ?? d}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="h-px bg-[var(--border)]" />
-
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <div className="w-14 h-14 bg-emerald-600/10 rounded-2xl flex items-center justify-center text-emerald-500">
-                <Globe className="w-6 h-6" />
-              </div>
-              <div>
-                <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">{tr("Explanation Style", "Стиль объяснений", "Tushuntirish uslubi")}</h4>
-                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">{tr("Your preferred way of learning", "Как тебе удобнее учиться", "Sizga qulay o‘rganish usuli")}</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              {['Metaphorical', 'Technical', 'Simple'].map((s) => (
-                <button
-                  key={s}
-                  onClick={() => updateProfileData({ explanationStyle: s as any })}
-                  className={`
-                    px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all
-                    ${profile?.explanationStyle === s 
-                      ? 'bg-emerald-600 text-white' 
-                      : 'bg-[var(--input)] text-[var(--muted)] hover:bg-[var(--border)]'}
-                  `}
-                >
-                  {STYLE_LABEL[s]?.[language] ?? s}
-                </button>
-              ))}
-            </div>
-          </div>
-        </Card>
-
-        <Card className="p-10 rounded-[3.5rem] border border-rose-500/20 dark:border-rose-500/10 bg-rose-500/5 space-y-6">
-          <div className="flex items-center gap-6">
-            <div className="w-14 h-14 bg-rose-600/10 rounded-2xl flex items-center justify-center text-rose-500">
-              <Shield className="w-6 h-6" />
-            </div>
-            <div>
-              <h4 className="font-black uppercase text-sm tracking-tighter text-rose-500">{tr('Danger Zone', 'Опасная зона', 'Xavfli hudud')}</h4>
-              <p className="text-[10px] font-black uppercase text-rose-500/60 tracking-widest">{tr("Irreversible account actions", "Необратимые действия с аккаунтом", "Hisobdagi qaytarib bo‘lmas amallar")}</p>
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button 
-              variant="outline" 
-              className="border-rose-500/20 text-rose-500 hover:bg-rose-500 hover:text-white flex-1 h-16 rounded-2xl gap-3 transition-all"
-              onClick={handleDeleteAccount}
-              disabled={isDeleting}
-            >
-              <Trash2 className="w-5 h-5" />
-              {isDeleting ? tr('Deleting...', 'Удаление...', 'O‘chirilmoqda...') : tr('Delete Account', 'Удалить аккаунт', 'Hisobni o‘chirish')}
+      <section aria-labelledby="set-account">
+        <h2 id="set-account" className="mb-3 text-base font-semibold text-fg">{tr('Account', 'Аккаунт', 'Hisob')}</h2>
+        <Panel className="divide-y divide-line">
+          <Row title={tr('Sign out', 'Выйти из аккаунта', 'Hisobdan chiqish')}>
+            <Button variant="secondary" onClick={() => signOut()}>
+              {t.logout}
             </Button>
-            <Button 
-              variant="outline" 
-              className="border-[var(--border)] flex-1 h-16 rounded-2xl gap-3 hover:bg-[var(--input)] transition-all text-[var(--text)]"
-              onClick={handleSignOutEverywhere}
-            >
-              <LogOut className="w-5 h-5" />
-              {tr('Sign Out Everywhere', 'Выйти', 'Chiqish')}
+          </Row>
+          <Row
+            title={tr('Delete account', 'Удалить аккаунт', 'Hisobni o‘chirish')}
+            hint={tr('This cannot be undone.', 'Это действие нельзя отменить.', 'Bu amalni qaytarib bo‘lmaydi.')}
+          >
+            <Button variant="danger" onClick={() => setConfirmDelete(true)}>
+              <Trash2 className="size-4" aria-hidden="true" />
+              {tr('Delete', 'Удалить', 'O‘chirish')}
             </Button>
-          </div>
-        </Card>
-      </div>
+          </Row>
+        </Panel>
+      </section>
+
+      <Modal open={confirmDelete} onClose={() => !isDeleting && setConfirmDelete(false)} title={tr('Delete your account?', 'Удалить аккаунт?', 'Hisob o‘chirilsinmi?')}>
+        <p className="text-[15px] text-fg-muted">
+          {tr(
+            'Your profile and progress will be removed and you will be signed out. This cannot be undone.',
+            'Профиль и прогресс будут удалены, а ты выйдешь из аккаунта. Отменить это нельзя.',
+            'Profil va jarayon o‘chiriladi, siz hisobdan chiqasiz. Buni qaytarib bo‘lmaydi.'
+          )}
+        </p>
+        {deleteError && (
+          <Notice tone="bad" className="mt-4">
+            {tr('Could not delete the account. Sign in again and retry.', 'Не удалось удалить аккаунт. Войди заново и повтори.', 'Hisobni o‘chirib bo‘lmadi. Qayta kirib, urinib ko‘ring.')}
+          </Notice>
+        )}
+        <div className="mt-5 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setConfirmDelete(false)} disabled={isDeleting}>
+            {tr('Cancel', 'Отмена', 'Bekor qilish')}
+          </Button>
+          <Button variant="danger" onClick={handleDeleteAccount} loading={isDeleting}>
+            {tr('Delete account', 'Удалить аккаунт', 'Hisobni o‘chirish')}
+          </Button>
+        </div>
+      </Modal>
     </div>
   );
 };

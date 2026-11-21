@@ -1,121 +1,98 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Search, 
-  Send, 
-  MoreHorizontal, 
-  ArrowLeft,
-  Loader2,
-  User,
-  Plus,
-  MessageSquare,
-  Image as ImageIcon
-} from 'lucide-react';
+import { ArrowLeft, MessageSquare, Search, Send } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
-import { useLanguage } from '../../context/LanguageContext';
+import { useLanguage, useTr } from '../../context/LanguageContext';
 import { ChatThread, DirectMessage, UserProfile } from '../../types';
 import { db } from '../../lib/firebase';
-import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot, 
-  addDoc, 
-  updateDoc, 
-  doc, 
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  doc,
   setDoc,
   getDocs,
   getDoc,
-  serverTimestamp,
-  limit
+  limit,
 } from 'firebase/firestore';
-import { Button } from '../UI/Button';
-import { Card } from '../UI/Card';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Avatar, Button, EmptyState, IconButton, Notice, PageHeader, Panel, Spinner, TextInput, cn } from '../ds';
 
 export const Messages: React.FC = () => {
   const { user, profile } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const tr = useTr();
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selectedThread, setSelectedThread] = useState<ChatThread | null>(null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [sendError, setSendError] = useState(false);
+  const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!user) return;
-
-    const q = query(
-      collection(db, 'chats'), 
-      where('participants', 'array-contains', user.uid),
-      orderBy('lastTimestamp', 'desc')
+    const q = query(collection(db, 'chats'), where('participants', 'array-contains', user.uid), orderBy('lastTimestamp', 'desc'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        setThreads(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as ChatThread)));
+        setLoadError(false);
+        setLoading(false);
+      },
+      (error) => {
+        console.error('Threads fetch error:', error);
+        setLoadError(true);
+        setLoading(false);
+      }
     );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const threadsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatThread));
-      setThreads(threadsData);
-      setLoading(false);
-    });
-
     return () => unsubscribe();
   }, [user]);
 
   useEffect(() => {
     if (!selectedThread) return;
-
-    const q = query(
-      collection(db, 'chats', selectedThread.id, 'messages'),
-      orderBy('timestamp', 'asc'),
-      limit(100)
-    );
-
+    const q = query(collection(db, 'chats', selectedThread.id, 'messages'), orderBy('timestamp', 'asc'), limit(100));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const messagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DirectMessage));
-      setMessages(messagesData);
-      scrollToBottom();
+      setMessages(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as DirectMessage)));
     });
-
     return () => unsubscribe();
   }, [selectedThread]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  useEffect(() => {
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
+  }, [messages]);
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
+  // Search people by name as the student types (debounced).
+  useEffect(() => {
+    const text = searchQuery.trim();
+    if (!text) {
       setSearchResults([]);
       return;
     }
-    setIsSearching(true);
-    try {
-      const q = query(
-        collection(db, 'users'),
-        where('name', '>=', searchQuery),
-        where('name', '<=', searchQuery + '\uf8ff'),
-        limit(5)
-      );
-      const snapshot = await getDocs(q);
-      const results = snapshot.docs
-        .map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile))
-        .filter(u => u.uid !== user?.uid);
-      setSearchResults(results);
-    } catch (error) {
-      console.error("Search error:", error);
-    } finally {
-      setIsSearching(false);
-    }
-  };
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const q = query(collection(db, 'users'), where('name', '>=', text), where('name', '<=', text + ''), limit(5));
+        const snapshot = await getDocs(q);
+        setSearchResults(snapshot.docs.map((d) => ({ uid: d.id, ...d.data() } as UserProfile)).filter((u) => u.uid !== user?.uid));
+      } catch (error) {
+        console.error('Search error:', error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, user?.uid]);
 
   const startNewChat = async (targetUser: UserProfile) => {
     if (!user || !profile) return;
-    
-    // Check if thread exists
     const threadId = [user.uid, targetUser.uid].sort().join('_');
     const threadRef = doc(db, 'chats', threadId);
     const threadSnap = await getDoc(threadRef);
@@ -123,26 +100,19 @@ export const Messages: React.FC = () => {
     if (!threadSnap.exists()) {
       const newThread: Partial<ChatThread> = {
         participants: [user.uid, targetUser.uid],
-        participantNames: {
-          [user.uid]: profile.name,
-          [targetUser.uid]: targetUser.name
-        },
-        participantPhotos: {
-          [user.uid]: profile.photoURL || null,
-          [targetUser.uid]: targetUser.photoURL || null
-        },
-        lastMessage: 'Начат новый разговор',
-        lastTimestamp: Date.now()
+        participantNames: { [user.uid]: profile.name, [targetUser.uid]: targetUser.name },
+        participantPhotos: { [user.uid]: profile.photoURL || null, [targetUser.uid]: targetUser.photoURL || null },
+        lastMessage: tr('New conversation', 'Новый разговор', 'Yangi suhbat'),
+        lastTimestamp: Date.now(),
       };
       await setDoc(threadRef, newThread);
       setSelectedThread({ id: threadId, ...newThread } as ChatThread);
     } else {
-      // Update photos if they exist but might be outdated
       const existingData = threadSnap.data() as ChatThread;
       const updatedPhotos = {
         ...existingData.participantPhotos,
         [user.uid]: profile.photoURL || null,
-        [targetUser.uid]: targetUser.photoURL || null
+        [targetUser.uid]: targetUser.photoURL || null,
       };
       await updateDoc(threadRef, { participantPhotos: updatedPhotos });
       setSelectedThread({ id: threadId, ...existingData, participantPhotos: updatedPhotos } as ChatThread);
@@ -153,218 +123,172 @@ export const Messages: React.FC = () => {
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedThread || !user) return;
-    const text = newMessage;
+    const text = newMessage.trim();
     setNewMessage('');
+    setSendError(false);
     try {
       await addDoc(collection(db, 'chats', selectedThread.id, 'messages'), {
         chatId: selectedThread.id,
         senderId: user.uid,
         text,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
-      await updateDoc(doc(db, 'chats', selectedThread.id), {
-        lastMessage: text,
-        lastTimestamp: Date.now()
-      });
+      await updateDoc(doc(db, 'chats', selectedThread.id), { lastMessage: text, lastTimestamp: Date.now() });
     } catch (error) {
-      console.error("Send error:", error);
+      console.error('Send error:', error);
+      setNewMessage(text);
+      setSendError(true);
     }
   };
 
-  const getOtherParticipantName = (thread: ChatThread) => {
-    const otherId = thread.participants.find(id => id !== user?.uid);
-    return otherId ? thread.participantNames[otherId] : 'User';
-  };
+  const otherId = (thread: ChatThread) => thread.participants.find((id) => id !== user?.uid);
+  const otherName = (thread: ChatThread) => (otherId(thread) ? thread.participantNames[otherId(thread)!] : 'User');
+  const otherPhoto = (thread: ChatThread) => (otherId(thread) ? thread.participantPhotos?.[otherId(thread)!] : null) ?? undefined;
 
-  const getOtherParticipantPhoto = (thread: ChatThread) => {
-    const otherId = thread.participants.find(id => id !== user?.uid);
-    return otherId ? thread.participantPhotos?.[otherId] : null;
-  };
+  const formatTime = (timestamp: number) =>
+    new Date(timestamp).toLocaleTimeString(language === 'ru' ? 'ru-RU' : language === 'uz' ? 'uz-UZ' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
 
-  if (loading) {
-    return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
-      </div>
-    );
-  }
+  if (loading) return <Spinner />;
 
   return (
-    <div className="h-[calc(100vh-160px)] flex gap-6 animate-in fade-in duration-700">
-      {/* Sidebar Threads List */}
-      <div className={`
-        flex-col w-full md:w-80 bg-[var(--card)] border border-[var(--border)] rounded-[2.5rem] overflow-hidden flex
-        ${selectedThread ? 'hidden md:flex' : 'flex'}
-      `}>
-        <div className="p-6 border-b border-[var(--border)] space-y-4">
-          <h2 className="text-2xl font-black uppercase tracking-tight text-[var(--text)]">Чаты</h2>
-          <div className="relative">
-            <input 
-              type="text"
-              placeholder="Поиск собеседника..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyUp={(e) => e.key === 'Enter' && handleSearch()}
-              className="w-full bg-[var(--input)] border border-[var(--border)] rounded-2xl py-3 pl-10 pr-4 text-xs font-bold text-[var(--text)] focus:outline-none focus:border-indigo-500/50 transition-all"
-            />
-            <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-          </div>
-          
-          {/* Search Results */}
-          <AnimatePresence>
-            {searchResults.length > 0 && (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="absolute left-6 right-6 top-48 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl z-50 overflow-hidden"
-              >
-                {searchResults.map(u => (
-                  <button 
-                    key={u.uid}
-                    onClick={() => startNewChat(u)}
-                    className="w-full p-4 flex items-center gap-3 hover:bg-[var(--input)] transition-all border-b border-[var(--border)] last:border-none"
-                  >
-                    <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black overflow-hidden bg-indigo-600 shadow-lg shadow-indigo-500/10">
-                      {u.photoURL ? (
-                        <img src={u.photoURL} alt={u.name} className="w-full h-full object-cover" />
-                      ) : (
-                        u.name[0]
-                      )}
-                    </div>
-                    <div className="text-left">
-                      <p className="font-bold text-xs text-[var(--text)]">{u.name}</p>
-                    </div>
-                    <Plus className="w-4 h-4 ml-auto text-indigo-500" />
-                  </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
+    <>
+      <PageHeader title={t.messages} />
+      {loadError && (
+        <Notice tone="bad" className="mb-4">
+          {tr('Could not load your chats. Check your connection and reload the page.', 'Не удалось загрузить чаты. Проверь соединение и обнови страницу.', 'Chatlarni yuklab bo‘lmadi. Internetni tekshirib, sahifani yangilang.')}
+        </Notice>
+      )}
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
-          {threads.map(thread => (
-            <button
-              key={thread.id}
-              onClick={() => setSelectedThread(thread)}
-              className={`
-                w-full p-4 rounded-[1.5rem] flex items-center gap-3 transition-all
-                ${selectedThread?.id === thread.id ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-500/20' : 'hover:bg-[var(--input)] text-[var(--text)]'}
-              `}
-            >
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black overflow-hidden shadow-lg shadow-indigo-500/10 ${selectedThread?.id === thread.id ? 'bg-white/20 text-white' : 'bg-indigo-600 text-white'}`}>
-                {getOtherParticipantPhoto(thread) ? (
-                  <img src={getOtherParticipantPhoto(thread)!} alt={getOtherParticipantName(thread)} className="w-full h-full object-cover" />
-                ) : (
-                  getOtherParticipantName(thread)[0]
+      <div className="flex h-[calc(100dvh-15rem)] min-h-[440px] gap-4">
+        {/* Conversations */}
+        <Panel className={cn('flex w-full flex-col overflow-hidden md:w-80 md:shrink-0', selectedThread ? 'hidden md:flex' : 'flex')}>
+          <div className="border-b border-line p-3">
+            <label className="relative block">
+              <span className="sr-only">{tr('Find a person', 'Найти человека', 'Odam qidirish')}</span>
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-fg-muted" aria-hidden="true" />
+              <TextInput
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={tr('Find a person by name', 'Найти человека по имени', 'Ism bo‘yicha qidirish')}
+                className="pl-9"
+                autoComplete="off"
+              />
+            </label>
+            {searchQuery.trim() && (
+              <ul className="mt-2 space-y-0.5">
+                {searchResults.map((result) => (
+                  <li key={result.uid}>
+                    <button
+                      type="button"
+                      onClick={() => startNewChat(result)}
+                      className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg px-2 text-left transition-colors duration-150 hover:bg-panel-2"
+                    >
+                      <Avatar name={result.name} src={result.photoURL} />
+                      <span className="truncate text-[15px] text-fg">{result.name}</span>
+                    </button>
+                  </li>
+                ))}
+                {!isSearching && searchResults.length === 0 && (
+                  <li className="px-2 py-2 text-sm text-fg-muted">{tr('Nobody found.', 'Никого не нашли.', 'Hech kim topilmadi.')}</li>
                 )}
+              </ul>
+            )}
+          </div>
+
+          <ul className="scroll-area min-h-0 flex-1 overflow-y-auto p-2">
+            {threads.length === 0 && (
+              <li className="px-3 py-8 text-center text-sm text-fg-muted">
+                {tr('No chats yet. Find a person above to start one.', 'Чатов пока нет. Найди человека выше, чтобы начать.', 'Hozircha chat yo‘q. Boshlash uchun yuqorida odam qidiring.')}
+              </li>
+            )}
+            {threads.map((thread) => {
+              const active = selectedThread?.id === thread.id;
+              return (
+                <li key={thread.id}>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedThread(thread)}
+                    aria-current={active ? 'true' : undefined}
+                    className={cn(
+                      'flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors duration-150',
+                      active ? 'bg-brand-soft' : 'hover:bg-panel-2'
+                    )}
+                  >
+                    <Avatar name={otherName(thread)} src={otherPhoto(thread)} className="size-10" />
+                    <span className="min-w-0 flex-1">
+                      <span className="flex items-baseline justify-between gap-2">
+                        <span className={cn('truncate text-[15px] font-medium', active ? 'text-brand' : 'text-fg')}>{otherName(thread)}</span>
+                        <span className="shrink-0 text-xs text-fg-muted tabular">{formatTime(thread.lastTimestamp)}</span>
+                      </span>
+                      <span className="block truncate text-sm text-fg-muted">{thread.lastMessage}</span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </Panel>
+
+        {/* Conversation */}
+        <Panel className={cn('min-w-0 flex-1 flex-col overflow-hidden', selectedThread ? 'flex' : 'hidden md:flex')}>
+          {selectedThread ? (
+            <>
+              <div className="flex items-center gap-2 border-b border-line px-3 py-2.5">
+                <IconButton label={tr('Back to chats', 'К чатам', 'Chatlarga')} onClick={() => setSelectedThread(null)} className="md:hidden">
+                  <ArrowLeft className="size-5" />
+                </IconButton>
+                <Avatar name={otherName(selectedThread)} src={otherPhoto(selectedThread)} />
+                <h2 className="truncate text-[15px] font-semibold text-fg">{otherName(selectedThread)}</h2>
               </div>
-              <div className="flex-1 text-left overflow-hidden">
-                <p className="font-black text-sm truncate">{getOtherParticipantName(thread)}</p>
-                <p className={`text-[10px] truncate ${selectedThread?.id === thread.id ? 'text-white/60' : 'text-gray-500'} font-bold`}>
-                  {thread.lastMessage}
-                </p>
+
+              <div ref={logRef} role="log" aria-live="polite" className="scroll-area min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
+                {messages.map((message) => {
+                  const mine = message.senderId === user?.uid;
+                  return (
+                    <div key={message.id} className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
+                      <div className={cn('max-w-[80%] break-words rounded-xl px-3.5 py-2 text-[15px]', mine ? 'bg-brand text-on-brand' : 'border border-line bg-panel-2 text-fg')}>
+                        <p className="whitespace-pre-wrap">{message.text}</p>
+                        <p className={cn('mt-0.5 text-right text-xs tabular', mine ? 'text-on-brand/70' : 'text-fg-muted')}>{formatTime(message.timestamp)}</p>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </button>
-          ))}
-          {threads.length === 0 && (
-            <div className="p-10 text-center opacity-30">
-              <User className="w-12 h-12 mx-auto mb-4" />
-              <p className="text-[10px] font-black uppercase tracking-widest">Нет активных чатов</p>
+
+              <form
+                className="space-y-2 border-t border-line p-3"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleSendMessage();
+                }}
+              >
+                {sendError && <Notice tone="bad">{tr('Message not sent. Try again.', 'Сообщение не отправлено. Попробуй ещё раз.', 'Xabar yuborilmadi. Qayta urinib ko‘ring.')}</Notice>}
+                <div className="flex items-center gap-2">
+                  <TextInput
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    aria-label={tr('Message', 'Сообщение', 'Xabar')}
+                    placeholder={tr('Write a message…', 'Напиши сообщение…', 'Xabar yozing…')}
+                    maxLength={2000}
+                    autoComplete="off"
+                  />
+                  <Button type="submit" disabled={!newMessage.trim()} aria-label={tr('Send', 'Отправить', 'Yuborish')} className="size-11 shrink-0 px-0 sm:size-10">
+                    <Send className="size-4" aria-hidden="true" />
+                  </Button>
+                </div>
+              </form>
+            </>
+          ) : (
+            <div className="flex flex-1 items-center justify-center p-6">
+              <EmptyState
+                icon={<MessageSquare className="size-5" />}
+                title={tr('Pick a chat', 'Выбери чат', 'Chatni tanlang')}
+                text={tr('Choose a conversation on the left or find a person to message.', 'Выбери разговор слева или найди человека, которому хочешь написать.', 'Chapdagi suhbatni tanlang yoki yozmoqchi bo‘lgan odamni toping.')}
+              />
             </div>
           )}
-        </div>
+        </Panel>
       </div>
-
-      {/* Chat Area */}
-      <div className={`
-        flex-1 bg-[var(--card)] border border-[var(--border)] rounded-[2.5rem] overflow-hidden flex flex-col relative
-        ${!selectedThread ? 'hidden md:flex' : 'flex'}
-      `}>
-        {selectedThread ? (
-          <>
-            {/* Header */}
-            <div className="p-6 border-b border-[var(--border)] flex items-center gap-4">
-              <button 
-                onClick={() => setSelectedThread(null)}
-                className="md:hidden text-gray-500"
-              >
-                <ArrowLeft className="w-6 h-6" />
-              </button>
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black overflow-hidden shadow-lg shadow-indigo-500/10">
-                {getOtherParticipantPhoto(selectedThread) ? (
-                  <img src={getOtherParticipantPhoto(selectedThread)!} alt={getOtherParticipantName(selectedThread)} className="w-full h-full object-cover" />
-                ) : (
-                  getOtherParticipantName(selectedThread)[0]
-                )}
-              </div>
-              <div className="flex-1">
-                <h3 className="font-black text-[var(--text)]">{getOtherParticipantName(selectedThread)}</h3>
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">В сети</span>
-                </div>
-              </div>
-              <button className="text-gray-400 hover:text-indigo-500 transition-colors">
-                <MoreHorizontal className="w-6 h-6" />
-              </button>
-            </div>
-
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-              {messages.map((msg, i) => (
-                <div 
-                  key={msg.id} 
-                  className={`flex ${msg.senderId === user?.uid ? 'justify-end' : 'justify-start'}`}
-                >
-                  <div className={`
-                    max-w-[80%] md:max-w-[70%] p-4 rounded-3xl text-sm leading-relaxed
-                    ${msg.senderId === user?.uid 
-                      ? 'bg-indigo-600 text-white rounded-tr-none shadow-lg shadow-indigo-500/20' 
-                      : 'bg-[var(--input)] text-[var(--text)] rounded-tl-none border border-[var(--border)]'}
-                  `}>
-                    {msg.text}
-                    <div className={`text-[8px] mt-1 font-black uppercase tracking-widest ${msg.senderId === user?.uid ? 'text-white/50' : 'text-gray-500'}`}>
-                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input */}
-            <div className="p-6 border-t border-[var(--border)] bg-[var(--bg)]/50 backdrop-blur-md">
-              <div className="flex gap-4">
-                <input 
-                  type="text"
-                  placeholder="Введите сообщение..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyUp={(e) => e.key === 'Enter' && handleSendMessage()}
-                  className="flex-1 bg-[var(--input)] border border-[var(--border)] rounded-2xl px-6 py-4 text-sm font-bold text-[var(--text)] focus:outline-none focus:border-indigo-500/50 transition-all shadow-inner"
-                />
-                <Button 
-                  onClick={handleSendMessage}
-                  disabled={!newMessage.trim()}
-                  className="w-14 h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-500 p-0 shadow-lg shadow-indigo-500/30 group"
-                >
-                  <Send className="w-6 h-6 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
-                </Button>
-              </div>
-            </div>
-          </>
-        ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center p-10 opacity-30">
-            <div className="w-24 h-24 bg-indigo-600/10 rounded-[3rem] flex items-center justify-center text-indigo-500 mb-8">
-              <MessageSquare className="w-10 h-10" />
-            </div>
-            <h3 className="text-2xl font-black uppercase tracking-tight text-[var(--text)] mb-2">Ваши сообщения</h3>
-            <p className="max-w-xs text-sm font-medium">Выберите чат из списка или найдите пользователя по имени, чтобы начать общение.</p>
-          </div>
-        )}
-      </div>
-    </div>
+    </>
   );
 };

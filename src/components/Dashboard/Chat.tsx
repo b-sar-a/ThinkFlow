@@ -1,286 +1,219 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Paperclip, X, User, Bot, Loader2 } from 'lucide-react';
+import { Send, Paperclip, X, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useAuth } from '../../context/AuthContext';
-import { useLanguage } from '../../context/LanguageContext';
+import { useTr } from '../../context/LanguageContext';
 import { AIModelType, Message, Attachment, ChatSession } from '../../types';
 import { askThinkFlowAI } from '../../services/gemini';
 import { db } from '../../lib/firebase';
-import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, addDoc } from 'firebase/firestore';
-import { Button } from '../UI/Button';
-import { Card } from '../UI/Card';
+import { doc, onSnapshot, updateDoc, collection, addDoc } from 'firebase/firestore';
+import { Badge, Button, Chip, IconButton, Notice, cn } from '../ds';
 
 interface ChatProps {
   type: AIModelType;
   sessionId?: string;
+  /** What the student is studying right now. Sent to the AI with each question, not shown in the chat. */
+  context?: string;
 }
 
-export const Chat: React.FC<ChatProps> = ({ type, sessionId: initialSessionId }) => {
+const XP_PER_QUESTION = 15;
+
+export const Chat: React.FC<ChatProps> = ({ type, sessionId: initialSessionId, context }) => {
   const { profile, user, updateProfileData } = useAuth();
-  const { t } = useLanguage();
+  const tr = useTr();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [attachment, setAttachment] = useState<Attachment | null>(null);
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
+  const [error, setError] = useState<string | null>(null);
+  const [xpGain, setXpGain] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [floatingXP, setFloatingXP] = useState<{ id: number; amount: number }[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const addXP = async (amount: number) => {
     if (!profile || !user) return;
-    const newXP = (profile.xp || 0) + amount;
-    await updateProfileData({ xp: newXP });
-    
-    const id = Date.now();
-    setFloatingXP(prev => [...prev, { id, amount }]);
-    setTimeout(() => setFloatingXP(prev => prev.filter(x => x.id !== id)), 2000);
+    await updateProfileData({ xp: (profile.xp || 0) + amount });
+    setXpGain(amount);
+    setTimeout(() => setXpGain(null), 2500);
   };
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages]);
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+  }, [messages, isLoading]);
 
   useEffect(() => {
     if (!user || !sessionId) return;
-
-    const sessionRef = doc(db, 'sessions', sessionId);
-    
-    const unsubscribe = onSnapshot(sessionRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setMessages((docSnap.data() as ChatSession).messages);
-      }
-    }, (error) => {
-      console.error("Chat session fetch error:", error);
-    });
-
+    const unsubscribe = onSnapshot(
+      doc(db, 'sessions', sessionId),
+      (docSnap) => {
+        if (docSnap.exists()) setMessages((docSnap.data() as ChatSession).messages);
+      },
+      (err) => console.error('Chat session fetch error:', err)
+    );
     return () => unsubscribe();
   }, [user, sessionId]);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (evt) => {
       const base64 = (evt.target?.result as string).split(',')[1];
-      setAttachment({
-        data: base64,
-        mimeType: file.type,
-        name: file.name
-      });
+      setAttachment({ data: base64, mimeType: file.type, name: file.name });
     };
     reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
-  const sendMessage = async () => {
-    if ((!input.trim() && !attachment) || !user || !profile || isLoading) return;
+  const sendMessage = async (text = input) => {
+    if ((!text.trim() && !attachment) || !user || !profile || isLoading) return;
 
-    const userMsg: Message = {
-      role: 'user',
-      text: input,
-      timestamp: Date.now()
-    };
-
-    if (attachment) {
-      userMsg.attachment = attachment;
-    }
+    const userMsg: Message = { role: 'user', text, timestamp: Date.now() };
+    if (attachment) userMsg.attachment = attachment;
 
     const newMessages = [...messages, userMsg];
     setMessages(newMessages);
     setInput('');
     setAttachment(null);
+    setError(null);
     setIsLoading(true);
 
     try {
-      const aiResponse = await askThinkFlowAI(type, input, profile, messages, attachment || undefined);
-      
-      const modelMsg: Message = {
-        role: 'model',
-        text: aiResponse,
-        timestamp: Date.now()
-      };
+      const prompt = context ? `[${tr('Topic', 'Тема', 'Mavzu')}: ${context}] ${text}` : text;
+      const aiResponse = await askThinkFlowAI(type, prompt, profile, messages, attachment || undefined);
+      const finalMessages = [...newMessages, { role: 'model', text: aiResponse, timestamp: Date.now() } as Message];
 
-      const finalMessages = [...newMessages, modelMsg];
-      
       if (!sessionId) {
-        const sessionData = {
+        const docRef = await addDoc(collection(db, 'sessions'), {
           userId: user.uid,
-          title: (input.slice(0, 30) || "New Conversation").trim(),
+          title: (text.slice(0, 30) || 'New Conversation').trim(),
           type,
           messages: finalMessages,
-          lastUpdated: Date.now()
-        };
-        const docRef = await addDoc(collection(db, 'sessions'), sessionData);
+          lastUpdated: Date.now(),
+        });
         setSessionId(docRef.id);
       } else {
-        await updateDoc(doc(db, 'sessions', sessionId), {
-          messages: finalMessages,
-          lastUpdated: Date.now()
-        });
+        await updateDoc(doc(db, 'sessions', sessionId), { messages: finalMessages, lastUpdated: Date.now() });
       }
-
-      // Update XP
-      await addXP(15);
-    } catch (error: any) {
-      console.error("Chat error:", error);
-      let errorMessage = error?.message || "I'm sorry, I encountered an error. Please try again.";
-      
-      if (error?.message === "PRO_LIMIT_REACHED") {
-        if (profile?.language === 'ru') {
-          errorMessage = "Лимит токенов ИИ исчерпан ⚡ Загляни в раздел «Бонусы и Коды» — там можно получить дополнительную квоту.";
-        } else if (profile?.language === 'uz') {
-          errorMessage = "AI tokenlar limiti tugadi ⚡ Qo'shimcha kvota olish uchun «Bonuslar & Kodlar» bo'limiga o'ting.";
-        } else {
-          errorMessage = "AI token quota reached ⚡ Check the “Bonuses & Codes” section to get extra quota.";
-        }
-      }
-
-      setMessages(prev => [...prev, {
-        role: 'model',
-        text: `⚠️ **Error**: ${errorMessage}`,
-        timestamp: Date.now()
-      }]);
+      await addXP(XP_PER_QUESTION);
+    } catch (err: any) {
+      console.error('Chat error:', err);
+      setMessages(messages); // take the unanswered question back out of the log
+      setInput(text);
+      setError(
+        err?.message === 'PRO_LIMIT_REACHED'
+          ? tr(
+              'AI token limit reached. Get more in “Bonuses & codes”.',
+              'Лимит ИИ-токенов исчерпан. Получи ещё в разделе «Бонусы и коды».',
+              'AI token limiti tugadi. «Bonus va kodlar» bo‘limidan oling.'
+            )
+          : err?.message || tr('Something went wrong. Try again.', 'Что-то пошло не так. Попробуй ещё раз.', 'Xatolik yuz berdi. Qayta urinib ko‘ring.')
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
+  const starters = [
+    tr('Explain it more simply', 'Объясни проще', 'Oddiyroq tushuntir'),
+    tr('Give me another example', 'Приведи ещё пример', 'Yana bir misol keltir'),
+    tr('Quiz me on this', 'Задай мне вопрос по теме', 'Shu mavzu bo‘yicha savol ber'),
+  ];
+
   return (
-    <div className="flex flex-col h-[calc(100vh-160px)] max-w-5xl mx-auto w-full relative">
-      <AnimatePresence>
-        {floatingXP.map(xp => (
-          <motion.div
-            key={xp.id}
-            initial={{ opacity: 0, scale: 0.5, y: 0 }}
-            animate={{ opacity: 1, scale: 1, y: -100 }}
-            exit={{ opacity: 0 }}
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 z-50 text-indigo-400 font-black text-4xl pointer-events-none drop-shadow-glow"
-          >
-            +{xp.amount} XP
-          </motion.div>
-        ))}
-      </AnimatePresence>
-      <div 
-        ref={scrollRef}
-        className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 custom-scrollbar"
-      >
-        {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center opacity-40 space-y-6 px-4">
-            <div className="w-32 h-32 bg-indigo-600/10 rounded-[3rem] flex items-center justify-center text-6xl shadow-inner">
-              {type === 'teacher' ? '🎓' : type === 'coach' ? '🧠' : '⚡'}
-            </div>
-            <div className="space-y-3">
-              <h3 className="text-3xl font-black uppercase tracking-tighter text-[var(--text)]">
-                {t.thinkFlow} {type}
-              </h3>
-              <p className="text-[11px] font-black uppercase tracking-[0.3em] max-w-md mx-auto leading-relaxed text-[var(--muted)]">
-                {type === 'teacher' ? t.feat1 : type === 'coach' ? t.feat2 : t.feat3}
-              </p>
+    <div className="flex h-full min-h-[420px] flex-col">
+      <div ref={scrollRef} role="log" aria-live="polite" className="scroll-area min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+        {messages.length === 0 && !isLoading ? (
+          <div className="flex h-full flex-col items-center justify-center gap-4 text-center">
+            <p className="max-w-xs text-[15px] text-fg-muted">
+              {tr(
+                'Ask anything about this topic. Answers use your interests as examples.',
+                'Спроси что угодно по этой теме. Объяснения строятся на твоих интересах.',
+                'Shu mavzu bo‘yicha istalgan savolni bering. Javoblar qiziqishlaringiz asosida.'
+              )}
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              {starters.map((starter) => (
+                <Chip key={starter} onClick={() => sendMessage(starter)} disabled={isLoading}>
+                  {starter}
+                </Chip>
+              ))}
             </div>
           </div>
         ) : (
           messages.map((m, i) => (
-            <div 
-              key={i} 
-              className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-4 duration-500`}
-            >
-              <div className={`
-                flex gap-4 max-w-[85%] 
-                ${m.role === 'user' ? 'flex-row-reverse' : 'flex-row'}
-              `}>
-                <div className={`
-                  w-10 h-10 rounded-xl flex items-center justify-center shrink-0
-                  ${m.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-[var(--input)] text-[var(--text)]'}
-                `}>
-                  {m.role === 'user' ? <User className="w-5 h-5" /> : <Bot className="w-5 h-5" />}
-                </div>
-                <div className={`
-                  p-5 md:p-6 rounded-2xl md:rounded-[2rem] shadow-xl break-words
-                  ${m.role === 'user' 
-                    ? 'bg-indigo-600 text-white rounded-tr-none' 
-                    : 'bg-[var(--card)] border border-[var(--border)] rounded-tl-none text-[var(--text)]'}
-                `}>
-                  {m.attachment && (
-                    <div className="mb-4 rounded-xl overflow-hidden border border-white/10 bg-black/20 max-w-sm">
-                      <img 
-                        src={`data:${m.attachment.mimeType};base64,${m.attachment.data}`} 
-                        className="max-h-60 w-full object-contain" 
-                        alt="Attachment" 
-                      />
-                    </div>
-                  )}
-                  <div className="prose dark:prose-invert prose-sm max-w-none">
-                    <ReactMarkdown>{m.text}</ReactMarkdown>
-                  </div>
+            <div key={i} className={cn('flex', m.role === 'user' ? 'justify-end' : 'justify-start')}>
+              <div
+                className={cn(
+                  'max-w-[88%] break-words rounded-xl px-4 py-2.5 text-[15px] leading-relaxed',
+                  m.role === 'user' ? 'bg-brand text-on-brand' : 'border border-line bg-panel-2 text-fg'
+                )}
+              >
+                {m.attachment && (
+                  <img
+                    src={`data:${m.attachment.mimeType};base64,${m.attachment.data}`}
+                    className="mb-2 max-h-56 rounded-lg object-contain"
+                    alt={m.attachment.name || tr('Attachment', 'Вложение', 'Ilova')}
+                  />
+                )}
+                <div className="md">
+                  <ReactMarkdown>{m.text}</ReactMarkdown>
                 </div>
               </div>
             </div>
           ))
         )}
         {isLoading && (
-          <div className="flex gap-4 animate-in fade-in">
-            <div className="w-10 h-10 rounded-xl bg-[var(--input)] flex items-center justify-center">
-              <Loader2 className="w-5 h-5 animate-spin text-indigo-500" />
-            </div>
-            <div className="bg-[var(--card)] border border-[var(--border)] p-6 rounded-[2rem] rounded-tl-none">
-              <div className="flex gap-1">
-                <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
-            </div>
+          <div role="status" className="flex items-center gap-2 text-sm text-fg-muted">
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            {tr('Thinking…', 'Думаю…', 'O‘ylayapman…')}
           </div>
         )}
       </div>
 
-      <div className="p-6 md:p-10 border-t border-[var(--border)] bg-[var(--bg)]/50 backdrop-blur-md">
-        <div className="max-w-4xl mx-auto flex items-end gap-4 md:gap-6">
-          <div className="flex-1 relative">
-            {attachment && (
-              <div className="absolute -top-14 left-0 flex items-center gap-2 bg-indigo-600 text-white px-4 py-2 rounded-2xl text-[10px] font-black uppercase animate-in slide-in-from-bottom-2 shadow-lg">
-                <span className="truncate max-w-[150px]">{attachment.name}</span>
-                <button onClick={() => setAttachment(null)} className="ml-2 hover:text-red-400 transition-colors">
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-            <textarea 
-              value={input} 
-              onChange={e => setInput(e.target.value)} 
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }} 
-              placeholder={t.chatPlaceholder} 
-              className={`
-                w-full bg-[var(--input)] border border-[var(--border)] 
-                rounded-[2rem] p-5 pr-16 outline-none focus:border-indigo-500 transition-all 
-                resize-none h-16 md:h-20 text-[var(--text)] text-sm font-medium
-              `} 
-            />
-            <label className="absolute right-5 bottom-5 cursor-pointer text-slate-500 hover:text-indigo-500 transition-colors">
-              <input 
-                type="file" 
-                className="hidden" 
-                onChange={handleFileUpload} 
-                accept="image/*" 
-              />
-              <Paperclip className="w-6 h-6" />
-            </label>
+      <div className="space-y-2 border-t border-line p-3">
+        {error && <Notice tone="bad">{error}</Notice>}
+        {attachment && (
+          <div className="flex w-fit items-center gap-1 rounded-lg bg-panel-2 py-1 pl-3 pr-1 text-sm">
+            <span className="max-w-[200px] truncate">{attachment.name}</span>
+            <IconButton label={tr('Remove attachment', 'Убрать вложение', 'Ilovani olib tashlash')} onClick={() => setAttachment(null)} className="size-8">
+              <X className="size-4" />
+            </IconButton>
           </div>
-          <Button 
-            onClick={sendMessage} 
+        )}
+        <div className="flex items-end gap-2">
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+              }
+            }}
+            aria-label={tr('Your question', 'Твой вопрос', 'Savolingiz')}
+            placeholder={tr('Type a question…', 'Напиши вопрос…', 'Savol yozing…')}
+            rows={2}
+            className="min-h-[52px] flex-1 resize-none rounded-lg border border-line-strong bg-panel px-3 py-2.5 text-[15px] text-fg placeholder:text-fg-muted/70 hover:border-fg-muted"
+          />
+          <input ref={fileRef} type="file" accept="image/*" className="sr-only" tabIndex={-1} onChange={handleFileUpload} />
+          <IconButton label={tr('Attach an image', 'Прикрепить изображение', 'Rasm biriktirish')} onClick={() => fileRef.current?.click()}>
+            <Paperclip className="size-5" />
+          </IconButton>
+          <Button
+            onClick={() => sendMessage()}
             disabled={(!input.trim() && !attachment) || isLoading}
-            className="w-16 h-16 md:w-20 md:h-20 rounded-full p-0 shrink-0"
+            aria-label={tr('Send', 'Отправить', 'Yuborish')}
+            className="size-11 px-0 sm:size-10"
           >
-            <Send className="w-8 h-8" />
+            <Send className="size-4" aria-hidden="true" />
           </Button>
+        </div>
+        <div className="flex items-center justify-between text-xs text-fg-muted">
+          <span>{tr('Enter to send, Shift+Enter for a new line', 'Enter — отправить, Shift+Enter — новая строка', 'Enter — yuborish, Shift+Enter — yangi qator')}</span>
+          <span aria-live="polite">{xpGain && <Badge tone="hl">+{xpGain} XP</Badge>}</span>
         </div>
       </div>
     </div>
