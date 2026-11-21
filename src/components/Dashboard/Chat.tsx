@@ -15,9 +15,11 @@ import { Card } from '../UI/Card';
 interface ChatProps {
   type: AIModelType;
   sessionId?: string;
+  /** What the student is studying now. It goes to the AI with each question but is not shown in the chat. */
+  context?: string;
 }
 
-export const Chat: React.FC<ChatProps> = ({ type, sessionId: initialSessionId }) => {
+export const Chat: React.FC<ChatProps> = ({ type, sessionId: initialSessionId, context }) => {
   const { profile, user, updateProfileData } = useAuth();
   const { t } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -96,7 +98,7 @@ export const Chat: React.FC<ChatProps> = ({ type, sessionId: initialSessionId })
     setIsLoading(true);
 
     try {
-      const aiResponse = await askThinkFlowAI(type, input, profile, messages, attachment || undefined);
+      const aiResponse = await askThinkFlowAI(type, context ? `[${context}] ${input}` : input, profile, messages, attachment || undefined);
       
       const modelMsg: Message = {
         role: 'model',

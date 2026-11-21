@@ -98,7 +98,7 @@ const App: React.FC = () => {
 
   const renderView = () => {
     switch (currentView) {
-      case 'genius_lab': return <GeniusLab />;
+      case 'genius_lab': return <GeniusLab onNavigate={setCurrentView} />;
       case 'community': return <Community />;
       case 'messages': return <Messages />;
       case 'tasks': return <Tasks />;
@@ -110,7 +110,7 @@ const App: React.FC = () => {
       case 'progress': return <Progress />;
       case 'settings': return <Settings />;
       case 'admin': return <Admin />;
-      default: return <GeniusLab />;
+      default: return <GeniusLab onNavigate={setCurrentView} />;
     }
   };
 
