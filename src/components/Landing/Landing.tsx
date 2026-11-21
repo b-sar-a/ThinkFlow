@@ -1,11 +1,12 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { motion, useScroll, useTransform, useSpring, useInView } from 'framer-motion';
 import { Brain, Sparkles, Target, Users, ArrowRight, Zap, Globe, ShieldCheck, Star, Cpu, Rocket, PlayCircle, Fingerprint, ChevronRight, Activity, Layers, Code, Magnet } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '../UI/Button';
 import { Card } from '../UI/Card';
 import { GeniusBackground } from '../UI/GeniusBackground';
+import { LegalModal, type LegalTab } from '../Legal/LegalModal';
 
 interface LandingProps {
   onGetStarted: () => void;
@@ -70,6 +71,8 @@ const FeatureCard = ({ feature, index }: { feature: any, index: number }) => {
 export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
   const { t, language, setLanguage } = useLanguage();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [legalTab, setLegalTab] = useState<LegalTab | null>(null);
+  const termsLabel = language === 'ru' ? 'Условия' : language === 'uz' ? 'Shartlar' : 'Terms';
   
   const { scrollYProgress } = useScroll({
     target: containerRef,
@@ -357,11 +360,11 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
 
             <div className="grid grid-cols-2 gap-8 pt-6">
               <div>
-                <div className="text-5xl font-black text-white mb-2">3.5X</div>
+                <div className="text-5xl font-black text-white mb-2">3</div>
                 <div className="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-500">{t.speedBoost}</div>
               </div>
               <div>
-                <div className="text-5xl font-black text-white mb-2">98%</div>
+                <div className="text-5xl font-black text-white mb-2">24/7</div>
                 <div className="text-[10px] font-black uppercase tracking-[0.4em] text-emerald-500">{t.retention}</div>
               </div>
             </div>
@@ -438,9 +441,9 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
             
             <div className="flex items-center gap-8 text-[10px] font-black uppercase tracking-[0.2em] text-gray-600">
               <a href="https://t.me/b_sar_a" target="_blank" rel="noopener noreferrer" className="text-indigo-500 hover:text-white transition-colors">{t.navContact}</a>
-              <a href="#" className="hover:text-white transition-colors">{t.privacy}</a>
-              <a href="#" className="hover:text-white transition-colors">{t.security}</a>
-              <a href="#" className="hover:text-white transition-colors">{t.contactFooter}</a>
+              <button onClick={() => setLegalTab('privacy')} className="hover:text-white transition-colors uppercase">{t.privacy}</button>
+              <button onClick={() => setLegalTab('terms')} className="hover:text-white transition-colors uppercase">{termsLabel}</button>
+              <button onClick={() => setLegalTab('safety')} className="hover:text-white transition-colors uppercase">{t.security}</button>
             </div>
           </div>
 
@@ -449,6 +452,8 @@ export const Landing: React.FC<LandingProps> = ({ onGetStarted }) => {
           </div>
         </div>
       </footer>
+
+      <LegalModal isOpen={legalTab !== null} onClose={() => setLegalTab(null)} initialTab={legalTab ?? 'privacy'} />
     </div>
   );
 };

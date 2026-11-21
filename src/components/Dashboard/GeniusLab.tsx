@@ -16,7 +16,7 @@ const presetTemplates = [
   {
     id: 'physics_ege',
     title: 'Подготовка к ЕГЭ по физике',
-    titleEn: 'Physics USE Prep',
+    titleEn: 'Physics Exam Prep',
     icon: '⚡',
     theme: 'border-amber-500/30 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500 bg-amber-500/5',
     tree: {
@@ -388,7 +388,7 @@ export const GeniusLab: React.FC = () => {
               transition={{ duration: 15, repeat: Infinity }}
               className="w-56 h-56 rounded-[3rem] bg-gradient-to-br from-indigo-600/30 to-purple-600/30 backdrop-blur-3xl flex items-center justify-center border border-white/20 shadow-[0_0_80px_rgba(79,70,229,0.5)] relative overflow-hidden"
             >
-              <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
+              <div className="absolute inset-0 bg-noise opacity-20" />
               <Brain className="w-24 h-24 text-indigo-400 drop-shadow-[0_0_20px_rgba(129,140,248,1)]" />
             </motion.div>
 

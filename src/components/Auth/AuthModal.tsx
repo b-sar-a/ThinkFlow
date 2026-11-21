@@ -6,6 +6,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '../UI/Button';
 import { Card } from '../UI/Card';
+import { LegalModal, type LegalTab } from '../Legal/LegalModal';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -25,6 +26,13 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [legalTab, setLegalTab] = useState<LegalTab | null>(null);
+  const consent =
+    language === 'ru'
+      ? { pre: 'Регистрируясь, ты принимаешь', terms: 'Условия', and: 'и', privacy: 'Политику приватности', kids: 'Если тебе меньше 14 лет — только с согласия родителей.' }
+      : language === 'uz'
+        ? { pre: 'Ro' + '‘yxatdan o' + '‘tib, siz qabul qilasiz:', terms: 'Shartlar', and: 'va', privacy: 'Maxfiylik siyosati', kids: '14 yoshdan kichiklar faqat ota-ona roziligi bilan.' }
+        : { pre: 'By signing up you accept the', terms: 'Terms', and: 'and', privacy: 'Privacy Policy', kids: 'If you are under 14, use ThinkFlow with a parent’s consent.' };
 
   const handleMouseMove = (e: React.MouseEvent) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -196,6 +204,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 </motion.div>
               )}
 
+              {!isLogin && (
+                <p className="text-xs leading-relaxed text-white/40">
+                  {consent.pre}{' '}
+                  <button type="button" onClick={() => setLegalTab('terms')} className="text-indigo-400 underline">{consent.terms}</button>
+                  {' '}{consent.and}{' '}
+                  <button type="button" onClick={() => setLegalTab('privacy')} className="text-indigo-400 underline">{consent.privacy}</button>. {consent.kids}
+                </p>
+              )}
+
               <div className="grid grid-cols-1 gap-4">
                 <Button 
                   type="submit" 
@@ -269,6 +286,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           </div>
         </Card>
       </motion.div>
+      <LegalModal isOpen={legalTab !== null} onClose={() => setLegalTab(null)} initialTab={legalTab ?? 'privacy'} />
     </div>
   );
 };

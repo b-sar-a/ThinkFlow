@@ -31,6 +31,13 @@ export interface UserProfile {
   geniusMode?: boolean;
   aiTokensUsed?: number;
   aiTokenLimit?: number;
+  studentClass?: string;
+  onboarded?: boolean;
+  goal?: string;
+  streakDays?: number;
+  longestStreak?: number;
+  lastActiveDate?: string;
+  referralCount?: number;
   learningDepth?: 'Surface' | 'Deep' | 'Architect';
   explanationStyle?: 'Metaphorical' | 'Technical' | 'Simple';
 }

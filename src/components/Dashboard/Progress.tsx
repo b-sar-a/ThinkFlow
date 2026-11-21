@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Trophy, Zap, Target, Star, TrendingUp, Loader2 } from 'lucide-react';
+import { BarChart3, Trophy, Zap, Target, Star } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../UI/Card';
@@ -40,7 +40,7 @@ export const Progress: React.FC = () => {
     { label: t.totalXP, value: profile.xp.toLocaleString(), icon: Zap, color: "text-indigo-500" },
     { label: t.currentLevelLabel, value: profile.level, icon: Trophy, color: "text-yellow-500" },
     { label: t.tasksDone, value: completedTasksCount !== null ? completedTasksCount : "...", icon: Target, color: "text-emerald-500" },
-    { label: t.dailyStreak, value: Math.min(30, (profile.level * 2) + (profile.xp % 3)), icon: Star, color: "text-purple-500" },
+    { label: t.dailyStreak, value: profile.streakDays ?? 0, icon: Star, color: "text-purple-500" },
   ];
 
   return (
@@ -95,21 +95,21 @@ export const Progress: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                <TrendingUp className="w-6 h-6" />
-              </div>
-              <div>
-                <p className="text-xs font-black uppercase text-[var(--text)]">{t.growthRate}</p>
-                <p className="text-[var(--muted)] text-[10px] font-bold">+{Math.floor((profile.xp % 100) / 10) + 2}% {t.thisWeek}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-500">
                 <Zap className="w-6 h-6" />
               </div>
               <div>
                 <p className="text-xs font-black uppercase text-[var(--text)]">{t.dailyStreak}</p>
-                <p className="text-[var(--muted)] text-[10px] font-bold">{Math.min(30, (profile.level * 2) + (profile.xp % 3))} {t.days}</p>
+                <p className="text-[var(--muted)] text-[10px] font-bold">{profile.streakDays ?? 0} {t.days}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                <Trophy className="w-6 h-6" />
+              </div>
+              <div>
+                <p className="text-xs font-black uppercase text-[var(--text)]">{t.xpNextLevel}</p>
+                <p className="text-[var(--muted)] text-[10px] font-bold">{1000 - (profile.xp % 1000)} XP</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -117,8 +117,8 @@ export const Progress: React.FC = () => {
                 <Target className="w-6 h-6" />
               </div>
               <div>
-                <p className="text-xs font-black uppercase text-[var(--text)]">{t.focusScore}</p>
-                <p className="text-[var(--muted)] text-[10px] font-bold">{70 + (profile.xp % 25)}/100</p>
+                <p className="text-xs font-black uppercase text-[var(--text)]">{t.tasksDone}</p>
+                <p className="text-[var(--muted)] text-[10px] font-bold">{completedTasksCount ?? "…"}</p>
               </div>
             </div>
           </div>

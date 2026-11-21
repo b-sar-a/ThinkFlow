@@ -91,7 +91,13 @@ service cloud.firestore {
              (!('uid' in data) || data.uid is string) &&
              data.email is string && isValidEmail(data.email) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             (!('age' in data) || data.age is number) &&
+             (!('age' in data) || (data.age is number && data.age >= 5 && data.age <= 100)) &&
+             (!('onboarded' in data) || data.onboarded is bool) &&
+             (!('goal' in data) || (data.goal is string && data.goal.size() < 100)) &&
+             (!('streakDays' in data) || (data.streakDays is number && data.streakDays >= 0 && data.streakDays <= 3650)) &&
+             (!('longestStreak' in data) || (data.longestStreak is number && data.longestStreak >= 0 && data.longestStreak <= 3650)) &&
+             (!('lastActiveDate' in data) || (data.lastActiveDate is string && data.lastActiveDate.size() == 10)) &&
+             (!('referralCount' in data) || data.referralCount is number) &&
              (!('studentClass' in data) || data.studentClass is string) &&
              (!('interests' in data) || data.interests is list) &&
              (!('xp' in data) || data.xp is number) &&
@@ -173,6 +179,11 @@ service cloud.firestore {
              request.resource.data.get('level', 1) - resource.data.get('level', 1) <= 3;
     }
 
+    // A streak can grow by one per write (or restart); it can never jump ahead.
+    function safeStreak() {
+      return request.resource.data.get('streakDays', 0) <= resource.data.get('streakDays', 0) + 1;
+    }
+
     match /users/{userId} {
       allow read: if isAuthenticated();
       allow create: if isOwner(userId) && isValidUser(request.resource.data) &&
@@ -181,13 +192,17 @@ service cloud.firestore {
                         request.resource.data.get('xp', 0) == 0 &&
                         request.resource.data.get('level', 1) == 1 &&
                         request.resource.data.get('aiTokensUsed', 0) == 0 &&
-                        request.resource.data.get('aiTokenLimit', 15000) == 15000
+                        request.resource.data.get('aiTokenLimit', 15000) == 15000 &&
+                        request.resource.data.get('referralCount', 0) == 0 &&
+                        request.resource.data.get('streakDays', 0) <= 1
                       ));
       allow update: if isAdmin() ||
                       (isOwner(userId) && isValidUser(request.resource.data) &&
                        request.resource.data.role == resource.data.role &&
                        lockedField('aiTokenLimit', 15000) &&
                        lockedField('aiTokensUsed', 0) &&
+                       lockedField('referralCount', 0) &&
+                       safeStreak() &&
                        safeProgress());
       allow delete: if isAdmin();
     }

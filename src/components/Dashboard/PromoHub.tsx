@@ -50,10 +50,12 @@ export const PromoHub: React.FC = () => {
     }
   };
 
-  const referralUrl = `https://thinkflow.ai/join?ref=${profile?.uid?.slice(0, 6) || 'genius'}`;
+  // Invite code = first 8 characters of the user id; the server credits both sides once.
+  const referralUrl = `${window.location.origin}/?ref=${profile?.uid?.slice(0, 8) ?? ''}`;
+  const invited = profile?.referralCount ?? 0;
   
-  const referralShareTextEn = `Unlock your academic genius with ThinkFlow AI! Use my invite link to claim an instant +500 token quota bonus: ${referralUrl}`;
-  const referralShareTextRu = `Активируй свой учебный интеллект с ИИ-помощником ThinkFlow! Переходи по моей ссылке и получи мгновенные +500 токенов на счет: ${referralUrl}`;
+  const referralShareTextEn = `Unlock your academic genius with ThinkFlow AI! Use my invite link to get +1,000 AI tokens when you join: ${referralUrl}`;
+  const referralShareTextRu = `Активируй свой учебный интеллект с ИИ-помощником ThinkFlow! Переходи по моей ссылке и получи +1 000 токенов ИИ при регистрации: ${referralUrl}`;
 
   const copyReferralLink = () => {
     setIsCopyingLink(true);
@@ -114,16 +116,21 @@ export const PromoHub: React.FC = () => {
                 <h3 className="font-black text-white uppercase tracking-tighter text-base leading-none">
                   {currentThemeText("Invite your Friends", "Пригласить друзей")}
                 </h3>
-                <span className="text-[10px] text-indigo-400 font-black uppercase tracking-widest block mt-1">Get +500 tokens for each friend</span>
+                <span className="text-[10px] text-indigo-400 font-black uppercase tracking-widest block mt-1">{currentThemeText("Get +1,000 tokens for each friend", "+1 000 токенов за каждого друга")}</span>
               </div>
             </div>
 
             <p className="text-xs text-gray-400 leading-relaxed">
               {currentThemeText(
-                "When friends sign up using your unique invitation, you will receive a +500 quota boost. They also get a starting +500 token reward to explore physics, algebra, and chemistry!",
-                "Когда ваши друзья регистрируются по вашему приглашению, их квота ИИ увеличивается на +500 токенов. Вы также получаете +500 бонусных токенов на свой баланс!"
+                "When a friend signs up with your link, you both get +1,000 AI tokens. Friends must be new accounts, and up to 20 invites pay out.",
+                "Когда друг регистрируется по твоей ссылке, вы оба получаете +1 000 токенов ИИ. Друг должен быть новым пользователем; награда выплачивается за первые 20 приглашений."
               )}
             </p>
+            {invited > 0 && (
+              <p className="text-xs font-black uppercase tracking-widest text-emerald-400">
+                {currentThemeText(`Friends joined: ${invited}`, `Присоединилось друзей: ${invited}`)}
+              </p>
+            )}
 
             <div className="space-y-2 pt-2">
               <label className="text-[9px] font-black uppercase text-gray-500 tracking-wider block">Your Invite URL</label>

@@ -13,7 +13,7 @@ import { Card } from '../UI/Card';
 
 export const ProfileEditor: React.FC = () => {
   const { user, profile, updateProfileData } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [isSaving, setIsSaving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [selectedInterests, setSelectedInterests] = useState<string[]>(profile?.interests || []);
@@ -134,7 +134,7 @@ export const ProfileEditor: React.FC = () => {
             {t.profile}
           </h2>
           <p className="text-[var(--muted)] font-medium mt-2">
-            Customize your digital identity in the ThinkFlow ecosystem.
+            {language === 'ru' ? 'Расскажи о себе — так ИИ объясняет лучше.' : language === 'uz' ? 'O‘zingiz haqingizda yozing — AI yaxshiroq tushuntiradi.' : 'Tell us about you so the AI can explain better.'}
           </p>
         </div>
         <motion.div 
@@ -182,7 +182,7 @@ export const ProfileEditor: React.FC = () => {
                 />
               </div>
               <div className="group space-y-2">
-                <label className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest group-focus-within:text-indigo-500 transition-colors">Age</label>
+                <label className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest group-focus-within:text-indigo-500 transition-colors">{language === 'ru' ? 'Возраст' : language === 'uz' ? 'Yosh' : 'Age'}</label>
                 <motion.input 
                   whileFocus={{ scale: 1.01 }}
                   name="age" 
@@ -207,7 +207,7 @@ export const ProfileEditor: React.FC = () => {
           </div>
 
           <motion.div variants={itemVariants} className="mt-10 space-y-4">
-            <label className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">My Interests</label>
+            <label className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">{language === 'ru' ? 'Мои интересы' : language === 'uz' ? 'Qiziqishlarim' : 'My Interests'}</label>
             <div className={`p-8 bg-[var(--input)] rounded-[2.5rem] border border-[var(--border)] grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4`}>
               {INTERESTS.map((i, idx) => {
                 const isSelected = selectedInterests.includes(i);

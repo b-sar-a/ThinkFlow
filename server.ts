@@ -7,7 +7,7 @@ import { createApiRouter } from "./server/apiRouter.js";
 dotenv.config();
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 // Same-origin by default. Set ALLOWED_ORIGINS=https://a.com,https://b.com to allow others.
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map((o) => o.trim()).filter(Boolean);

@@ -43,3 +43,9 @@ export function adminDb(): Firestore | null {
 export async function verifyIdToken(idToken: string) {
   return getAuth(adminApp()).verifyIdToken(idToken);
 }
+
+/** When the Firebase Auth account was created (ms since epoch). */
+export async function accountCreatedAt(uid: string): Promise<number> {
+  const record = await getAuth(adminApp()).getUser(uid);
+  return new Date(record.metadata.creationTime).getTime();
+}

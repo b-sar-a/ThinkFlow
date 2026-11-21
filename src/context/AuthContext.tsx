@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { 
   User, 
   onAuthStateChanged, 
@@ -17,7 +17,23 @@ import {
   getDocFromServer
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../lib/firebase';
-import { UserProfile } from '../types';
+import { UserProfile, Language } from '../types';
+import { captureReferral, claimPendingReferral } from '../lib/referral';
+
+const DEMO_UID = 'demo-uid-123';
+
+/** The language the visitor already chose on the landing page (defaults to Russian). */
+const savedLanguage = (): Language => {
+  try {
+    const saved = localStorage.getItem('tf_lang');
+    if (saved === 'ru' || saved === 'en' || saved === 'uz') return saved;
+  } catch { /* storage blocked */ }
+  return 'ru';
+};
+
+/** Local calendar day as YYYY-MM-DD (a streak follows the student's own midnight). */
+const dayKey = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
 interface AuthContextType {
   user: User | null;
@@ -51,6 +67,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateProfileData = async (data: Partial<UserProfile>) => {
     if (!user) return;
+    if (user.uid === DEMO_UID) {
+      // The demo account has no Firestore document; keep changes in memory only.
+      setProfile(prev => (prev ? { ...prev, ...data } : prev));
+      return;
+    }
     try {
       const userDocRef = doc(db, 'users', user.uid);
       await setDoc(userDocRef, data, { merge: true });
@@ -121,10 +142,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         xp: 0,
         level: 1,
         role: 'student',
-        language: 'en',
+        language: savedLanguage(),
         theme: 'light',
         bio: '',
         geniusMode: true,
+        onboarded: false,
         aiTokensUsed: 0,
         aiTokenLimit: 15000,
         learningDepth: 'Deep',
@@ -219,10 +241,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             xp: 0,
             level: 1,
             role: isOwner ? 'admin' : 'student',
-            language: 'en',
+            language: savedLanguage(),
             theme: 'light',
             bio: '',
             geniusMode: true,
+            onboarded: false,
             aiTokensUsed: 0,
             aiTokenLimit: isOwner ? 1000000 : 15000,
             learningDepth: 'Deep',
@@ -244,6 +267,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return () => unsubscribe();
     }
   }, [user]);
+
+  // Real daily streak: +1 on the first visit of each day, back to 1 after a missed day.
+  const streakWriting = useRef(false);
+  useEffect(() => {
+    if (!user || !profile || user.uid === DEMO_UID || streakWriting.current) return;
+    const today = dayKey(new Date());
+    if (profile.lastActiveDate === today) return;
+    const yesterday = dayKey(new Date(Date.now() - 24 * 60 * 60 * 1000));
+    const streakDays = profile.lastActiveDate === yesterday ? (profile.streakDays ?? 0) + 1 : 1;
+    streakWriting.current = true;
+    setDoc(
+      doc(db, 'users', user.uid),
+      { lastActiveDate: today, streakDays, longestStreak: Math.max(profile.longestStreak ?? 0, streakDays) },
+      { merge: true }
+    )
+      .catch(err => console.warn('Could not update streak:', err))
+      .finally(() => { streakWriting.current = false; });
+  }, [user, profile?.lastActiveDate]);
+
+  // Invite links: remember ?ref= on arrival, credit it once the account exists.
+  useEffect(() => { captureReferral(); }, []);
+  const referralTried = useRef(false);
+  useEffect(() => {
+    if (!user || !profile || user.uid === DEMO_UID || referralTried.current) return;
+    referralTried.current = true;
+    claimPendingReferral(user.uid);
+  }, [user, profile]);
 
   return (
     <AuthContext.Provider value={{ 

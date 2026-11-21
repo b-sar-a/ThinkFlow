@@ -13,13 +13,24 @@ export const Settings: React.FC = () => {
   const { language, setLanguage, t } = useLanguage();
   const { signOut, deleteAccount, geniusMode, setGeniusMode, profile, updateProfileData } = useAuth();
   const [isDeleting, setIsDeleting] = useState(false);
+  const DEPTH_LABEL: Record<string, Record<string, string>> = {
+    Surface: { en: 'Surface', ru: 'Кратко', uz: 'Qisqa' },
+    Deep: { en: 'Deep', ru: 'Глубоко', uz: 'Chuqur' },
+    Architect: { en: 'Architect', ru: 'Эксперт', uz: 'Ekspert' },
+  };
+  const STYLE_LABEL: Record<string, Record<string, string>> = {
+    Metaphorical: { en: 'Metaphorical', ru: 'Через примеры', uz: 'Misollar orqali' },
+    Technical: { en: 'Technical', ru: 'Технически', uz: 'Texnik' },
+    Simple: { en: 'Simple', ru: 'Просто', uz: 'Oddiy' },
+  };
+  const tr = (en: string, ru: string, uz: string) => (language === 'ru' ? ru : language === 'uz' ? uz : en);
 
   const handleGeniusToggle = () => {
     setGeniusMode(!geniusMode);
   };
 
   const handleDeleteAccount = async () => {
-    if (window.confirm('Are you absolutely sure you want to delete your account? This action is irreversible.')) {
+    if (window.confirm(tr('Are you absolutely sure you want to delete your account? This action is irreversible.', 'Точно удалить аккаунт? Это действие необратимо.', 'Hisobni o‘chirishni xohlaysizmi? Bu amalni qaytarib bo‘lmaydi.'))) {
       setIsDeleting(true);
       try {
         await deleteAccount();
@@ -45,7 +56,7 @@ export const Settings: React.FC = () => {
             {t.settings}
           </h2>
           <p className="text-[var(--muted)] font-medium mt-2">
-            Configure your ThinkFlow experience.
+            {tr("Configure your ThinkFlow experience.", "Настрой ThinkFlow под себя.", "ThinkFlow’ni o‘zingizga moslang.")}
           </p>
         </div>
         <div className="w-20 h-20 bg-indigo-600/10 rounded-[2rem] flex items-center justify-center text-indigo-500">
@@ -62,7 +73,7 @@ export const Settings: React.FC = () => {
               </div>
               <div>
                 <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">{t.theme}</h4>
-                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">Switch between light and dark mode</p>
+                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">{tr("Switch between light and dark mode", "Светлая или тёмная тема", "Yorug‘ yoki qorong‘u rejim")}</p>
               </div>
             </div>
             <button 
@@ -88,7 +99,7 @@ export const Settings: React.FC = () => {
               </div>
               <div>
                 <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">{t.language}</h4>
-                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">Select your preferred interface language</p>
+                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">{tr("Select your preferred interface language", "Язык интерфейса и ответов ИИ", "Interfeys va AI javoblari tili")}</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -117,8 +128,8 @@ export const Settings: React.FC = () => {
                 <Bell className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">Notifications</h4>
-                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">Manage your learning alerts</p>
+                <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">{tr("Notifications", "Уведомления", "Bildirishnomalar")}</h4>
+                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">{tr("Manage your learning alerts", "Напоминания об учёбе", "O‘qish eslatmalari")}</p>
               </div>
             </div>
             <button className="w-16 h-8 bg-[var(--input)] rounded-full relative p-1 cursor-not-allowed opacity-50">
@@ -135,7 +146,7 @@ export const Settings: React.FC = () => {
               </div>
               <div>
                 <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">{t.geniusMode}</h4>
-                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">Enable advanced AI reasoning and metaphors</p>
+                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">{tr("Enable advanced AI reasoning and metaphors", "Глубокие рассуждения и метафоры ИИ", "AI’ning chuqur mulohazalari va metaforalari")}</p>
               </div>
             </div>
             <button 
@@ -160,8 +171,8 @@ export const Settings: React.FC = () => {
                 <Shield className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">Learning Depth</h4>
-                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">How deep should the AI go into concepts?</p>
+                <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">{tr("Learning Depth", "Глубина объяснений", "Tushuntirish chuqurligi")}</h4>
+                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">{tr("How deep should the AI go into concepts?", "Насколько глубоко ИИ объясняет темы", "AI mavzularni qanchalik chuqur tushuntirsin")}</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -176,7 +187,7 @@ export const Settings: React.FC = () => {
                       : 'bg-[var(--input)] text-[var(--muted)] hover:bg-[var(--border)]'}
                   `}
                 >
-                  {d}
+                  {DEPTH_LABEL[d]?.[language] ?? d}
                 </button>
               ))}
             </div>
@@ -190,8 +201,8 @@ export const Settings: React.FC = () => {
                 <Globe className="w-6 h-6" />
               </div>
               <div>
-                <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">Explanation Style</h4>
-                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">Your preferred way of learning</p>
+                <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">{tr("Explanation Style", "Стиль объяснений", "Tushuntirish uslubi")}</h4>
+                <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">{tr("Your preferred way of learning", "Как тебе удобнее учиться", "Sizga qulay o‘rganish usuli")}</p>
               </div>
             </div>
             <div className="flex gap-2">
@@ -206,7 +217,7 @@ export const Settings: React.FC = () => {
                       : 'bg-[var(--input)] text-[var(--muted)] hover:bg-[var(--border)]'}
                   `}
                 >
-                  {s}
+                  {STYLE_LABEL[s]?.[language] ?? s}
                 </button>
               ))}
             </div>
@@ -219,8 +230,8 @@ export const Settings: React.FC = () => {
               <Shield className="w-6 h-6" />
             </div>
             <div>
-              <h4 className="font-black uppercase text-sm tracking-tighter text-rose-500">Danger Zone</h4>
-              <p className="text-[10px] font-black uppercase text-rose-500/60 tracking-widest">Irreversible account actions</p>
+              <h4 className="font-black uppercase text-sm tracking-tighter text-rose-500">{tr('Danger Zone', 'Опасная зона', 'Xavfli hudud')}</h4>
+              <p className="text-[10px] font-black uppercase text-rose-500/60 tracking-widest">{tr("Irreversible account actions", "Необратимые действия с аккаунтом", "Hisobdagi qaytarib bo‘lmas amallar")}</p>
             </div>
           </div>
           <div className="flex flex-col sm:flex-row gap-4">
@@ -231,7 +242,7 @@ export const Settings: React.FC = () => {
               disabled={isDeleting}
             >
               <Trash2 className="w-5 h-5" />
-              {isDeleting ? 'Deleting...' : 'Delete Account'}
+              {isDeleting ? tr('Deleting...', 'Удаление...', 'O‘chirilmoqda...') : tr('Delete Account', 'Удалить аккаунт', 'Hisobni o‘chirish')}
             </Button>
             <Button 
               variant="outline" 
@@ -239,7 +250,7 @@ export const Settings: React.FC = () => {
               onClick={handleSignOutEverywhere}
             >
               <LogOut className="w-5 h-5" />
-              Sign Out Everywhere
+              {tr('Sign Out Everywhere', 'Выйти', 'Chiqish')}
             </Button>
           </div>
         </Card>

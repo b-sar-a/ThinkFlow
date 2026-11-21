@@ -1,0 +1,10 @@
+{
+  "name": "ThinkFlow",
+  "short_name": "ThinkFlow",
+  "description": "ИИ-наставник, который объясняет любую тему через твои интересы.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#020204",
+  "theme_color": "#4f46e5",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
