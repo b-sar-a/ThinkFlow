@@ -26,7 +26,6 @@ import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '../UI/Button';
-import { PaymentModal } from '../UI/PaymentModal';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -39,14 +38,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
   const { profile, signOut, geniusMode, setGeniusMode } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const { t } = useLanguage();
-  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
 
   const handleGeniusClick = () => {
-    if (!profile?.isPremium) {
-      setIsPaymentOpen(true);
-    } else {
-      setGeniusMode(!geniusMode);
-    }
+    setGeniusMode(!geniusMode);
   };
 
   const menuItems = [
@@ -110,32 +104,22 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
           {/* AI Quota Meter */}
           {profile && (() => {
             const dbUsed = profile.aiTokensUsed ?? 0;
-            const localUsed = (() => {
-              try {
-                return parseInt(localStorage.getItem('tf_device_burn_tokens') || '0', 10);
-              } catch {
-                return 0;
-              }
-            })();
-            const used = profile.isPremium ? dbUsed : Math.max(dbUsed, localUsed);
+            const used = dbUsed;
             const limit = profile.aiTokenLimit ?? 15000;
             const percent = Math.min(100, Math.round((used / limit) * 100));
-            const isPremium = profile.isPremium;
             return (
               <div className="p-3.5 rounded-2xl bg-[var(--input)] border border-[var(--border)] space-y-1.5 shadow-sm">
                 <div className="flex justify-between items-center text-[9px] font-black uppercase text-[var(--text)] tracking-wider">
                   <span className="flex items-center gap-1">
-                    <Zap className={`w-3.5 h-3.5 ${isPremium ? 'text-amber-500 fill-amber-500/20' : 'text-indigo-500'}`} />
+                    <Zap className="w-3.5 h-3.5 text-indigo-500" />
                     {profile.language === 'ru' ? 'Расход ИИ' : 'AI QUOTA USAGE'}
                   </span>
-                  <span className={isPremium ? 'text-amber-400 font-black' : 'text-[var(--muted)]'}>
-                    {isPremium ? (profile.language === 'ru' ? 'ПРЕМИУМ' : 'PREMIUM') : percent + '%'}
-                  </span>
+                  <span className="text-[var(--muted)]">{percent + '%'}</span>
                 </div>
-                
+
                 <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                  <div 
-                    className={`h-full rounded-full transition-all duration-500 ${isPremium ? 'bg-gradient-to-r from-amber-500 via-indigo-500 to-indigo-600' : percent > 85 ? 'bg-rose-500' : 'bg-indigo-600'}`}
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${percent > 85 ? 'bg-rose-500' : 'bg-indigo-600'}`}
                     style={{ width: `${percent}%` }}
                   />
                 </div>
@@ -144,26 +128,24 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
                   <span>{used.toLocaleString()} {profile.language === 'ru' ? 'ток.' : 'tok.'}</span>
                   <span>{limit >= 1000000 ? '1,000,000' : limit.toLocaleString()}</span>
                 </div>
-                {!isPremium && (
-                  <button 
-                    onClick={() => setIsPaymentOpen(true)}
-                    className="w-full text-center text-[8px] font-black uppercase text-indigo-400 hover:text-indigo-300 transition-colors pt-1 block"
-                  >
-                    {profile.language === 'ru' ? 'УВЕЛИЧИТЬ КВОТУ ⚡' : 'UPGRADE TO PREMIUM ⚡'}
-                  </button>
-                )}
+                <button
+                  onClick={() => onViewChange('leaderboard')}
+                  className="w-full text-center text-[8px] font-black uppercase text-indigo-400 hover:text-indigo-300 transition-colors pt-1 block"
+                >
+                  {profile.language === 'ru' ? 'ПОЛУЧИТЬ БОНУСНУЮ КВОТУ ⚡' : profile.language === 'uz' ? 'BONUS KVOTA OLISH ⚡' : 'GET BONUS QUOTA ⚡'}
+                </button>
               </div>
             );
           })()}
 
           <Button 
             variant="ghost" 
-            className={`w-full justify-start gap-4 transition-all ${geniusMode && profile?.isPremium ? 'text-indigo-400' : ''}`} 
+            className={`w-full justify-start gap-4 transition-all ${geniusMode ? 'text-indigo-400' : ''}`}
             onClick={handleGeniusClick}
           >
-            <Sparkles className={`w-5 h-5 ${geniusMode && profile?.isPremium ? 'animate-pulse' : ''}`} />
+            <Sparkles className={`w-5 h-5 ${geniusMode ? 'animate-pulse' : ''}`} />
             <span className="text-[10px] font-black uppercase tracking-widest">
-              {t.geniusMode} {profile?.isPremium ? '👑' : '🔒'}
+              {t.geniusMode}
             </span>
           </Button>
 
@@ -208,8 +190,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
           onClick={onToggle} 
         />
       )}
-
-      <PaymentModal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} />
     </>
   );
 };

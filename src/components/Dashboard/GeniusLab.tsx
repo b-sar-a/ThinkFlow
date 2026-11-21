@@ -266,11 +266,11 @@ export const GeniusLab: React.FC = () => {
       let msg = err instanceof Error ? err.message : "Failed to initialize lab";
       if (err?.message === "PRO_LIMIT_REACHED") {
         if (profile?.language === 'ru') {
-          msg = "⚠️ Превышен бесплатный лимит токенов ИИ! Пожалуйста, перейдите на один из предложенных Премиум-тарифов, чтобы создавать бесконечные карты знаний.";
+          msg = "⚠️ Лимит токенов ИИ исчерпан! Загляни в «Бонусы и Коды», чтобы получить дополнительную квоту для новых карт знаний.";
         } else if (profile?.language === 'uz') {
-          msg = "⚠️ Bepul AI tokenlar limiti tugadi! Istalgancha yangi dars xaritalari yaratish uchun Premium tarifiga o'ting.";
+          msg = "⚠️ AI tokenlar limiti tugadi! Yangi bilim xaritalari uchun qo'shimcha kvotani «Bonuslar & Kodlar» bo'limidan oling.";
         } else {
-          msg = "⚠️ AI Token Quota Limit Reached! Please upgrade to Premium to generate unlimited interactive knowledge trees.";
+          msg = "⚠️ AI token quota reached! Check “Bonuses & Codes” to get extra quota for new knowledge trees.";
         }
       }
       setError(msg);
@@ -312,11 +312,11 @@ export const GeniusLab: React.FC = () => {
       let msg = "AI Verification failed. Try again.";
       if (err?.message === "PRO_LIMIT_REACHED") {
         if (profile?.language === 'ru') {
-          msg = "⚠️ Превышен лимит токенов ИИ! Для проверки решений обновите тариф до Премиум.";
+          msg = "⚠️ Лимит токенов ИИ исчерпан! Для проверки решений получи дополнительную квоту в «Бонусы и Коды».";
         } else if (profile?.language === 'uz') {
-          msg = "⚠️ AI tokenlar limiti tugadi! Javoblarni cheksiz tekshirish uchun tarifni yangilang.";
+          msg = "⚠️ AI tokenlar limiti tugadi! Javoblarni tekshirish uchun «Bonuslar & Kodlar» bo'limidan kvota oling.";
         } else {
-          msg = "⚠️ AI Token Quota Limit Reached! Please upgrade to Premium to verify challenges.";
+          msg = "⚠️ AI token quota reached! Get extra quota in “Bonuses & Codes” to verify challenges.";
         }
       }
       setError(msg);

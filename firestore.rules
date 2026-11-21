@@ -101,7 +101,6 @@ service cloud.firestore {
              (!('bio' in data) || (data.bio is string && data.bio.size() < 1000)) &&
              (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 2000000)) &&
              (!('geniusMode' in data) || data.geniusMode is bool) &&
-             (!('isPremium' in data) || data.isPremium is bool) &&
              (!('aiTokensUsed' in data) || data.aiTokensUsed is number) &&
              (!('aiTokenLimit' in data) || data.aiTokenLimit is number) &&
              (!('learningDepth' in data) || data.learningDepth in ['Surface', 'Deep', 'Architect']) &&
@@ -158,13 +157,38 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
+    // Fields only the server (Admin SDK, which bypasses these rules) or an admin may change.
+    // A student can set them once to their starting value, but never raise or reset them.
+    function lockedField(field, initial) {
+      return (field in resource.data && request.resource.data[field] == resource.data[field]) ||
+             (!(field in resource.data) &&
+               (!(field in request.resource.data) || request.resource.data[field] == initial));
+    }
+
+    // XP and level may only go up, and only by what one task or chat message can award.
+    function safeProgress() {
+      return request.resource.data.get('xp', 0) >= resource.data.get('xp', 0) &&
+             request.resource.data.get('xp', 0) - resource.data.get('xp', 0) <= 300 &&
+             request.resource.data.get('level', 1) >= resource.data.get('level', 1) &&
+             request.resource.data.get('level', 1) - resource.data.get('level', 1) <= 3;
+    }
+
     match /users/{userId} {
       allow read: if isAuthenticated();
-      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
-                      (request.resource.data.role == 'student' || isAdmin());
-      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && 
-                       (request.resource.data.role == resource.data.role || isAdmin())) || 
-                      isAdmin();
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) &&
+                      (isAdmin() || (
+                        request.resource.data.get('role', 'student') == 'student' &&
+                        request.resource.data.get('xp', 0) == 0 &&
+                        request.resource.data.get('level', 1) == 1 &&
+                        request.resource.data.get('aiTokensUsed', 0) == 0 &&
+                        request.resource.data.get('aiTokenLimit', 15000) == 15000
+                      ));
+      allow update: if isAdmin() ||
+                      (isOwner(userId) && isValidUser(request.resource.data) &&
+                       request.resource.data.role == resource.data.role &&
+                       lockedField('aiTokenLimit', 15000) &&
+                       lockedField('aiTokensUsed', 0) &&
+                       safeProgress());
       allow delete: if isAdmin();
     }
 

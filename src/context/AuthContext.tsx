@@ -53,11 +53,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!user) return;
     try {
       const userDocRef = doc(db, 'users', user.uid);
-      const updates = { ...data };
-      if (updates.isPremium === true) {
-        updates.aiTokenLimit = 1000000;
-      }
-      await setDoc(userDocRef, updates, { merge: true });
+      await setDoc(userDocRef, data, { merge: true });
     } catch (error) {
       console.error("Update profile error:", error);
       throw error;
@@ -89,7 +85,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         language: 'en',
         theme: 'dark',
         geniusMode: true,
-        isPremium: true,
         bio: 'Exploring the ThinkFlow universe in Genius Mode.'
       });
       setLoading(false);
@@ -129,8 +124,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         language: 'en',
         theme: 'light',
         bio: '',
-        geniusMode: false,
-        isPremium: false,
+        geniusMode: true,
+        aiTokensUsed: 0,
+        aiTokenLimit: 15000,
         learningDepth: 'Deep',
         explanationStyle: 'Metaphorical'
       };
@@ -183,28 +179,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (
             data.xp === undefined || 
             data.level === undefined || 
-            data.geniusMode === undefined || 
-            data.isPremium === undefined || 
-            data.uid === undefined || 
+            data.geniusMode === undefined ||
+            data.uid === undefined ||
             data.aiTokensUsed === undefined ||
             data.aiTokenLimit === undefined ||
-            (isOwner && (data.role !== "admin" || !data.geniusMode || !data.isPremium || data.aiTokenLimit !== 1000000))
+            (isOwner && (data.role !== "admin" || !data.geniusMode || data.aiTokenLimit !== 1000000))
           ) {
             const updates: Record<string, any> = {};
             if (data.xp === undefined) updates.xp = 0;
             if (data.level === undefined) updates.level = 1;
-            if (data.geniusMode === undefined) updates.geniusMode = isOwner ? true : false;
-            if (data.isPremium === undefined) updates.isPremium = isOwner ? true : false;
+            if (data.geniusMode === undefined) updates.geniusMode = true;
             if (data.uid === undefined) updates.uid = user.uid;
-            
-            const currentlyPremium = isOwner || data.isPremium || updates.isPremium;
+
             if (data.aiTokensUsed === undefined) updates.aiTokensUsed = 0;
-            if (data.aiTokenLimit === undefined) updates.aiTokenLimit = currentlyPremium ? 1000000 : 15000;
-            
+            if (data.aiTokenLimit === undefined) updates.aiTokenLimit = isOwner ? 1000000 : 15000;
+
             if (isOwner) {
               updates.role = "admin";
               updates.geniusMode = true;
-              updates.isPremium = true;
               updates.aiTokenLimit = 1000000;
             }
             
@@ -230,8 +222,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             language: 'en',
             theme: 'light',
             bio: '',
-            geniusMode: isOwner ? true : false,
-            isPremium: isOwner ? true : false,
+            geniusMode: true,
             aiTokensUsed: 0,
             aiTokenLimit: isOwner ? 1000000 : 15000,
             learningDepth: 'Deep',

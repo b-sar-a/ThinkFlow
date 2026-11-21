@@ -29,7 +29,6 @@ export interface UserProfile {
   role: 'student' | 'admin';
   theme: 'light' | 'dark';
   geniusMode?: boolean;
-  isPremium?: boolean;
   aiTokensUsed?: number;
   aiTokenLimit?: number;
   learningDepth?: 'Surface' | 'Deep' | 'Architect';

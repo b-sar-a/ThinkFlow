@@ -5,9 +5,10 @@ import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '../UI/Button';
 import { Card } from '../UI/Card';
+import { authedPost } from '../../services/http';
 
 export const PromoHub: React.FC = () => {
-  const { profile, updateProfileData } = useAuth();
+  const { profile } = useAuth();
   const { t } = useLanguage();
   const [promoCode, setPromoCode] = useState('');
   const [promoError, setPromoError] = useState<string | null>(null);
@@ -15,63 +16,37 @@ export const PromoHub: React.FC = () => {
   const [isCopyingLink, setIsCopyingLink] = useState(false);
   const [isCopyingText, setIsCopyingText] = useState(false);
   
-  // List of valid promo codes & their quota values
-  const VALID_CODES: Record<string, { value: number; msgEn: string; msgRu: string }> = {
-    'FREEGENIUS': { 
-      value: 10000, 
-      msgEn: 'Code applied! +10,000 AI tokens added to your quota limit!', 
-      msgRu: 'Промокод активирован! +10 000 ИИ токенов добавлены к вашей квоте!' 
-    },
-    'STARTAI': { 
-      value: 5000, 
-      msgEn: 'Code applied! +5,000 AI tokens added to your quota!', 
-      msgRu: 'Промокод активирован! +5 000 ИИ токенов добавлены к квоте!' 
-    },
-    'LEARNFLOW': { 
-      value: 8000, 
-      msgEn: 'Code applied! +8,000 learning AI tokens granted!', 
-      msgRu: 'Промокод активирован! +8 000 дополнительных токенов начислены!' 
-    }
-  };
-
   const handleApplyPromo = async (e: React.FormEvent) => {
     e.preventDefault();
     setPromoError(null);
     setPromoSuccess(null);
 
     const code = promoCode.trim().toUpperCase();
-    if (!code) return;
+    if (!code || !profile) return;
 
-    if (!profile) {
-      setPromoError(profile?.language === 'ru' ? 'Вы должны войти в систему' : 'You must be signed in');
-      return;
-    }
+    const lang = profile.language;
+    const pick = (ru: string, uz: string, en: string) => (lang === 'ru' ? ru : lang === 'uz' ? uz : en);
 
-    const reward = VALID_CODES[code];
-    if (reward) {
-      try {
-        const claimedKey = `promo_claimed_${code}`;
-        const isAlreadyClaimed = localStorage.getItem(claimedKey);
-        
-        if (isAlreadyClaimed) {
-          setPromoError(profile?.language === 'ru' ? 'Вы уже активировали этот промокод!' : 'You have already claimed this promo code!');
-          return;
-        }
-
-        // Update quota in firestore and local setting
-        const currentLimit = profile.aiTokenLimit ?? 15000;
-        await updateProfileData({
-          aiTokenLimit: currentLimit + reward.value
-        });
-
-        localStorage.setItem(claimedKey, 'true');
-        setPromoSuccess(profile?.language === 'ru' ? reward.msgRu : reward.msgEn);
-        setPromoCode('');
-      } catch (err) {
-        setPromoError(profile?.language === 'ru' ? 'Не удалось активировать код. Попробуйте еще раз.' : 'Failed to apply coupon. Try again.');
+    try {
+      const { added } = await authedPost<{ added: number }>('/api/promo/redeem', { code });
+      const amount = added.toLocaleString();
+      setPromoSuccess(pick(
+        `Промокод активирован! +${amount} токенов ИИ добавлены к квоте!`,
+        `Promo kod faollashtirildi! Kvotangizga +${amount} AI token qo'shildi!`,
+        `Code applied! +${amount} AI tokens added to your quota!`
+      ));
+      setPromoCode('');
+    } catch (err: any) {
+      const reason = String(err?.message || '');
+      if (reason === 'ALREADY_CLAIMED') {
+        setPromoError(pick('Вы уже активировали этот промокод!', 'Bu promo kod allaqachon ishlatilgan!', 'You have already claimed this promo code!'));
+      } else if (reason === 'INVALID_CODE') {
+        setPromoError(pick('Неверный промокод или срок действия истек', "Promo kod noto'g'ri yoki muddati tugagan", 'Invalid promo code or expired'));
+      } else if (reason === 'PROMO_UNAVAILABLE') {
+        setPromoError(pick('Промокоды временно недоступны.', 'Promo kodlar vaqtincha mavjud emas.', 'Promo codes are temporarily unavailable.'));
+      } else {
+        setPromoError(pick('Не удалось активировать код. Попробуйте еще раз.', "Kodni faollashtirib bo'lmadi. Qayta urinib ko'ring.", 'Failed to apply code. Try again.'));
       }
-    } else {
-      setPromoError(profile?.language === 'ru' ? 'Неверный промокод или срок действия истек' : 'Invalid promo code or expired');
     }
   };
 

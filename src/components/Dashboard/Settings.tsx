@@ -7,21 +7,15 @@ import { useAuth } from '../../context/AuthContext';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
 import { useState } from 'react';
-import { PaymentModal } from '../UI/PaymentModal';
 
 export const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const { signOut, deleteAccount, geniusMode, setGeniusMode, profile, updateProfileData } = useAuth();
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
 
   const handleGeniusToggle = () => {
-    if (!profile?.isPremium) {
-      setIsPaymentOpen(true);
-    } else {
-      setGeniusMode(!geniusMode);
-    }
+    setGeniusMode(!geniusMode);
   };
 
   const handleDeleteAccount = async () => {
@@ -148,12 +142,12 @@ export const Settings: React.FC = () => {
               onClick={handleGeniusToggle}
               className={`
                 w-16 h-8 rounded-full transition-all relative p-1
-                ${geniusMode && profile?.isPremium ? 'bg-amber-500' : 'bg-slate-200'}
+                ${geniusMode ? 'bg-amber-500' : 'bg-slate-200'}
               `}
             >
               <div className={`
                 w-6 h-6 bg-white rounded-full shadow-lg transition-transform
-                ${geniusMode && profile?.isPremium ? 'translate-x-8' : 'translate-x-0'}
+                ${geniusMode ? 'translate-x-8' : 'translate-x-0'}
               `} />
             </button>
           </div>
@@ -250,7 +244,6 @@ export const Settings: React.FC = () => {
           </div>
         </Card>
       </div>
-      <PaymentModal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} />
     </div>
   );
 };

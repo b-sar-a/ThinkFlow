@@ -132,22 +132,10 @@ export const Admin: React.FC = () => {
 
     const retentionRate = totalUsers > 0 ? Math.round((retainedCount / totalUsers) * 100) : 0;
     
-    // SaaS Revenue KPIs based on real users
-    const premiumCount = users.filter(u => u.isPremium).length;
+    // Growth KPIs based on real users (no revenue while the product is free)
     const totalUsersCount = users.length;
-    
-    // ARR: $14.99/month * 12 months * premium users
-    const arrProjection = premiumCount * 14.99 * 12;
-    const formattedARR = arrProjection > 0 
-      ? `$${Math.round(arrProjection).toLocaleString()}` 
-      : `$0`;
-
-    // LTV:CAC logic
-    const churn = Math.max(0.08, 1 - (retentionRate / 100));
-    const arpu = totalUsersCount > 0 ? (premiumCount * 14.99) / totalUsersCount : 0;
-    const ltv = arpu / churn;
-    const cac = totalUsersCount > 0 ? Math.max(1.5, 12 / totalUsersCount) : 3.0;
-    const ltvToCac = premiumCount > 0 ? `${(ltv / cac).toFixed(1)}x` : "0.0x";
+    const activatedCount = users.filter(u => (u.xp || 0) > 0).length;
+    const activationRate = totalUsersCount > 0 ? Math.round((activatedCount / totalUsersCount) * 100) : 0;
 
     return {
       retentionRate,
@@ -155,8 +143,9 @@ export const Admin: React.FC = () => {
       retainedUsers: retainedCount,
       activeRecords: activeDataList.length,
       userStreaks: userStreaks.sort((a, b) => b.streak - a.streak),
-      ltvToCacRatio: ltvToCac,
-      formattedARR
+      totalUsersCount,
+      activatedCount,
+      activationRate
     };
   };
 
@@ -217,7 +206,7 @@ export const Admin: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="font-black uppercase text-sm text-[var(--text)] flex items-center gap-2">
-                    {u.name} {u.isPremium && <span className="text-[10px] text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full border border-amber-400/20">👑 PREMIUM</span>}
+                    {u.name}
                   </h4>
                   <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">{u.email} • {u.role}</p>
                 </div>
@@ -321,23 +310,23 @@ export const Admin: React.FC = () => {
             <div className="flex flex-col gap-4">
               <Card className="p-6 rounded-[2rem] border border-indigo-500/20 bg-indigo-950/5 relative overflow-hidden flex flex-col justify-between flex-1">
                 <div className="flex justify-between items-center">
-                  <span className="text-[9px] font-black text-indigo-400 tracking-wider uppercase">LTV:CAC Ratio</span>
-                  <DollarSign className="w-4 h-4 text-indigo-400" />
+                  <span className="text-[9px] font-black text-indigo-400 tracking-wider uppercase">Registered Students</span>
+                  <Users className="w-4 h-4 text-indigo-400" />
                 </div>
                 <div>
-                  <h4 className="text-3xl font-black text-white italic">{retentionData.ltvToCacRatio}</h4>
-                  <p className="text-[10px] text-gray-400 mt-1">Premium subscription model yields extremely low client acquisition costs.</p>
+                  <h4 className="text-3xl font-black text-white italic">{retentionData.totalUsersCount}</h4>
+                  <p className="text-[10px] text-gray-400 mt-1">Total accounts created on the platform.</p>
                 </div>
               </Card>
 
               <Card className="p-6 rounded-[2rem] border border-amber-500/20 bg-amber-950/5 relative overflow-hidden flex flex-col justify-between flex-1">
                 <div className="flex justify-between items-center">
-                  <span className="text-[9px] font-black text-amber-400 tracking-wider uppercase">ARR Projection</span>
+                  <span className="text-[9px] font-black text-amber-400 tracking-wider uppercase">Activation Rate</span>
                   <Award className="w-4 h-4 text-amber-400" />
                 </div>
                 <div>
-                  <h4 className="text-3xl font-black text-white italic">{retentionData.formattedARR}</h4>
-                  <p className="text-[10px] text-gray-400 mt-1">Estimated annual recurring revenue based on current active user growth.</p>
+                  <h4 className="text-3xl font-black text-white italic">{retentionData.activationRate}%</h4>
+                  <p className="text-[10px] text-gray-400 mt-1">{retentionData.activatedCount} students earned XP at least once.</p>
                 </div>
               </Card>
             </div>

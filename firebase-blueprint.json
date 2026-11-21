@@ -19,7 +19,6 @@
         "bio": { "type": "string", "description": "User's short biography." },
         "photoURL": { "type": "string", "description": "Base64 or URL of the user's avatar." },
         "geniusMode": { "type": "boolean", "description": "Whether genius mode is enabled." },
-        "isPremium": { "type": "boolean", "description": "Whether premium is enabled." },
         "aiTokensUsed": { "type": "number", "description": "Number of AI tokens used." },
         "aiTokenLimit": { "type": "number", "description": "AI token quota limit." },
         "learningDepth": { "type": "string", "enum": ["Surface", "Deep", "Architect"], "description": "Preferred depth of explanation." },
