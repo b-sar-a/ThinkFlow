@@ -16,12 +16,12 @@ import { track } from '../../lib/analytics';
 const presetTemplates = [
   {
     id: 'physics_ege',
-    title: 'Подготовка к ЕГЭ по физике',
+    title: 'Подготовка к экзамену по физике',
     titleEn: 'Physics Exam Prep',
     icon: '⚡',
     theme: 'border-amber-500/30 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500 bg-amber-500/5',
     tree: {
-      topic: 'Подготовка к ЕГЭ по физике',
+      topic: 'Подготовка к экзамену по физике',
       nodes: [
         {
           id: 'p1',

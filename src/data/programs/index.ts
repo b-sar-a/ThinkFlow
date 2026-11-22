@@ -5,6 +5,12 @@ import { ieltsWriting } from './ielts-writing';
 import { physicsMechanics } from './physics-mechanics';
 import { chemistryBasics } from './chemistry-basics';
 import { pythonBasics } from './python-basics';
+import { biologyBasics } from './biology-basics';
+import { informaticsBasics } from './informatics-basics';
+import { historyUzbekistan } from './history-uzbekistan';
+import { biologyBasicsUz } from './uz/biology-basics';
+import { informaticsBasicsUz } from './uz/informatics-basics';
+import { historyUzbekistanUz } from './uz/history-uzbekistan';
 import { chemistryBasicsUz } from './uz/chemistry-basics';
 import { pythonBasicsUz } from './uz/python-basics';
 import { algebraUz } from './uz/algebra';
@@ -19,7 +25,10 @@ export const PROGRAMS: Program[] = [
   withUzbek(algebra, algebraUz),
   withUzbek(physicsMechanics, physicsMechanicsUz),
   withUzbek(chemistryBasics, chemistryBasicsUz),
+  withUzbek(biologyBasics, biologyBasicsUz),
   withUzbek(pythonBasics, pythonBasicsUz),
+  withUzbek(informaticsBasics, informaticsBasicsUz),
+  withUzbek(historyUzbekistan, historyUzbekistanUz),
   withUzbek(satMath, satMathUz),
   withUzbek(ieltsWriting, ieltsWritingUz),
 ];
