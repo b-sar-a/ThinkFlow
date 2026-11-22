@@ -36,13 +36,13 @@ export interface Lesson {
 }
 
 export type ProgramKind = 'school' | 'exam';
-export type ProgramIcon = 'calculator' | 'target' | 'pen' | 'atom' | 'flask' | 'code';
+export type ProgramIcon = 'calculator' | 'target' | 'pen' | 'atom' | 'flask' | 'code' | 'dna' | 'landmark' | 'cpu';
 
 export interface Program {
   id: string;
   kind: ProgramKind;
   icon: ProgramIcon;
-  accent: 'indigo' | 'emerald' | 'amber' | 'rose' | 'cyan' | 'purple';
+  accent: 'indigo' | 'emerald' | 'amber' | 'rose' | 'cyan' | 'purple' | 'teal' | 'orange' | 'sky';
   title: Record<ProgramLang, string>;
   summary: Record<ProgramLang, string>;
   audience: Record<ProgramLang, string>;

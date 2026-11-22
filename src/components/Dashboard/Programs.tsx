@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { GraduationCap, Calculator, Target, PenTool, Atom, FlaskConical, Code2, ArrowLeft, ArrowRight, Check, CheckCircle2, Circle, Sparkles, Eye } from 'lucide-react';
+import { GraduationCap, Calculator, Target, PenTool, Atom, FlaskConical, Code2, Dna, Landmark, Cpu, ArrowLeft, ArrowRight, Check, CheckCircle2, Circle, Sparkles, Eye } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../UI/Card';
@@ -8,7 +8,7 @@ import { levelInfo } from '../../lib/progress';
 import { track } from '../../lib/analytics';
 import { PROGRAMS, LESSON_XP, checkAnswer, Bi, Lesson, Program, PracticeItem } from '../../data/programs';
 
-const ICONS = { calculator: Calculator, target: Target, pen: PenTool, atom: Atom, flask: FlaskConical, code: Code2 } as const;
+const ICONS = { calculator: Calculator, target: Target, pen: PenTool, atom: Atom, flask: FlaskConical, code: Code2, dna: Dna, landmark: Landmark, cpu: Cpu } as const;
 
 const ACCENT = {
   indigo: { text: 'text-indigo-500', soft: 'bg-indigo-500/10', border: 'border-indigo-500/30' },
@@ -17,6 +17,9 @@ const ACCENT = {
   rose: { text: 'text-rose-500', soft: 'bg-rose-500/10', border: 'border-rose-500/30' },
   cyan: { text: 'text-cyan-500', soft: 'bg-cyan-500/10', border: 'border-cyan-500/30' },
   purple: { text: 'text-purple-500', soft: 'bg-purple-500/10', border: 'border-purple-500/30' },
+  teal: { text: 'text-teal-500', soft: 'bg-teal-500/10', border: 'border-teal-500/30' },
+  orange: { text: 'text-orange-500', soft: 'bg-orange-500/10', border: 'border-orange-500/30' },
+  sky: { text: 'text-sky-500', soft: 'bg-sky-500/10', border: 'border-sky-500/30' },
 } as const;
 
 type ItemStatus = 'idle' | 'correct' | 'wrong' | 'shown' | 'selfdone';
