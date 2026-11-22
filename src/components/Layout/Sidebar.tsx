@@ -64,13 +64,19 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
 
   // The parent cabinet shows up once an account has connected a child (or opened the cabinet from Settings).
   let isParent = false;
+  let isTeacher = false;
   try {
     isParent = localStorage.getItem('tf_parent_mode') === '1';
+    isTeacher = localStorage.getItem('tf_teacher_mode') === '1';
   } catch {
     /* storage blocked */
   }
   if (isParent || currentView === 'family') {
     menuItems.push({ id: 'family', label: tr('Parent cabinet', 'Кабинет родителя', 'Ota-ona kabineti'), icon: Users });
+  }
+
+  if (isTeacher || currentView === 'teacher') {
+    menuItems.push({ id: 'teacher', label: tr('Teacher cabinet', 'Кабинет учителя', "O'qituvchi kabineti"), icon: GraduationCap });
   }
 
   if (profile?.role === 'admin') {

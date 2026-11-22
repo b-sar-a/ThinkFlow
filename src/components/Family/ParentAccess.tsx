@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
 import { ConfirmDialog } from '../Safety/Safety';
+import { ClassAccess } from './ClassAccess';
 import { createFamilyCode, fetchParents, unlinkFamily, familyErrorText, type LinkedParent } from '../../services/family';
 
 interface Props {
@@ -71,7 +72,7 @@ export const ParentAccess: React.FC<Props> = ({ onNavigate }) => {
         <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
           <Users className="w-5 h-5" aria-hidden="true" />
         </div>
-        <h2 className="text-xs font-black uppercase tracking-[0.3em] text-indigo-400">{tr('Parent access', 'Доступ для родителей', "Ota-ona uchun kirish")}</h2>
+        <h2 className="text-xs font-black uppercase tracking-[0.3em] text-indigo-400">{tr('Parents and teachers', 'Родители и учителя', "Ota-ona va o'qituvchilar")}</h2>
       </div>
 
       <p className="text-sm text-[var(--muted)] leading-relaxed">
@@ -126,9 +127,17 @@ export const ParentAccess: React.FC<Props> = ({ onNavigate }) => {
         <p className="text-sm text-[var(--muted)]">{tr('Nobody has access yet.', 'Пока доступа нет ни у кого.', "Hozircha hech kimda kirish yo'q.")}</p>
       )}
 
+      <ClassAccess />
+
       {onNavigate && (
         <button type="button" onClick={() => onNavigate('family')} className="text-sm font-bold text-indigo-400 hover:text-indigo-300 transition-colors h-11">
           {tr("I'm a parent: open the parent cabinet", 'Я родитель: открыть кабинет родителя', "Men ota-onaman: kabinetni ochish")}
+        </button>
+      )}
+
+      {onNavigate && (
+        <button type="button" onClick={() => onNavigate('teacher')} className="block text-sm font-bold text-indigo-400 hover:text-indigo-300 transition-colors h-11">
+          {tr("I'm a teacher: open the teacher cabinet", 'Я учитель: открыть кабинет учителя', "Men o'qituvchiman: kabinetni ochish")}
         </button>
       )}
 

@@ -47,10 +47,10 @@ export const MAX_CHILDREN_PER_PARENT = 10;
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O/1/I to avoid misreading
 const CODE_LENGTH = 8;
 
-const generateCode = () => Array.from({ length: CODE_LENGTH }, () => ALPHABET[randomInt(ALPHABET.length)]).join("");
+export const generateCode = () => Array.from({ length: CODE_LENGTH }, () => ALPHABET[randomInt(ALPHABET.length)]).join("");
 
 export const normalizeCode = (raw: unknown) => String(raw ?? "").toUpperCase().replace(/[\s-]/g, "");
-const isValidCode = (code: string) => new RegExp(`^[${ALPHABET}]{${CODE_LENGTH}}$`).test(code);
+export const isValidCode = (code: string) => new RegExp(`^[${ALPHABET}]{${CODE_LENGTH}}$`).test(code);
 
 const linkId = (childUid: string, parentUid: string) => `${childUid}_${parentUid}`;
 

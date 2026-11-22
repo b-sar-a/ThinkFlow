@@ -39,6 +39,7 @@ const RU: Copy = {
             'Переписка с ИИ-наставником и твои сообщения и посты в сообществе.',
             'Обезличенные события (например, «зарегистрировался», «решил первое задание») с случайным номером устройства, чтобы понимать, где ученики застревают. Это не следит за тобой на других сайтах; при включённом «Не отслеживать» в браузере такие события не отправляются.',
             'Если ты создашь код для родителя, родитель увидит имя, класс, цель, XP, уровень, серии, число заданий и дни занятий. Сообщения, посты, чаты с ИИ и почту он не видит. Доступ можно отозвать в Настройках.',
+            'Если ты вступишь в класс по коду учителя, учитель (его проверяет администратор) увидит то же самое: имя, класс, XP, уровень, серии, задания и дни занятий. Выйти из класса можно в Настройках в любой момент.',
           ],
         },
         {
@@ -136,6 +137,7 @@ const EN: Copy = {
             'Your conversations with the AI tutor and your community posts and messages.',
             'Anonymous events (for example "signed up" or "finished a first task") tied to a random device id, so we can see where students get stuck. We do not track you on other sites, and nothing is sent if your browser has Do Not Track turned on.',
             'If you create a parent code, that parent can see your name, grade, goal, XP, level, streaks, number of finished tasks and study days. They cannot see your messages, posts, AI chats or email. You can remove access in Settings.',
+            'If you join a class with a teacher’s code, the teacher (checked by an administrator) can see the same: name, grade, XP, level, streaks, tasks and study days. You can leave the class in Settings at any time.',
           ],
         },
         {

@@ -9,8 +9,9 @@ import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
 import { ConfirmDialog } from '../Safety/Safety';
 import { authedPost } from '../../services/http';
+import { fetchTeacherAdmin, teacherAction, type TeacherAdminData } from '../../services/classes';
 
-type Tab = 'users' | 'reports' | 'reviews' | 'analytics';
+type Tab = 'users' | 'reports' | 'reviews' | 'teachers' | 'analytics';
 type ReportFilter = 'open' | 'resolved';
 
 const USERS_LIMIT = 500;
@@ -190,6 +191,7 @@ export const Admin: React.FC = () => {
     { id: 'users', label: tr('Users', 'Ученики'), count: users.length, active: 'bg-indigo-600' },
     { id: 'reports', label: tr('Reports', 'Жалобы'), count: openReports.length, active: 'bg-rose-600' },
     { id: 'reviews', label: tr('Reviews', 'Отзывы'), count: reviews.length, active: 'bg-indigo-600' },
+    { id: 'teachers', label: tr('Teachers', 'Учителя'), active: 'bg-indigo-600' },
     { id: 'analytics', label: tr('Analytics', 'Аналитика'), active: 'bg-emerald-600' },
   ];
 
@@ -364,6 +366,8 @@ export const Admin: React.FC = () => {
               ))
             )}
           </div>
+        ) : activeTab === 'teachers' ? (
+          <TeacherApprovals tr={tr} />
         ) : activeTab === 'reviews' ? (
           <ul className="space-y-3">
             {reviews.length === 0 && <li className="py-10 text-center text-[var(--muted)]">{tr('No reviews yet.', 'Отзывов пока нет.')}</li>}
@@ -638,5 +642,112 @@ const VisitorFunnel: React.FC<{ tr: (en: string, ru: string) => string }> = ({ t
         </>
       )}
     </Card>
+  );
+};
+
+/** Teacher requests: an admin checks who is asking before anyone can see students (server/classes.ts). */
+const TeacherApprovals: React.FC<{ tr: (en: string, ru: string) => string }> = ({ tr }) => {
+  const [data, setData] = useState<TeacherAdminData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+
+  const load = () =>
+    fetchTeacherAdmin()
+      .then((d) => {
+        setData(d);
+        setError(null);
+      })
+      .catch((e) => {
+        setData({ requests: [], teachers: [] });
+        setError(
+          String(e?.message || '') === 'FAMILY_UNAVAILABLE'
+            ? tr('Needs FIREBASE_SERVICE_ACCOUNT on the server.', 'Нужен FIREBASE_SERVICE_ACCOUNT на сервере.')
+            : tr('Could not load teachers.', 'Не удалось загрузить учителей.')
+        );
+      });
+
+  useEffect(() => {
+    load();
+  }, []);
+
+  const ask = (action: 'approve' | 'decline' | 'revoke', uid: string, name: string) =>
+    setConfirm({
+      title:
+        action === 'approve' ? tr('Approve this teacher?', 'Подтвердить учителя?')
+        : action === 'decline' ? tr('Decline this request?', 'Отклонить заявку?')
+        : tr('Revoke teacher access?', 'Забрать доступ учителя?'),
+      text:
+        action === 'approve'
+          ? tr(`${name} will be able to create classes and see the progress of students who join.`, `${name} сможет создавать классы и видеть прогресс учеников, которые вступят.`)
+          : action === 'decline'
+            ? tr('The request is deleted.', 'Заявка будет удалена.')
+            : tr(`${name} loses access to every class at once and class codes stop working.`, `${name} сразу теряет доступ ко всем классам, коды классов перестают работать.`),
+      confirmLabel: action === 'approve' ? tr('Approve', 'Подтвердить') : action === 'decline' ? tr('Decline', 'Отклонить') : tr('Revoke', 'Забрать'),
+      danger: action !== 'approve',
+      run: async () => {
+        await teacherAction(action, uid);
+        await load();
+      },
+    });
+
+  if (!data) return <div className="py-10 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-indigo-500" aria-label={tr('Loading', 'Загрузка')} /></div>;
+
+  return (
+    <div className="space-y-8">
+      {error && <p role="alert" className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-sm font-semibold">{error}</p>}
+
+      <section className="space-y-3">
+        <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[var(--muted)]">{tr('Requests', 'Заявки')} ({data.requests.length})</h2>
+        {data.requests.length === 0 ? (
+          <p className="py-8 text-center border border-dashed border-[var(--border)] rounded-[2rem] text-[var(--muted)]">{tr('No pending requests.', 'Новых заявок нет.')}</p>
+        ) : (
+          <ul className="space-y-3">
+            {data.requests.map((r) => (
+              <li key={r.uid}>
+                <Card className="p-5 rounded-3xl border border-[var(--border)] space-y-3">
+                  <div>
+                    <p className="font-black text-[var(--text)]">{r.name || r.uid}</p>
+                    <p className="text-xs text-[var(--muted)] break-all">{r.email}</p>
+                  </div>
+                  <p className="text-sm text-[var(--text)]"><span className="font-bold">{tr('School', 'Школа')}:</span> {r.school}</p>
+                  {r.note && <p className="text-sm text-[var(--muted)] whitespace-pre-wrap break-words">{r.note}</p>}
+                  <div className="flex flex-wrap gap-3">
+                    <Button size="sm" onClick={() => ask('approve', r.uid, r.name)} className="rounded-xl h-11"><span className="font-black uppercase text-xs tracking-wider">{tr('Approve', 'Подтвердить')}</span></Button>
+                    <Button variant="outline" size="sm" onClick={() => ask('decline', r.uid, r.name)} className="rounded-xl h-11"><span className="font-black uppercase text-xs tracking-wider">{tr('Decline', 'Отклонить')}</span></Button>
+                  </div>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[var(--muted)]">{tr('Teachers', 'Учителя')} ({data.teachers.length})</h2>
+        {data.teachers.length === 0 ? (
+          <p className="py-8 text-center border border-dashed border-[var(--border)] rounded-[2rem] text-[var(--muted)]">{tr('No approved teachers yet.', 'Подтверждённых учителей пока нет.')}</p>
+        ) : (
+          <ul className="space-y-3">
+            {data.teachers.map((t) => (
+              <li key={t.uid}>
+                <Card className="p-4 rounded-3xl border border-[var(--border)] flex items-center justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="font-black text-[var(--text)] truncate">{t.name || t.uid}</p>
+                    <p className="text-xs text-[var(--muted)] truncate">{t.email}</p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => ask('revoke', t.uid, t.name)} className="rounded-xl h-11 px-4 shrink-0 border-rose-500 text-rose-500 hover:bg-rose-500 hover:text-white">
+                    <span className="font-black uppercase text-xs tracking-wider">{tr('Revoke', 'Забрать')}</span>
+                  </Button>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {confirm && (
+        <ConfirmDialog title={confirm.title} text={confirm.text} confirmLabel={confirm.confirmLabel} danger={confirm.danger} onConfirm={confirm.run} onClose={() => setConfirm(null)} />
+      )}
+    </div>
   );
 };
