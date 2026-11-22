@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, Sparkles, Target, Zap, ArrowRight, Loader2, CheckCircle2, ChevronRight, MessageSquare, Star, AlertCircle, Play } from 'lucide-react';
+import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
+import { Brain, Sparkles, Target, Zap, ArrowRight, Loader2, CheckCircle2, ChevronRight, MessageSquare, Star, AlertCircle, Play, Atom, Code2, Landmark } from 'lucide-react';
 import { generateKnowledgeTree, verifyTask } from '../../services/gemini';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
@@ -16,7 +16,7 @@ const presetTemplates = [
   {
     id: 'physics_ege',
     title: 'Подготовка к ЕГЭ по физике',
-    titleEn: 'Physics USE Prep',
+    titleEn: 'Physics Exam Prep',
     icon: '⚡',
     theme: 'border-amber-500/30 text-amber-500 hover:bg-amber-500/10 hover:border-amber-500 bg-amber-500/5',
     tree: {
@@ -153,10 +153,46 @@ const presetTemplates = [
   }
 ];
 
-export const GeniusLab: React.FC = () => {
+// Icons for the ready-made courses (instead of emoji).
+const PRESET_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
+  physics_ege: Atom,
+  python_basics: Code2,
+  history_19: Landmark,
+};
+
+// Interest names are stored in English; show them in the interface language.
+const INTEREST_LABEL: Record<string, Record<string, string>> = {
+  ru: { Sports: 'Спорт', Football: 'Футбол', Chess: 'Шахматы', Anime: 'Аниме', Music: 'Музыка', Design: 'Дизайн', Coding: 'Программирование', Cooking: 'Кулинария', Cars: 'Машины', Business: 'Бизнес', Gaming: 'Игры', Movies: 'Кино', Art: 'Искусство', Fitness: 'Фитнес', Science: 'Наука' },
+  uz: { Sports: 'Sport', Football: 'Futbol', Chess: 'Shaxmat', Anime: 'Anime', Music: 'Musiqa', Design: 'Dizayn', Coding: 'Dasturlash', Cooking: 'Pazandachilik', Cars: 'Mashinalar', Business: 'Biznes', Gaming: 'O‘yinlar', Movies: 'Kino', Art: 'San’at', Fitness: 'Fitnes', Science: 'Fan' },
+};
+
+interface GeniusLabProps {
+  /** Lets the Lab link to other screens (profile, bonuses). */
+  onNavigate?: (view: string) => void;
+}
+
+export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
   const { profile, updateProfileData, user } = useAuth();
   const { language, t } = useLanguage();
-  const [topic, setTopic] = useState('');
+  const tr = (en: string, ru: string, uz: string) => (language === 'ru' ? ru : language === 'uz' ? uz : en);
+  const reduceMotion = useReducedMotion();
+  const interestName = (value: string) => INTEREST_LABEL[language]?.[value] ?? value;
+  const interests = profile?.interests ?? [];
+  // A topic sent from an article ("Explore in the Lab"). Read in the initializer, cleared on mount.
+  const [topic, setTopic] = useState(() => {
+    try {
+      return sessionStorage.getItem('tf_lab_topic') ?? '';
+    } catch {
+      return '';
+    }
+  });
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem('tf_lab_topic');
+    } catch {
+      /* ignore */
+    }
+  }, []);
   const [tree, setTree] = useState<KnowledgeTree | null>(null);
   const [selectedNode, setSelectedNode] = useState<KnowledgeNode | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -167,6 +203,16 @@ export const GeniusLab: React.FC = () => {
   const [challengeAnswer, setChallengeAnswer] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyFeedback, setVerifyFeedback] = useState<{ isCorrect: boolean; text: string } | null>(null);
+  const [errorIsLimit, setErrorIsLimit] = useState(false);
+  const [elapsed, setElapsed] = useState(0);
+
+  // Real seconds while the AI builds the map (the old progress bar was a fixed 12-second animation).
+  useEffect(() => {
+    if (!isLoading) return;
+    setElapsed(0);
+    const timer = setInterval(() => setElapsed((s) => s + 1), 1000);
+    return () => clearInterval(timer);
+  }, [isLoading]);
 
   const logActivity = async () => {
     if (!user || !profile) return;
@@ -187,16 +233,13 @@ export const GeniusLab: React.FC = () => {
     const template = presetTemplates.find(p => p.id === presetId);
     if (!template || !profile) return;
     
-    setIsLoading(true);
     setError(null);
+    setErrorIsLimit(false);
     setDebugInfo(null);
     setVerifyFeedback(null);
     setChallengeAnswer('');
-    
+
     try {
-      // Sci-fi immersive buffer sequence
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
       const currentLabel = profile?.language === 'ru' ? template.title : template.titleEn;
       setTopic(currentLabel);
       
@@ -207,9 +250,7 @@ export const GeniusLab: React.FC = () => {
       await addXPAction(25);
       await logActivity();
     } catch (err) {
-      setError("Failed to open preset course.");
-    } finally {
-      setIsLoading(false);
+      setError(tr('Could not open the course. Try again.', 'Не удалось открыть курс. Попробуй ещё раз.', 'Kursni ochib bo‘lmadi. Qayta urinib ko‘ring.'));
     }
   };
 
@@ -248,6 +289,7 @@ export const GeniusLab: React.FC = () => {
     if (!topic.trim() || !profile) return;
     setIsLoading(true);
     setError(null);
+    setErrorIsLimit(false);
     setDebugInfo(null);
     setVerifyFeedback(null);
     setChallengeAnswer('');
@@ -265,12 +307,13 @@ export const GeniusLab: React.FC = () => {
       console.error("Genius Lab Error:", err);
       let msg = err instanceof Error ? err.message : "Failed to initialize lab";
       if (err?.message === "PRO_LIMIT_REACHED") {
+        setErrorIsLimit(true);
         if (profile?.language === 'ru') {
-          msg = "⚠️ Превышен бесплатный лимит токенов ИИ! Пожалуйста, перейдите на один из предложенных Премиум-тарифов, чтобы создавать бесконечные карты знаний.";
+          msg = "⚠️ Лимит токенов ИИ исчерпан! Загляни в «Бонусы и Коды», чтобы получить дополнительную квоту для новых карт знаний.";
         } else if (profile?.language === 'uz') {
-          msg = "⚠️ Bepul AI tokenlar limiti tugadi! Istalgancha yangi dars xaritalari yaratish uchun Premium tarifiga o'ting.";
+          msg = "⚠️ AI tokenlar limiti tugadi! Yangi bilim xaritalari uchun qo'shimcha kvotani «Bonuslar & Kodlar» bo'limidan oling.";
         } else {
-          msg = "⚠️ AI Token Quota Limit Reached! Please upgrade to Premium to generate unlimited interactive knowledge trees.";
+          msg = "⚠️ AI token quota reached! Check “Bonuses & Codes” to get extra quota for new knowledge trees.";
         }
       }
       setError(msg);
@@ -305,18 +348,20 @@ export const GeniusLab: React.FC = () => {
             ...tree,
             nodes: tree.nodes.map(n => n.id === selectedNode.id ? { ...n, completed: true } : n)
           });
+          setSelectedNode({ ...selectedNode, completed: true });
         }
       }
     } catch (err: any) {
       console.error("Verification failed:", err);
       let msg = "AI Verification failed. Try again.";
       if (err?.message === "PRO_LIMIT_REACHED") {
+        setErrorIsLimit(true);
         if (profile?.language === 'ru') {
-          msg = "⚠️ Превышен лимит токенов ИИ! Для проверки решений обновите тариф до Премиум.";
+          msg = "⚠️ Лимит токенов ИИ исчерпан! Для проверки решений получи дополнительную квоту в «Бонусы и Коды».";
         } else if (profile?.language === 'uz') {
-          msg = "⚠️ AI tokenlar limiti tugadi! Javoblarni cheksiz tekshirish uchun tarifni yangilang.";
+          msg = "⚠️ AI tokenlar limiti tugadi! Javoblarni tekshirish uchun «Bonuslar & Kodlar» bo'limidan kvota oling.";
         } else {
-          msg = "⚠️ AI Token Quota Limit Reached! Please upgrade to Premium to verify challenges.";
+          msg = "⚠️ AI token quota reached! Get extra quota in “Bonuses & Codes” to verify challenges.";
         }
       }
       setError(msg);
@@ -334,138 +379,61 @@ export const GeniusLab: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="h-full flex flex-col items-center justify-center p-8 bg-[#020205] overflow-hidden">
-        {/* Deep Space Atmosphere */}
+      <div className="h-full flex flex-col items-center justify-center p-8 bg-[#020205] overflow-hidden" role="status" aria-live="polite">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_40%,_rgba(79,70,229,0.15)_0%,_transparent_60%)]" />
 
-        {/* Floating XP Context */}
-        <AnimatePresence>
-          {floatingXP.map(xp => (
-            <motion.div
-              key={xp.id}
-              initial={{ opacity: 0, y: 0 }}
-              animate={{ opacity: 1, y: -100 }}
-              exit={{ opacity: 0 }}
-              className="fixed top-1/2 left-1/2 z-[100] text-emerald-400 font-black text-5xl pointer-events-none drop-shadow-[0_0_20px_rgba(52,211,153,0.8)]"
-            >
-              +{xp.amount} XP
-            </motion.div>
-          ))}
-        </AnimatePresence>
-
-        <div className="w-full max-w-4xl space-y-16 relative">
-          {/* WOW NEURAL SCAN ANIMATION - ENHANCED */}
-          <div className="relative flex flex-col items-center">
-            {/* Energy Fields */}
-            <motion.div 
-               animate={{ 
-                 scale: [1, 1.4, 1],
-                 opacity: [0.1, 0.3, 0.1]
-               }}
-               transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-               className="absolute w-[600px] h-[600px] rounded-full bg-indigo-500/10 blur-[100px]"
-            />
-
-            {/* Outer Rings */}
-            {[...Array(4)].map((_, i) => (
+        <div className="w-full max-w-3xl space-y-12 relative">
+          <div className="relative flex flex-col items-center h-72 justify-center">
+            {[0, 1].map((i) => (
               <motion.div
                 key={i}
-                animate={{ rotate: i % 2 === 0 ? 360 : -360, scale: [1, 1.05, 1] }}
-                transition={{ duration: 10 + i * 5, repeat: Infinity, ease: "linear" }}
+                animate={reduceMotion ? undefined : { rotate: i % 2 === 0 ? 360 : -360 }}
+                transition={{ duration: 14 + i * 8, repeat: Infinity, ease: 'linear' }}
                 className="absolute border border-indigo-500/30 rounded-full"
-                style={{ 
-                  width: `${350 + i * 100}px`, 
-                  height: `${350 + i * 100}px`,
-                  borderStyle: i % 2 === 0 ? 'solid' : 'dashed',
-                  opacity: 0.5 - (i * 0.1)
-                }}
+                style={{ width: `${260 + i * 90}px`, height: `${260 + i * 90}px`, borderStyle: i % 2 === 0 ? 'solid' : 'dashed' }}
               />
             ))}
-
-            {/* Pulsing Core */}
-            <motion.div 
-              animate={{ scale: [1, 1.15, 1], rotate: -360 }}
-              transition={{ duration: 15, repeat: Infinity }}
-              className="w-56 h-56 rounded-[3rem] bg-gradient-to-br from-indigo-600/30 to-purple-600/30 backdrop-blur-3xl flex items-center justify-center border border-white/20 shadow-[0_0_80px_rgba(79,70,229,0.5)] relative overflow-hidden"
+            <motion.div
+              animate={reduceMotion ? undefined : { scale: [1, 1.08, 1] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+              className="w-40 h-40 rounded-[2.5rem] bg-gradient-to-br from-indigo-600/30 to-purple-600/30 flex items-center justify-center border border-white/20 shadow-[0_0_60px_rgba(79,70,229,0.45)] relative"
             >
-              <div className="absolute inset-0 bg-[url('https://grainy-gradients.vercel.app/noise.svg')] opacity-20" />
-              <Brain className="w-24 h-24 text-indigo-400 drop-shadow-[0_0_20px_rgba(129,140,248,1)]" />
+              <Brain className="w-20 h-20 text-indigo-400 drop-shadow-[0_0_20px_rgba(129,140,248,1)]" aria-hidden="true" />
             </motion.div>
-
-            {/* Orbiting Particles */}
-            {[...Array(12)].map((_, i) => (
-              <motion.div
-                key={i}
-                animate={{ 
-                  rotate: 360,
-                }}
-                transition={{ duration: 6 + (i % 3), repeat: Infinity, ease: "linear" }}
-                style={{
-                  position: 'absolute',
-                  width: '400px',
-                  height: '400px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'flex-start',
-                  transform: `rotate(${i * 30}deg)`
-                }}
-              >
-                <div className="w-2 h-2 bg-indigo-400 rounded-full shadow-[0_0_15px_rgba(99,102,241,1)]" />
-              </motion.div>
-            ))}
           </div>
 
-          <div className="space-y-10 font-mono text-center relative z-10">
+          <div className="space-y-8 text-center relative z-10">
             <div className="space-y-3">
-              <h2 className="text-4xl font-black text-white tracking-[0.3em] uppercase italic drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
+              <h2 className="text-3xl md:text-4xl font-black text-white tracking-[0.2em] uppercase italic drop-shadow-[0_0_10px_rgba(255,255,255,0.3)]">
                 {t.constructingKnowledge}
               </h2>
-              <p className="text-indigo-400/60 text-sm font-black tracking-widest uppercase">
-                {t.synthesizingNode} <span className="text-white border-b-2 border-indigo-500 pb-1 px-2">{topic}</span>
+              <p className="text-indigo-300 text-sm font-bold tracking-widest uppercase">
+                {t.synthesizingNode} <span className="text-white border-b-2 border-indigo-500 pb-1 px-2 normal-case tracking-normal">{topic}</span>
               </p>
             </div>
-            
-            <div className="max-w-xl mx-auto space-y-4">
-              <div className="flex justify-between text-[11px] text-indigo-400 font-black tracking-widest">
-                <span className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse" />
-                  {t.systemOptimizing}
-                </span>
-                <motion.span
-                  animate={{ opacity: [1, 0.4, 1] }}
-                  transition={{ duration: 1 }}
-                >
-                  NEURAL LINK ESTABLISHED
-                </motion.span>
+
+            <div className="max-w-xl mx-auto space-y-3">
+              <div className="flex justify-between text-xs text-indigo-300 font-bold tracking-widest uppercase">
+                <span>{t.systemOptimizing}</span>
+                <span className="tabular-nums">{elapsed} {tr('s', 'с', 's')}</span>
               </div>
-              <div className="h-3 w-full bg-white/5 rounded-full overflow-hidden border border-white/10 p-0.5 shadow-inner">
-                <motion.div 
-                  initial={{ width: "0%" }}
-                  animate={{ width: "100%" }}
-                  transition={{ duration: 12, ease: "easeInOut" }}
-                  className="h-full bg-gradient-to-r from-indigo-600 via-purple-500 to-emerald-500 animate-gradient-x rounded-full"
+              <div className="relative h-3 w-full bg-white/5 rounded-full overflow-hidden border border-white/10">
+                <motion.div
+                  animate={reduceMotion ? undefined : { x: ['-100%', '300%'] }}
+                  transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
+                  className="absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-indigo-600 via-purple-500 to-emerald-500 rounded-full"
                 />
               </div>
+              <p className="text-sm text-gray-400">
+                {tr('Usually takes 10–20 seconds.', 'Обычно это занимает 10–20 секунд.', 'Odatda 10–20 soniya davom etadi.')}
+              </p>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-              {[
-                { label: t.deepUnderstanding, status: 'MAPPING' },
-                { label: t.personalizedMetaphors, status: 'ENCODING' },
-                { label: t.skillMastery, status: 'SCAFFOLDING' },
-                { label: t.knowledgeMap, status: 'FLUIDIZING' }
-              ].map((step, idx) => (
-                <motion.div 
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ delay: idx * 0.4 }}
-                  key={idx} 
-                  className="p-5 rounded-3xl bg-white/5 border border-white/10 backdrop-blur-xl relative group overflow-hidden"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className="text-[10px] text-gray-500 font-black uppercase tracking-widest mb-2">{step.label}</div>
-                  <div className="text-sm font-black text-indigo-400 tracking-tighter">{step.status}...</div>
-                </motion.div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+              {[t.deepUnderstanding, t.personalizedMetaphors, t.skillMastery, t.knowledgeMap].map((label) => (
+                <div key={label} className="p-4 rounded-3xl bg-white/5 border border-white/10 text-xs text-gray-300 font-bold uppercase tracking-widest">
+                  {label}
+                </div>
               ))}
             </div>
           </div>
@@ -474,74 +442,34 @@ export const GeniusLab: React.FC = () => {
     );
   }
 
-  // Ambient Data Logs for 'Cyber' immersion
-  const dataLogs = [
-    "NEURAL_LINK_ESTABLISHED",
-    "DECODER_READY_STATE:_ACTIVE",
-    "SYNCING_METAPHOR_MATRIX...",
-    "KNOWLEDGE_TREE_DEPTH:_6",
-    "BRAIN_WAVE_CONSISTENCY:_98%",
-    "ENFORCING_COGNITIVE_SCAFFOLDING",
-    "FETCHING_GENIUS_INSIGHTS...",
-    "DATA_STREAM_POLLING:_TRUE",
-    "VIRTUAL_NEURONS:_1024",
-    "AI_CORE_TEMPERATURE:_STABLE"
-  ];
-
   if (!tree) {
     return (
-      <div className="max-w-5xl mx-auto flex flex-col items-center pt-24 md:pt-40 pb-20 p-6 relative">
+      <div className="max-w-5xl mx-auto flex flex-col items-center px-6 pt-8 md:pt-14 pb-16 relative">
         <motion.div 
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
-          className="w-full space-y-16 text-center"
+          className="w-full space-y-10 text-center"
         >
           <div className="space-y-6 relative">
-            {/* Holographic Particles around Title */}
-            <div className="absolute inset-x-0 -top-20 pointer-events-none flex justify-center">
-              <motion.div 
-                animate={{ rotate: 360 }}
-                transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
-                className="w-40 h-40 border-2 border-dashed border-indigo-500/20 rounded-full blur-sm"
-              />
-            </div>
-
             <div className="flex flex-wrap items-center justify-center gap-4">
-              <div className="inline-flex items-center gap-3 px-6 py-2.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-[11px] font-black uppercase tracking-[0.2em] shadow-lg shadow-indigo-500/10">
-                <Zap className="w-5 h-5 fill-current" />
-                {t.nextGenAI} [v7.0]
+              <div className="inline-flex items-center gap-3 px-6 py-2.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-black uppercase tracking-[0.15em] shadow-lg shadow-indigo-500/10">
+                <Zap className="w-5 h-5 fill-current" aria-hidden="true" />
+                {interests.length > 0
+                  ? `${tr('Through your interests', 'Через твои интересы', 'Qiziqishlaringiz orqali')}: ${interests.slice(0, 3).map(interestName).join(' · ')}`
+                  : t.nextGenAI}
               </div>
               {profile?.geniusMode && (
-                <motion.div 
-                  animate={{ scale: [1, 1.05, 1], opacity: [0.7, 1, 0.7] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                  className="inline-flex items-center gap-3 px-6 py-2.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[11px] font-black uppercase tracking-[0.2em] shadow-lg shadow-emerald-500/10"
-                >
-                  <Sparkles className="w-5 h-5 fill-current" />
+                <div className="inline-flex items-center gap-3 px-6 py-2.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-black uppercase tracking-[0.15em] shadow-lg shadow-emerald-500/10">
+                  <Sparkles className="w-5 h-5 fill-current" aria-hidden="true" />
                   {t.geniusModeActive}
-                </motion.div>
+                </div>
               )}
             </div>
 
-              <h1 className="relative inline-block text-6xl md:text-9xl font-black uppercase tracking-tighter italic">
+              <h1 className="relative inline-block text-5xl md:text-7xl font-black uppercase tracking-tighter italic">
                 <span className="relative z-10 text-white mix-blend-overlay">Genius</span>
                 <span className="text-indigo-500 drop-shadow-[0_0_50px_rgba(99,102,241,0.8)] px-4">Lab</span>
                 
-                {/* Chromatic Aberration Layers */}
-                <motion.span
-                  animate={{ x: [-1, 1, -1], y: [1, -1, 1], opacity: [0, 0.4, 0] }}
-                  transition={{ duration: 0.2, repeat: Infinity }}
-                  className="absolute inset-0 text-rose-500 italic -z-10 translate-x-1"
-                >
-                  Genius Lab
-                </motion.span>
-                <motion.span
-                  animate={{ x: [1, -1, 1], y: [-1, 1, -1], opacity: [0, 0.4, 0] }}
-                  transition={{ duration: 0.2, repeat: Infinity, delay: 0.1 }}
-                  className="absolute inset-0 text-cyan-500 italic -z-10 -translate-x-1"
-                >
-                  Genius Lab
-                </motion.span>
               </h1>
             
             <p className="text-gray-400 max-w-2xl mx-auto font-medium text-lg leading-relaxed">
@@ -553,17 +481,20 @@ export const GeniusLab: React.FC = () => {
             <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-[3rem] blur opacity-25 group-hover:opacity-100 transition duration-1000 group-hover:duration-200"></div>
             <Card className="p-3 rounded-[3rem] bg-black/40 border border-white/10 backdrop-blur-2xl relative">
               <div className="flex flex-col md:flex-row gap-4">
-                <input 
+                <input
                   value={topic}
                   onChange={e => setTopic(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleInitialize()}
                   placeholder={t.masterTopic}
-                  className="flex-1 bg-transparent px-10 py-8 outline-none text-2xl font-black text-white placeholder:text-gray-700"
+                  aria-label={t.masterTopic}
+                  maxLength={200}
+                  autoComplete="off"
+                  className="flex-1 bg-transparent px-8 py-6 outline-none text-xl md:text-2xl font-black text-white placeholder:text-gray-500"
                 />
                 <Button 
                   onClick={handleInitialize}
                   disabled={isLoading || !topic.trim()}
-                  className="h-auto py-8 px-14 rounded-[2.5rem] text-xl gap-4 bg-indigo-600 hover:bg-indigo-500 shadow-2xl shadow-indigo-500/40 relative overflow-hidden group"
+                  className="h-auto py-6 px-10 rounded-[2.5rem] text-lg gap-4 bg-indigo-600 hover:bg-indigo-500 shadow-2xl shadow-indigo-500/40 relative overflow-hidden group"
                 >
                   <motion.div
                     className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"
@@ -580,23 +511,36 @@ export const GeniusLab: React.FC = () => {
             </Card>
           </div>
 
+          {interests.length === 0 && onNavigate && (
+            <p className="text-sm text-gray-400 -mt-4">
+              {tr('Add your interests so explanations feel like yours.', 'Добавь интересы, чтобы объяснения были про тебя.', 'Tushuntirishlar o‘zingiznikidek bo‘lishi uchun qiziqishlarni qo‘shing.')}{' '}
+              <button type="button" onClick={() => onNavigate('profile')} className="text-indigo-300 underline underline-offset-4 hover:text-white">
+                {tr('Add interests', 'Добавить интересы', 'Qiziqish qo‘shish')}
+              </button>
+            </p>
+          )}
+
           {/* Quick-Start Preset Courses Section */}
           <div className="space-y-6 max-w-4xl mx-auto pt-6">
-            <span className="text-[11px] font-black uppercase tracking-[0.25em] text-gray-500 block text-center">
-              {profile?.language === 'ru' ? '⚡️ ГОТОВЫЕ КУРСЫ-ШАБЛОНЫ ДЛЯ КРУТОЙ ДОРОЖНОЙ КАРТЫ' : '⚡️ READY-MADE TEMPLATES FOR INSTANT ROADMAPS'}
+            <span className="text-xs font-black uppercase tracking-[0.2em] text-gray-400 block text-center">
+              {tr('Ready-made courses · no AI tokens spent', 'Готовые курсы · токены не тратятся', 'Tayyor kurslar · token sarflanmaydi')}
             </span>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {presetTemplates.map((tmpl) => (
-                <motion.div
+                <motion.button
+                  type="button"
                   key={tmpl.id}
-                  whileHover={{ scale: 1.05, y: -4 }}
-                  whileTap={{ scale: 0.98 }}
+                  whileHover={reduceMotion ? undefined : { scale: 1.05, y: -4 }}
+                  whileTap={reduceMotion ? undefined : { scale: 0.98 }}
                   onClick={() => handleLaunchPreset(tmpl.id)}
-                  className={`p-6 rounded-[2rem] border min-h-[160px] text-left cursor-pointer transition-all flex flex-col justify-between relative overflow-hidden group ${tmpl.theme}`}
+                  className={`p-6 rounded-[2rem] border min-h-[160px] w-full text-left cursor-pointer transition-all flex flex-col justify-between relative overflow-hidden group ${tmpl.theme}`}
                 >
                   <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-2xl group-hover:bg-indigo-500/10 transition-colors" />
                   <div className="flex justify-between items-start">
-                    <span className="text-3xl filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.2)]">{tmpl.icon}</span>
+                    {(() => {
+                      const PresetIcon = PRESET_ICON[tmpl.id] ?? Atom;
+                      return <PresetIcon className="w-9 h-9" aria-hidden="true" />;
+                    })()}
                     <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-current opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all">
                       <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
                     </div>
@@ -605,11 +549,11 @@ export const GeniusLab: React.FC = () => {
                     <h4 className="font-black text-sm uppercase tracking-tight text-white leading-tight">
                       {profile?.language === 'ru' ? tmpl.title : tmpl.titleEn}
                     </h4>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">
-                      {tmpl.tree.nodes.length} {profile?.language === 'ru' ? 'модуля' : 'modules'} • {tmpl.tree.nodes.reduce((acc, current) => acc + (current.points || 0), 0)} XP
+                    <p className="text-xs text-gray-300 font-bold uppercase tracking-wider">
+                      {tmpl.tree.nodes.length} {tr('modules', 'модуля', 'modul')} • {tmpl.tree.nodes.reduce((acc, current) => acc + (current.points || 0), 0)} XP
                     </p>
                   </div>
-                </motion.div>
+                </motion.button>
               ))}
             </div>
           </div>
@@ -628,23 +572,14 @@ export const GeniusLab: React.FC = () => {
                 <div className="space-y-2">
                   <p className="text-white text-xl uppercase tracking-tighter font-black">{t.systemFailure}</p>
                   <p className="opacity-80 font-medium leading-relaxed">{error}</p>
-                  {debugInfo && (
-                    <div className="mt-4 p-4 bg-black/40 rounded-xl text-[10px] font-mono text-indigo-300 border border-indigo-500/30">
-                      <p className="font-bold mb-1 text-white">DIAGNOSTICS:</p>
-                      <p>Env Keys: {debugInfo.envKeys?.join(', ') || 'none'}</p>
-                      <p>Has Key: {String(debugInfo.hasApiKey)}</p>
-                      <p>Key Length: {debugInfo.apiKeyLength}</p>
-                      <p className="mt-2 text-rose-300 italic">If 'Has Key' is false, please re-add API_KEY in Settings and RESTART the server.</p>
-                    </div>
-                  )}
                 </div>
               </div>
               
-              <Button 
-                onClick={() => window.location.reload()}
-                className="w-full bg-white text-black hover:bg-gray-200 rounded-2xl h-14 font-black uppercase tracking-widest text-[10px]"
+              <Button
+                onClick={() => (errorIsLimit && onNavigate ? onNavigate('leaderboard') : setError(null))}
+                className="w-full bg-white text-black hover:bg-gray-200 rounded-2xl h-14 font-black uppercase tracking-widest text-xs"
               >
-                {t.tryAgain}
+                {errorIsLimit && onNavigate ? tr('Get more tokens', 'Получить токены', 'Token olish') : t.tryAgain}
               </Button>
             </motion.div>
           )}
@@ -658,7 +593,7 @@ export const GeniusLab: React.FC = () => {
               <div key={i} className="space-y-3 p-6 rounded-3xl bg-white/5 border border-white/5">
                 <item.icon className="w-6 h-6 text-indigo-500 mx-auto" />
                 <h4 className="text-xs font-black uppercase tracking-widest text-white">{item.label}</h4>
-                <p className="text-[10px] text-gray-500 leading-relaxed">{item.desc}</p>
+                <p className="text-xs text-gray-400 leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -666,6 +601,9 @@ export const GeniusLab: React.FC = () => {
       </div>
     );
   }
+
+  const doneCount = tree.nodes.filter((n) => n.completed).length;
+  const currentIndex = selectedNode ? tree.nodes.findIndex((n) => n.id === selectedNode.id) : -1;
 
   return (
     <div className="h-full flex flex-col lg:flex-row gap-8 p-4 md:p-8 relative">
@@ -691,36 +629,38 @@ export const GeniusLab: React.FC = () => {
       </AnimatePresence>
 
       {/* Knowledge Map Sidebar */}
-      <div className="w-full lg:w-96 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-4 relative z-10">
-        {/* Neural Console Overlay (WOW FACTOR) */}
-        <div className="p-4 rounded-3xl bg-indigo-500/5 border border-indigo-500/20 backdrop-blur-xl mb-4 overflow-hidden relative">
-          <div className="absolute top-0 right-0 p-2 opacity-30">
-            <motion.div animate={{ rotate: 360 }} transition={{ duration: 4, repeat: Infinity, ease: "linear" }}>
-              <Zap className="w-3 h-3 text-indigo-400" />
-            </motion.div>
+      <div className="w-full lg:w-80 lg:shrink-0 flex flex-col gap-6 overflow-y-auto custom-scrollbar pr-4 relative z-10">
+        <div className="p-5 rounded-3xl bg-indigo-500/5 border border-indigo-500/20 backdrop-blur-xl mb-4">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="text-xs font-black uppercase tracking-widest text-indigo-300">{tr('Course progress', 'Прогресс курса', 'Kurs jarayoni')}</span>
+            <span className="text-sm font-black text-white tabular-nums">{doneCount} / {tree.nodes.length}</span>
           </div>
-          <div className="space-y-1.5 h-24 overflow-hidden font-mono text-[8px] text-indigo-400/60 leading-tight">
-            {dataLogs.concat(dataLogs).map((log, i) => (
-              <motion.div
-                key={i}
-                animate={{ y: [0, -100] }}
-                transition={{ duration: 15, repeat: Infinity, ease: "linear", delay: i * 0.1 }}
-              >
-                {`> ${log}`}
-              </motion.div>
-            ))}
+          <div
+            role="progressbar"
+            aria-label={tr('Course progress', 'Прогресс курса', 'Kurs jarayoni')}
+            aria-valuemin={0}
+            aria-valuemax={tree.nodes.length}
+            aria-valuenow={doneCount}
+            className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden"
+          >
+            <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-500" style={{ width: `${(doneCount / tree.nodes.length) * 100}%` }} />
           </div>
-          <div className="absolute bottom-0 left-0 w-full h-8 bg-gradient-to-t from-[#020205] to-transparent pointer-events-none" />
+          {doneCount === tree.nodes.length && (
+            <p className="mt-3 flex items-center gap-2 text-sm font-bold text-emerald-400">
+              <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
+              {tr('Course completed', 'Курс пройден', 'Kurs yakunlandi')}
+            </p>
+          )}
         </div>
 
         <div className="flex items-center justify-between px-2">
           <div className="space-y-1">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.5em] text-indigo-400/60">{t.knowledgeMap}</h3>
+            <h3 className="text-xs font-black uppercase tracking-[0.5em] text-indigo-400/60">{t.knowledgeMap}</h3>
             <div className="h-0.5 w-12 bg-indigo-500 rounded-full" />
           </div>
           <button 
             onClick={resetLab} 
-            className="px-4 py-1.5 rounded-full border border-indigo-500/30 text-[10px] font-black uppercase text-indigo-400 hover:bg-indigo-500/10 transition-colors shadow-lg shadow-indigo-500/5 backdrop-blur-md"
+            className="px-4 py-1.5 rounded-full border border-indigo-500/30 text-xs font-black uppercase text-indigo-400 hover:bg-indigo-500/10 transition-colors shadow-lg shadow-indigo-500/5 backdrop-blur-md"
           >
             {t.newTopic}
           </button>
@@ -740,6 +680,7 @@ export const GeniusLab: React.FC = () => {
                 handleNodeClick(node);
                 setShowChat(false);
               }}
+              aria-current={selectedNode?.id === node.id ? 'step' : undefined}
               className={`
                 w-full p-6 rounded-[2.2rem] border text-left transition-all relative overflow-hidden group z-10
                 ${selectedNode?.id === node.id 
@@ -762,7 +703,7 @@ export const GeniusLab: React.FC = () => {
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="font-black text-sm tracking-tight truncate uppercase italic">{node.label}</span>
-                  {node.points && <span className={`text-[9px] font-bold tracking-widest ${selectedNode?.id === node.id ? 'text-white/60' : 'text-indigo-400/60'}`}>+ {node.points} XP NODE</span>}
+                  {node.points && <span className={`text-xs font-bold tracking-widest ${selectedNode?.id === node.id ? 'text-white/80' : 'text-indigo-300'}`}>+{node.points} XP</span>}
                 </div>
                 {selectedNode?.id === node.id && (
                   <motion.div
@@ -775,7 +716,7 @@ export const GeniusLab: React.FC = () => {
                 )}
               </div>
               {node.completed && (
-                <div className="absolute top-4 right-4 animate-bounce-subtle">
+                <div className="absolute top-4 right-4">
                   <CheckCircle2 className="w-5 h-5 text-emerald-400 drop-shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
                 </div>
               )}
@@ -820,12 +761,12 @@ export const GeniusLab: React.FC = () => {
                     <ArrowRight className="w-6 h-6 rotate-180" />
                   </Button>
                   <div className="space-y-1">
-                    <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none">AI ASSISTANT</p>
+                    <p className="text-xs font-black text-indigo-300 uppercase tracking-widest leading-none">{tr('AI assistant', 'ИИ-ассистент', 'AI yordamchi')}</p>
                     <h2 className="text-3xl font-black uppercase tracking-tighter text-white italic">{t.askAbout} {selectedNode?.label}</h2>
                   </div>
                 </div>
               </div>
-              <Chat type="genius" />
+              <Chat type="genius" context={selectedNode?.label} />
             </motion.div>
           ) : selectedNode ? (
             <motion.div
@@ -835,7 +776,7 @@ export const GeniusLab: React.FC = () => {
               exit={{ opacity: 0, x: -20 }}
               className="h-full flex flex-col space-y-8"
             >
-              <Card className="p-12 rounded-[4rem] bg-black/40 border border-white/10 relative overflow-hidden backdrop-blur-3xl shadow-2xl group/main">
+              <Card className="p-6 md:p-10 rounded-[3rem] bg-black/40 border border-white/10 relative overflow-hidden backdrop-blur-3xl shadow-2xl group/main">
                 {/* Rainbow Energy Border Animation */}
                 <div className="absolute -inset-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-500 opacity-20 blur-2xl group-hover/main:opacity-40 transition-opacity duration-700 animate-gradient-x" />
                 
@@ -849,10 +790,10 @@ export const GeniusLab: React.FC = () => {
                   <div className="space-y-4">
                     <div className="flex items-center gap-3">
                       <div className="h-px flex-1 bg-gradient-to-r from-transparent to-indigo-500/30" />
-                      <div className="text-[11px] font-black uppercase tracking-[0.6em] text-indigo-500 drop-shadow-sm">{t.nodeExplanation}</div>
+                      <div className="text-xs font-black uppercase tracking-[0.6em] text-indigo-500 drop-shadow-sm">{t.nodeExplanation}</div>
                       <div className="h-px flex-1 bg-gradient-to-l from-transparent to-indigo-500/30" />
                     </div>
-                    <h2 className="text-5xl md:text-8xl font-black uppercase tracking-tighter text-white italic text-center">
+                    <h2 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-white italic text-center break-words">
                       <motion.span
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
@@ -863,18 +804,18 @@ export const GeniusLab: React.FC = () => {
                     </h2>
                   </div>
  
-                  <div className="grid grid-cols-1 xl:grid-cols-2 gap-16 items-start">
+                  <div className="grid grid-cols-1 min-[1800px]:grid-cols-2 gap-10 items-start">
                     <div className="space-y-10">
                       <motion.div 
                         initial={{ opacity: 0, scale: 0.95 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ delay: 0.2 }}
-                        className="p-8 rounded-[3rem] bg-indigo-600/5 border border-indigo-500/20 space-y-6 relative overflow-hidden group shadow-xl"
+                        className="p-6 md:p-8 rounded-[2.5rem] bg-indigo-600/5 border border-indigo-500/20 space-y-6 relative overflow-hidden group shadow-xl"
                       >
                         <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                         <div className="flex items-center gap-3 text-indigo-400 relative z-10">
                           <Sparkles className="w-6 h-6 animate-pulse" />
-                          <span className="text-[11px] font-black uppercase tracking-[0.3em]">{t.theMetaphor}</span>
+                          <span className="text-xs font-black uppercase tracking-[0.3em]">{t.theMetaphor}</span>
                         </div>
                         <p className="text-2xl font-bold text-white italic leading-relaxed relative z-10 drop-shadow-md">
                           "{selectedNode.metaphor}"
@@ -887,7 +828,7 @@ export const GeniusLab: React.FC = () => {
                         transition={{ delay: 0.3 }}
                         className="space-y-4"
                       >
-                        <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest pl-1">DEEP ANALYSIS</div>
+                        <div className="text-xs font-black text-gray-400 uppercase tracking-widest pl-1">{tr('In detail', 'Подробнее', 'Batafsil')}</div>
                         <p className="text-gray-400 leading-relaxed text-xl font-medium px-1">
                           {selectedNode.description}
                         </p>
@@ -897,14 +838,14 @@ export const GeniusLab: React.FC = () => {
                     <div className="space-y-8">
                       <div className="relative group/card">
                         <div className="absolute -inset-0.5 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-[3rem] blur opacity-10 group-hover/card:opacity-20 transition duration-500" />
-                        <div className="p-10 rounded-[3rem] bg-emerald-600/5 border border-emerald-500/20 space-y-8 relative backdrop-blur-xl">
+                        <div className="p-6 md:p-8 rounded-[2.5rem] bg-emerald-600/5 border border-emerald-500/20 space-y-8 relative backdrop-blur-xl">
                           <div className="flex items-center justify-between gap-4 text-emerald-400">
                             <div className="flex items-center gap-3">
                               <Target className="w-6 h-6" />
-                              <span className="text-[11px] font-black uppercase tracking-[0.3em]">{t.geniusChallenge}</span>
+                              <span className="text-xs font-black uppercase tracking-[0.3em]">{t.geniusChallenge}</span>
                             </div>
                             {selectedNode.points && (
-                              <div className="px-5 py-2 rounded-full bg-emerald-400/10 text-emerald-400 text-[11px] font-black tracking-widest border border-emerald-400/20 shadow-lg shadow-emerald-500/10">
+                              <div className="px-5 py-2 rounded-full bg-emerald-400/10 text-emerald-400 text-xs font-black tracking-widest border border-emerald-400/20 shadow-lg shadow-emerald-500/10">
                                 {t.rewardLabel} <span className="text-white ml-2">+{selectedNode.points} XP</span>
                               </div>
                             )}
@@ -914,6 +855,28 @@ export const GeniusLab: React.FC = () => {
                             {selectedNode.challenge}
                           </p>
 
+                          <div aria-live="polite">
+                                <AnimatePresence>
+                                  {verifyFeedback && (
+                                    <motion.div 
+                                      initial={{ opacity: 0, height: 0 }}
+                                      animate={{ opacity: 1, height: 'auto' }}
+                                      exit={{ opacity: 0, height: 0 }}
+                                      className={`p-6 rounded-3xl text-sm font-bold border flex gap-4 ${
+                                        verifyFeedback.isCorrect 
+                                          ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
+                                          : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
+                                      }`}
+                                    >
+                                      <div className="shrink-0 pt-1">
+                                        {verifyFeedback.isCorrect ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+                                      </div>
+                                      <p className="leading-relaxed">{verifyFeedback.text}</p>
+                                    </motion.div>
+                                  )}
+                                </AnimatePresence>
+                          </div>
+
                           {!selectedNode.completed && (
                             <div className="space-y-6">
                               <div className="relative">
@@ -921,33 +884,16 @@ export const GeniusLab: React.FC = () => {
                                   value={challengeAnswer}
                                   onChange={(e) => setChallengeAnswer(e.target.value)}
                                   placeholder={t.geniusAnswerPlaceholder}
-                                  className="w-full h-32 bg-black/40 border border-white/10 rounded-3xl p-6 text-base text-white placeholder:text-gray-700 focus:outline-none focus:border-emerald-500/50 transition-all custom-scrollbar resize-none font-medium shadow-inner"
+                                  aria-label={t.geniusChallenge}
+                                  maxLength={1000}
+                                  onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleCompleteChallenge(); }}
+                                  className="w-full h-32 bg-black/40 border border-white/10 rounded-3xl p-6 text-base text-white placeholder:text-gray-500 focus:outline-none focus:border-emerald-500/50 transition-all custom-scrollbar resize-none font-medium shadow-inner"
                                 />
-                                <div className="absolute bottom-4 right-4 text-[10px] font-black text-gray-600 tracking-widest uppercase">
-                                  {challengeAnswer.length} chars
+                                <div className="absolute bottom-4 right-4 text-xs font-black text-gray-600 tracking-widest uppercase">
+                                  {challengeAnswer.length} / 1000
                                 </div>
                               </div>
                               
-                              <AnimatePresence>
-                                {verifyFeedback && (
-                                  <motion.div 
-                                    initial={{ opacity: 0, height: 0 }}
-                                    animate={{ opacity: 1, height: 'auto' }}
-                                    exit={{ opacity: 0, height: 0 }}
-                                    className={`p-6 rounded-3xl text-sm font-bold border flex gap-4 ${
-                                      verifyFeedback.isCorrect 
-                                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' 
-                                        : 'bg-rose-500/10 border-rose-500/20 text-rose-400'
-                                    }`}
-                                  >
-                                    <div className="shrink-0 pt-1">
-                                      {verifyFeedback.isCorrect ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-                                    </div>
-                                    <p className="leading-relaxed">{verifyFeedback.text}</p>
-                                  </motion.div>
-                                )}
-                              </AnimatePresence>
-
                               <Button 
                                 onClick={handleCompleteChallenge}
                                 disabled={isVerifying || !challengeAnswer.trim()}
@@ -997,30 +943,22 @@ export const GeniusLab: React.FC = () => {
                       <div key={i} className="w-2.5 h-2.5 bg-indigo-500 rounded-full border border-black animate-pulse" style={{ animationDelay: `${i * 0.2}s` }} />
                     ))}
                   </div>
-                  <span className="text-[10px] font-black uppercase tracking-[0.4em] text-gray-500 whitespace-nowrap">{t.architectingMind}</span>
+                  <span className="text-xs font-black uppercase tracking-[0.4em] text-gray-500 whitespace-nowrap">{t.architectingMind}</span>
                 </div>
                 <div className="flex gap-4">
                   <Button 
                     variant="ghost" 
-                    disabled={!tree?.nodes || tree.nodes.indexOf(selectedNode) === 0}
-                    onClick={() => {
-                      if (tree?.nodes) {
-                        setSelectedNode(tree.nodes[tree.nodes.indexOf(selectedNode) - 1]);
-                      }
-                    }}
-                    className="rounded-2xl px-6 h-12 bg-white/5 hover:bg-white/10 text-[10px] font-black tracking-widest uppercase border border-white/5"
+                    disabled={currentIndex <= 0}
+                    onClick={() => handleNodeClick(tree.nodes[currentIndex - 1])}
+                    className="rounded-2xl px-6 h-12 bg-white/5 hover:bg-white/10 text-xs font-black tracking-widest uppercase border border-white/5"
                   >
                     {t.previous}
                   </Button>
                   <Button 
                     variant="ghost"
-                    disabled={!tree?.nodes || tree.nodes.indexOf(selectedNode) === tree.nodes.length - 1}
-                    onClick={() => {
-                      if (tree?.nodes) {
-                        setSelectedNode(tree.nodes[tree.nodes.indexOf(selectedNode) + 1]);
-                      }
-                    }}
-                    className="rounded-2xl px-8 h-12 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 text-[10px] font-black tracking-widest uppercase border border-indigo-500/20 gap-3"
+                    disabled={currentIndex === -1 || currentIndex >= tree.nodes.length - 1}
+                    onClick={() => handleNodeClick(tree.nodes[currentIndex + 1])}
+                    className="rounded-2xl px-8 h-12 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 text-xs font-black tracking-widest uppercase border border-indigo-500/20 gap-3"
                   >
                     {t.next} <ArrowRight className="w-5 h-5" />
                   </Button>

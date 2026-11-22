@@ -11,14 +11,15 @@ import { db } from '../../lib/firebase';
 import { doc, getDoc, setDoc, updateDoc, onSnapshot, collection, addDoc } from 'firebase/firestore';
 import { Button } from '../UI/Button';
 import { Card } from '../UI/Card';
-import { PaymentModal } from '../UI/PaymentModal';
 
 interface ChatProps {
   type: AIModelType;
   sessionId?: string;
+  /** What the student is studying now. It goes to the AI with each question but is not shown in the chat. */
+  context?: string;
 }
 
-export const Chat: React.FC<ChatProps> = ({ type, sessionId: initialSessionId }) => {
+export const Chat: React.FC<ChatProps> = ({ type, sessionId: initialSessionId, context }) => {
   const { profile, user, updateProfileData } = useAuth();
   const { t } = useLanguage();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -28,7 +29,6 @@ export const Chat: React.FC<ChatProps> = ({ type, sessionId: initialSessionId })
   const [sessionId, setSessionId] = useState<string | undefined>(initialSessionId);
   const scrollRef = useRef<HTMLDivElement>(null);
   const [floatingXP, setFloatingXP] = useState<{ id: number; amount: number }[]>([]);
-  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
 
   const addXP = async (amount: number) => {
     if (!profile || !user) return;
@@ -98,7 +98,7 @@ export const Chat: React.FC<ChatProps> = ({ type, sessionId: initialSessionId })
     setIsLoading(true);
 
     try {
-      const aiResponse = await askThinkFlowAI(type, input, profile, messages, attachment || undefined);
+      const aiResponse = await askThinkFlowAI(type, context ? `[${context}] ${input}` : input, profile, messages, attachment || undefined);
       
       const modelMsg: Message = {
         role: 'model',
@@ -133,15 +133,12 @@ export const Chat: React.FC<ChatProps> = ({ type, sessionId: initialSessionId })
       
       if (error?.message === "PRO_LIMIT_REACHED") {
         if (profile?.language === 'ru') {
-          errorMessage = "Превышен бесплатный лимит токенов ИИ ⚡ Пожалуйста, перейдите на один из предложенных Премиум-тарифов, чтобы получить безлимитный доступ!";
+          errorMessage = "Лимит токенов ИИ исчерпан ⚡ Загляни в раздел «Бонусы и Коды» — там можно получить дополнительную квоту.";
         } else if (profile?.language === 'uz') {
-          errorMessage = "Bepul AI tokenlar limiti tugadi ⚡ Cheksiz foydalanish uchun Premium tarifiga o'ting!";
+          errorMessage = "AI tokenlar limiti tugadi ⚡ Qo'shimcha kvota olish uchun «Bonuslar & Kodlar» bo'limiga o'ting.";
         } else {
-          errorMessage = "AI Token Quota Limit Reached ⚡ Please upgrade to one of our Premium plans to unlock unlimited AI querying & Genius Mode permanently!";
+          errorMessage = "AI token quota reached ⚡ Check the “Bonuses & Codes” section to get extra quota.";
         }
-        setTimeout(() => {
-          setIsPaymentOpen(true);
-        }, 1200);
       }
 
       setMessages(prev => [...prev, {
@@ -288,7 +285,6 @@ export const Chat: React.FC<ChatProps> = ({ type, sessionId: initialSessionId })
           </Button>
         </div>
       </div>
-      <PaymentModal isOpen={isPaymentOpen} onClose={() => setIsPaymentOpen(false)} />
     </div>
   );
 };

@@ -91,7 +91,13 @@ service cloud.firestore {
              (!('uid' in data) || data.uid is string) &&
              data.email is string && isValidEmail(data.email) &&
              data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
-             (!('age' in data) || data.age is number) &&
+             (!('age' in data) || (data.age is number && data.age >= 5 && data.age <= 100)) &&
+             (!('onboarded' in data) || data.onboarded is bool) &&
+             (!('goal' in data) || (data.goal is string && data.goal.size() < 100)) &&
+             (!('streakDays' in data) || (data.streakDays is number && data.streakDays >= 0 && data.streakDays <= 3650)) &&
+             (!('longestStreak' in data) || (data.longestStreak is number && data.longestStreak >= 0 && data.longestStreak <= 3650)) &&
+             (!('lastActiveDate' in data) || (data.lastActiveDate is string && data.lastActiveDate.size() == 10)) &&
+             (!('referralCount' in data) || data.referralCount is number) &&
              (!('studentClass' in data) || data.studentClass is string) &&
              (!('interests' in data) || data.interests is list) &&
              (!('xp' in data) || data.xp is number) &&
@@ -101,7 +107,6 @@ service cloud.firestore {
              (!('bio' in data) || (data.bio is string && data.bio.size() < 1000)) &&
              (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() < 2000000)) &&
              (!('geniusMode' in data) || data.geniusMode is bool) &&
-             (!('isPremium' in data) || data.isPremium is bool) &&
              (!('aiTokensUsed' in data) || data.aiTokensUsed is number) &&
              (!('aiTokenLimit' in data) || data.aiTokenLimit is number) &&
              (!('learningDepth' in data) || data.learningDepth in ['Surface', 'Deep', 'Architect']) &&
@@ -147,6 +152,26 @@ service cloud.firestore {
              data.createdAt is number;
     }
 
+    function isValidComment(data) {
+      return data.userId is string &&
+             data.userName is string &&
+             data.content is string && data.content.size() > 0 && data.content.size() <= 1000 &&
+             data.createdAt is number;
+    }
+
+    // A like update may only add or remove my own uid.
+    function onlyOwnLikeChange() {
+      let added = request.resource.data.likes.toSet().difference(resource.data.likes.toSet());
+      let removed = resource.data.likes.toSet().difference(request.resource.data.likes.toSet());
+      return added.hasOnly([request.auth.uid]) && removed.hasOnly([request.auth.uid]);
+    }
+
+    // True when the other person in a two-person chat has blocked me.
+    function peerBlockedMe(participants) {
+      let other = participants[0] == request.auth.uid ? participants[1] : participants[0];
+      return exists(/databases/$(database)/documents/users/$(other)/blocks/$(request.auth.uid));
+    }
+
     function isValidChatThread(data) {
       return hasRequiredFields(['participants', 'lastMessage', 'lastTimestamp']) &&
              data.participants is list && data.participants.size() == 2 &&
@@ -158,14 +183,83 @@ service cloud.firestore {
     // Rules
     // ===============================================================
 
+    // Fields only the server (Admin SDK, which bypasses these rules) or an admin may change.
+    // A student can set them once to their starting value, but never raise or reset them.
+    function lockedField(field, initial) {
+      return (field in resource.data && request.resource.data[field] == resource.data[field]) ||
+             (!(field in resource.data) &&
+               (!(field in request.resource.data) || request.resource.data[field] == initial));
+    }
+
+    // XP and level may only go up, and only by what one task or chat message can award.
+    function safeProgress() {
+      return request.resource.data.get('xp', 0) >= resource.data.get('xp', 0) &&
+             request.resource.data.get('xp', 0) - resource.data.get('xp', 0) <= 300 &&
+             request.resource.data.get('level', 1) >= resource.data.get('level', 1) &&
+             request.resource.data.get('level', 1) - resource.data.get('level', 1) <= 3;
+    }
+
+    // A streak can grow by one per write (or restart); it can never jump ahead.
+    function safeStreak() {
+      return request.resource.data.get('streakDays', 0) <= resource.data.get('streakDays', 0) + 1;
+    }
+
     match /users/{userId} {
-      allow read: if isAuthenticated();
-      allow create: if isOwner(userId) && isValidUser(request.resource.data) && 
-                      (request.resource.data.role == 'student' || isAdmin());
-      allow update: if (isOwner(userId) && isValidUser(request.resource.data) && 
-                       (request.resource.data.role == resource.data.role || isAdmin())) || 
-                      isAdmin();
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Who I blocked: private to me.
+      match /blocks/{blockedId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) &&
+                              request.resource.data.keys().hasOnly(['name', 'blockedAt']) &&
+                              request.resource.data.name is string && request.resource.data.name.size() < 100 &&
+                              request.resource.data.blockedAt is number;
+      }
+
+      allow create: if isOwner(userId) && isValidUser(request.resource.data) &&
+                      (isAdmin() || (
+                        request.resource.data.get('role', 'student') == 'student' &&
+                        request.resource.data.get('xp', 0) == 0 &&
+                        request.resource.data.get('level', 1) == 1 &&
+                        request.resource.data.get('aiTokensUsed', 0) == 0 &&
+                        request.resource.data.get('aiTokenLimit', 15000) == 15000 &&
+                        request.resource.data.get('referralCount', 0) == 0 &&
+                        request.resource.data.get('streakDays', 0) <= 1
+                      ));
+      allow update: if isAdmin() ||
+                      (isOwner(userId) && isValidUser(request.resource.data) &&
+                       request.resource.data.role == resource.data.role &&
+                       lockedField('aiTokenLimit', 15000) &&
+                       lockedField('aiTokensUsed', 0) &&
+                       lockedField('referralCount', 0) &&
+                       safeStreak() &&
+                       safeProgress());
       allow delete: if isAdmin();
+    }
+
+    // What other students can see about a person: name and photo only.
+    match /publicProfiles/{profileId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(profileId) &&
+                            request.resource.data.keys().hasOnly(['uid', 'name', 'photoURL', 'updatedAt']) &&
+                            request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() < 100 &&
+                            (!('photoURL' in request.resource.data) || request.resource.data.photoURL == null ||
+                              (request.resource.data.photoURL is string && request.resource.data.photoURL.size() < 500000));
+      allow delete: if isAdmin();
+    }
+
+    // "Report" from posts, comments and chats. Only moderators can read them.
+    match /reports/{reportId} {
+      allow create: if isAuthenticated() &&
+                    request.resource.data.reporterId == request.auth.uid &&
+                    request.resource.data.keys().hasOnly(['reporterId', 'targetType', 'targetId', 'targetUserId', 'reason', 'details', 'text', 'postId', 'status', 'createdAt']) &&
+                    request.resource.data.targetType in ['post', 'comment', 'message', 'user'] &&
+                    request.resource.data.reason in ['spam', 'bullying', 'personal_data', 'inappropriate', 'other'] &&
+                    request.resource.data.status == 'open' &&
+                    request.resource.data.details is string && request.resource.data.details.size() <= 500 &&
+                    request.resource.data.text is string && request.resource.data.text.size() <= 300 &&
+                    request.resource.data.createdAt is number;
+      allow read, update, delete: if isAdmin();
     }
 
     match /sessions/{sessionId} {
@@ -206,30 +300,40 @@ service cloud.firestore {
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidPost(request.resource.data);
       allow update: if isAuthenticated() && (
         (resource.data.userId == request.auth.uid && isValidPost(request.resource.data)) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'commentsCount']))
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'commentsCount']) &&
+         request.resource.data.likes is list && onlyOwnLikeChange() &&
+         request.resource.data.commentsCount is number &&
+         math.abs(request.resource.data.commentsCount - resource.data.commentsCount) <= 1)
       );
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
 
       match /comments/{commentId} {
         allow read: if isAuthenticated();
-        allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+        allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidComment(request.resource.data);
         allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       }
     }
 
     match /chats/{chatId} {
       allow read: if isAuthenticated() && request.auth.uid in resource.data.participants;
-      allow create: if isAuthenticated() && request.auth.uid in request.resource.data.participants && isValidChatThread(request.resource.data);
-      allow update: if isAuthenticated() && request.auth.uid in resource.data.participants;
+      allow create: if isAuthenticated() && request.auth.uid in request.resource.data.participants && isValidChatThread(request.resource.data) &&
+                      !peerBlockedMe(request.resource.data.participants);
+      allow update: if isAuthenticated() && request.auth.uid in resource.data.participants &&
+                      request.resource.data.participants == resource.data.participants &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage', 'lastTimestamp', 'participantPhotos', 'participantNames', 'unreadCount']);
       
       match /messages/{messageId} {
         allow read: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
-        allow create: if isAuthenticated() && request.auth.uid == request.resource.data.senderId;
+        allow create: if isAuthenticated() && request.auth.uid == request.resource.data.senderId &&
+                        request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
+                        request.resource.data.chatId == chatId &&
+                        request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 2000 &&
+                        !peerBlockedMe(get(/databases/$(database)/documents/chats/$(chatId)).data.participants);
       }
     }
 
     match /genius_lab_activities/{activityId} {
-      allow read: if isAuthenticated();
+      allow read: if isAdmin();
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAdmin();
     }

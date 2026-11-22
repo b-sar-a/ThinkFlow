@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import { 
   User, 
   onAuthStateChanged, 
@@ -17,7 +17,23 @@ import {
   getDocFromServer
 } from 'firebase/firestore';
 import { auth, db, googleProvider } from '../lib/firebase';
-import { UserProfile } from '../types';
+import { UserProfile, Language } from '../types';
+import { captureReferral, claimPendingReferral } from '../lib/referral';
+
+const DEMO_UID = 'demo-uid-123';
+
+/** The language the visitor already chose on the landing page (defaults to Russian). */
+const savedLanguage = (): Language => {
+  try {
+    const saved = localStorage.getItem('tf_lang');
+    if (saved === 'ru' || saved === 'en' || saved === 'uz') return saved;
+  } catch { /* storage blocked */ }
+  return 'ru';
+};
+
+/** Local calendar day as YYYY-MM-DD (a streak follows the student's own midnight). */
+const dayKey = (date: Date) =>
+  `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
 interface AuthContextType {
   user: User | null;
@@ -51,13 +67,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const updateProfileData = async (data: Partial<UserProfile>) => {
     if (!user) return;
+    if (user.uid === DEMO_UID) {
+      // The demo account has no Firestore document; keep changes in memory only.
+      setProfile(prev => (prev ? { ...prev, ...data } : prev));
+      return;
+    }
     try {
       const userDocRef = doc(db, 'users', user.uid);
-      const updates = { ...data };
-      if (updates.isPremium === true) {
-        updates.aiTokenLimit = 1000000;
-      }
-      await setDoc(userDocRef, updates, { merge: true });
+      await setDoc(userDocRef, data, { merge: true });
     } catch (error) {
       console.error("Update profile error:", error);
       throw error;
@@ -89,7 +106,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         language: 'en',
         theme: 'dark',
         geniusMode: true,
-        isPremium: true,
         bio: 'Exploring the ThinkFlow universe in Genius Mode.'
       });
       setLoading(false);
@@ -126,11 +142,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         xp: 0,
         level: 1,
         role: 'student',
-        language: 'en',
+        language: savedLanguage(),
         theme: 'light',
         bio: '',
-        geniusMode: false,
-        isPremium: false,
+        geniusMode: true,
+        onboarded: false,
+        aiTokensUsed: 0,
+        aiTokenLimit: 15000,
         learningDepth: 'Deep',
         explanationStyle: 'Metaphorical'
       };
@@ -183,28 +201,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (
             data.xp === undefined || 
             data.level === undefined || 
-            data.geniusMode === undefined || 
-            data.isPremium === undefined || 
-            data.uid === undefined || 
+            data.geniusMode === undefined ||
+            data.uid === undefined ||
             data.aiTokensUsed === undefined ||
             data.aiTokenLimit === undefined ||
-            (isOwner && (data.role !== "admin" || !data.geniusMode || !data.isPremium || data.aiTokenLimit !== 1000000))
+            (isOwner && (data.role !== "admin" || !data.geniusMode || data.aiTokenLimit !== 1000000))
           ) {
             const updates: Record<string, any> = {};
             if (data.xp === undefined) updates.xp = 0;
             if (data.level === undefined) updates.level = 1;
-            if (data.geniusMode === undefined) updates.geniusMode = isOwner ? true : false;
-            if (data.isPremium === undefined) updates.isPremium = isOwner ? true : false;
+            if (data.geniusMode === undefined) updates.geniusMode = true;
             if (data.uid === undefined) updates.uid = user.uid;
-            
-            const currentlyPremium = isOwner || data.isPremium || updates.isPremium;
+
             if (data.aiTokensUsed === undefined) updates.aiTokensUsed = 0;
-            if (data.aiTokenLimit === undefined) updates.aiTokenLimit = currentlyPremium ? 1000000 : 15000;
-            
+            if (data.aiTokenLimit === undefined) updates.aiTokenLimit = isOwner ? 1000000 : 15000;
+
             if (isOwner) {
               updates.role = "admin";
               updates.geniusMode = true;
-              updates.isPremium = true;
               updates.aiTokenLimit = 1000000;
             }
             
@@ -227,11 +241,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             xp: 0,
             level: 1,
             role: isOwner ? 'admin' : 'student',
-            language: 'en',
+            language: savedLanguage(),
             theme: 'light',
             bio: '',
-            geniusMode: isOwner ? true : false,
-            isPremium: isOwner ? true : false,
+            geniusMode: true,
+            onboarded: false,
             aiTokensUsed: 0,
             aiTokenLimit: isOwner ? 1000000 : 15000,
             learningDepth: 'Deep',
@@ -253,6 +267,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return () => unsubscribe();
     }
   }, [user]);
+
+  // Real daily streak: +1 on the first visit of each day, back to 1 after a missed day.
+  const streakWriting = useRef(false);
+  useEffect(() => {
+    if (!user || !profile || user.uid === DEMO_UID || streakWriting.current) return;
+    const today = dayKey(new Date());
+    if (profile.lastActiveDate === today) return;
+    const yesterday = dayKey(new Date(Date.now() - 24 * 60 * 60 * 1000));
+    const streakDays = profile.lastActiveDate === yesterday ? (profile.streakDays ?? 0) + 1 : 1;
+    streakWriting.current = true;
+    setDoc(
+      doc(db, 'users', user.uid),
+      { lastActiveDate: today, streakDays, longestStreak: Math.max(profile.longestStreak ?? 0, streakDays) },
+      { merge: true }
+    )
+      .catch(err => console.warn('Could not update streak:', err))
+      .finally(() => { streakWriting.current = false; });
+  }, [user, profile?.lastActiveDate]);
+
+  // Other students find you by name and see your photo. This public card is all they can read:
+  // the full profile (email, age, class) is private to you.
+  const publicSynced = useRef('');
+  useEffect(() => {
+    if (!user || !profile || user.uid === DEMO_UID) return;
+    const signature = `${profile.name}|${profile.photoURL ?? ''}`;
+    if (publicSynced.current === signature) return;
+    publicSynced.current = signature;
+    setDoc(
+      doc(db, 'publicProfiles', user.uid),
+      { uid: user.uid, name: profile.name, photoURL: profile.photoURL ?? null, updatedAt: Date.now() },
+      { merge: true }
+    ).catch((err) => {
+      publicSynced.current = '';
+      console.warn('Could not update the public profile:', err);
+    });
+  }, [user, profile?.name, profile?.photoURL]);
+
+  // Invite links: remember ?ref= on arrival, credit it once the account exists.
+  useEffect(() => { captureReferral(); }, []);
+  const referralTried = useRef(false);
+  useEffect(() => {
+    if (!user || !profile || user.uid === DEMO_UID || referralTried.current) return;
+    referralTried.current = true;
+    claimPendingReferral(user.uid);
+  }, [user, profile]);
 
   return (
     <AuthContext.Provider value={{ 

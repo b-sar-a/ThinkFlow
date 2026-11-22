@@ -1,28 +1,31 @@
 
 import React, { useState } from 'react';
-import { User, Camera, Save, Loader2, CheckCircle2 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Camera, Save, Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { INTERESTS } from '../../constants';
 import { UserProfile } from '../../types';
-import { db } from '../../lib/firebase';
-import { doc, updateDoc } from 'firebase/firestore';
 import { Button } from '../UI/Button';
 import { Card } from '../UI/Card';
+import { GOALS, GOAL_LABEL, GRADES, GRADE_LABEL, MAX_INTERESTS, interestLabel } from '../../lib/profileOptions';
+
+const FIELD = 'w-full bg-[var(--input)] border border-[var(--border)] rounded-2xl p-5 text-[var(--text)] outline-none focus:border-indigo-500 transition-colors';
+const LABEL = 'text-xs font-black uppercase text-[var(--muted)] tracking-widest group-focus-within:text-indigo-500 transition-colors';
 
 export const ProfileEditor: React.FC = () => {
   const { user, profile, updateProfileData } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const tr = (en: string, ru: string, uz: string) => (language === 'ru' ? ru : language === 'uz' ? uz : en);
   const [isSaving, setIsSaving] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [status, setStatus] = useState<{ ok: boolean; text: string } | null>(null);
   const [selectedInterests, setSelectedInterests] = useState<string[]>(profile?.interests || []);
   const [photoURL, setPhotoURL] = useState<string | undefined>(profile?.photoURL);
 
   const compressImage = (base64Str: string, maxWidth = 400, maxHeight = 400): Promise<string> => {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const img = new Image();
-      img.src = base64Str;
+      img.onerror = () => reject(new Error('bad image'));
       img.onload = () => {
         const canvas = document.createElement('canvas');
         let width = img.width;
@@ -46,32 +49,38 @@ export const ProfileEditor: React.FC = () => {
         ctx?.drawImage(img, 0, 0, width, height);
         resolve(canvas.toDataURL('image/jpeg', 0.7));
       };
+      img.src = base64Str;
     });
   };
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (!file) return;
 
     // Check file size (limit to 5MB for processing)
     if (file.size > 5 * 1024 * 1024) {
-      alert("Image is too large (max 5MB)");
+      setStatus({ ok: false, text: tr('The image is too large (max 5 MB).', 'Изображение слишком большое (максимум 5 МБ).', 'Rasm juda katta (eng ko‘pi 5 MB).') });
       return;
     }
 
     const reader = new FileReader();
     reader.onloadend = async () => {
-      const compressed = await compressImage(reader.result as string);
-      setPhotoURL(compressed);
+      try {
+        setPhotoURL(await compressImage(reader.result as string));
+        setStatus(null);
+      } catch {
+        setStatus({ ok: false, text: tr('Could not read this image.', 'Не удалось прочитать изображение.', 'Rasmni o‘qib bo‘lmadi.') });
+      }
     };
     reader.readAsDataURL(file);
   };
 
   const toggleInterest = (interest: string) => {
-    setSelectedInterests(prev => 
-      prev.includes(interest) 
-        ? prev.filter(i => i !== interest) 
-        : [...prev, interest]
+    setSelectedInterests(prev =>
+      prev.includes(interest)
+        ? prev.filter(i => i !== interest)
+        : prev.length >= MAX_INTERESTS ? prev : [...prev, interest]
     );
   };
 
@@ -79,26 +88,28 @@ export const ProfileEditor: React.FC = () => {
     e.preventDefault();
     if (!user || !profile || isSaving) return;
     setIsSaving(true);
+    setStatus(null);
 
     const fd = new FormData(e.currentTarget);
-    const ageVal = fd.get('age') as string;
-    
+    const ageVal = parseInt(fd.get('age') as string, 10);
+
     const updatedProfile: Partial<UserProfile> = {
-      name: fd.get('name') as string,
-      bio: fd.get('bio') as string,
+      name: String(fd.get('name') || '').trim() || profile.name,
+      bio: String(fd.get('bio') || ''),
       interests: selectedInterests,
-      age: ageVal ? parseInt(ageVal) : profile.age,
+      // The database accepts ages 5–100; keep the value inside that range.
+      age: Number.isFinite(ageVal) ? Math.min(100, Math.max(5, ageVal)) : profile.age,
+      studentClass: String(fd.get('studentClass') || '') || profile.studentClass,
+      goal: String(fd.get('goal') || '') || profile.goal,
       photoURL: photoURL
     };
 
     try {
       await updateProfileData(updatedProfile);
-      
-      setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000);
+      setStatus({ ok: true, text: tr('Saved.', 'Сохранено.', 'Saqlandi.') });
     } catch (error) {
       console.error("Profile update error:", error);
-      alert("Failed to save profile. Please try a smaller image or check your connection.");
+      setStatus({ ok: false, text: tr('Could not save. Try a smaller photo or check your connection.', 'Не удалось сохранить. Попробуй фото поменьше или проверь соединение.', 'Saqlab bo‘lmadi. Kichikroq rasm tanlang yoki internetni tekshiring.') });
     } finally {
       setIsSaving(false);
     }
@@ -106,147 +117,129 @@ export const ProfileEditor: React.FC = () => {
 
   if (!profile) return null;
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 }
-  };
-
   return (
-    <motion.div 
-      variants={containerVariants}
-      initial="hidden"
-      animate="visible"
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
       className="max-w-4xl mx-auto space-y-12 pb-20"
     >
-      <motion.div variants={itemVariants} className="flex items-center justify-between">
-        <div>
-          <h2 className="text-5xl font-black uppercase tracking-tighter text-[var(--text)]">
+      <div className="flex items-center justify-between gap-4">
+        <div className="min-w-0">
+          <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)]">
             {t.profile}
           </h2>
           <p className="text-[var(--muted)] font-medium mt-2">
-            Customize your digital identity in the ThinkFlow ecosystem.
+            {tr('Tell us about you so the AI can explain better.', 'Расскажи о себе — так ИИ объясняет лучше.', 'O‘zingiz haqingizda yozing — AI yaxshiroq tushuntiradi.')}
           </p>
+          <p className="text-xs font-bold text-[var(--muted)] tracking-wide mt-1 truncate">{profile.email}</p>
         </div>
-        <motion.div 
-          whileHover={{ scale: 1.05 }}
-          className="relative group"
-        >
+        <div className="relative group shrink-0">
           <div className="w-24 h-24 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white text-4xl font-black shadow-2xl overflow-hidden relative">
             {photoURL ? (
               <img src={photoURL} alt={profile.name} className="w-full h-full object-cover" />
             ) : (
               profile.name[0]
             )}
-            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" aria-hidden="true">
               <Camera className="w-8 h-8 text-white" />
             </div>
           </div>
-          <input 
-            type="file" 
-            accept="image/*" 
-            className="hidden" 
+          <input
+            type="file"
+            accept="image/*"
+            className="sr-only peer"
             id="avatar-upload"
             onChange={handlePhotoUpload}
           />
-          <label 
+          <label
             htmlFor="avatar-upload"
-            className="absolute -bottom-2 -right-2 bg-[var(--card)] p-3 rounded-xl shadow-xl border border-[var(--border)] group-hover:scale-110 transition-transform cursor-pointer"
+            className="absolute -bottom-2 -right-2 bg-[var(--card)] p-3 rounded-xl shadow-xl border border-[var(--border)] group-hover:scale-110 peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-400 transition-transform cursor-pointer"
           >
-            <Camera className="w-4 h-4 text-indigo-500" />
+            <Camera className="w-4 h-4 text-indigo-500" aria-hidden="true" />
+            <span className="sr-only">{tr('Change photo', 'Сменить фото', 'Rasmni almashtirish')}</span>
           </label>
-        </motion.div>
-      </motion.div>
+        </div>
+      </div>
 
       <form onSubmit={handleSubmit} className="space-y-8">
-        <Card className="p-10 md:p-14 rounded-[4rem] border border-[var(--border)] shadow-2xl overflow-hidden relative">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-            <motion.div variants={itemVariants} className="space-y-6">
+        <Card className="p-6 md:p-14 rounded-[2.5rem] md:rounded-[4rem] border border-[var(--border)] shadow-2xl overflow-hidden relative">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
+            <div className="space-y-6">
               <div className="group space-y-2">
-                <label className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest group-focus-within:text-indigo-500 transition-colors">{t.name}</label>
-                <motion.input 
-                  whileFocus={{ scale: 1.01 }}
-                  name="name" 
-                  defaultValue={profile.name} 
-                  required
-                  className={`w-full bg-[var(--input)] border border-[var(--border)] rounded-2xl p-5 text-[var(--text)] outline-none focus:border-indigo-500 transition-all`} 
-                />
+                <label htmlFor="profile-name" className={LABEL}>{t.name}</label>
+                <input id="profile-name" name="name" defaultValue={profile.name} required maxLength={80} autoComplete="name" className={FIELD} />
               </div>
               <div className="group space-y-2">
-                <label className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest group-focus-within:text-indigo-500 transition-colors">Age</label>
-                <motion.input 
-                  whileFocus={{ scale: 1.01 }}
-                  name="age" 
-                  type="number"
-                  defaultValue={profile.age} 
-                  className={`w-full bg-[var(--input)] border border-[var(--border)] rounded-2xl p-5 text-[var(--text)] outline-none focus:border-indigo-500 transition-all`} 
-                />
+                <label htmlFor="profile-age" className={LABEL}>{tr('Age', 'Возраст', 'Yosh')}</label>
+                <input id="profile-age" name="age" type="number" inputMode="numeric" min={5} max={100} defaultValue={profile.age} className={FIELD} />
               </div>
-            </motion.div>
+              <div className="group space-y-2">
+                <label htmlFor="profile-class" className={LABEL}>{tr('Grade', 'Класс', 'Sinf')}</label>
+                <select id="profile-class" name="studentClass" defaultValue={profile.studentClass || 'Grade 9'} className={`${FIELD} [&>option]:bg-[var(--card)] [&>option]:text-[var(--text)]`}>
+                  {GRADES.map((grade) => (
+                    <option key={grade} value={grade}>{GRADE_LABEL[language][grade]}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
-            <motion.div variants={itemVariants} className="space-y-6">
+            <div className="space-y-6">
               <div className="group space-y-2">
-                <label className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest group-focus-within:text-indigo-500 transition-colors">{t.bio}</label>
-                <motion.textarea 
-                  whileFocus={{ scale: 1.01 }}
-                  name="bio" 
-                  defaultValue={profile.bio} 
-                  className={`w-full bg-[var(--input)] border border-[var(--border)] rounded-2xl p-5 text-[var(--text)] outline-none focus:border-indigo-500 transition-all h-[212px] resize-none`} 
-                />
+                <label htmlFor="profile-bio" className={LABEL}>{t.bio}</label>
+                <textarea id="profile-bio" name="bio" defaultValue={profile.bio} maxLength={500} className={`${FIELD} h-[212px] resize-none`} />
               </div>
-            </motion.div>
+              <div className="group space-y-2">
+                <label htmlFor="profile-goal" className={LABEL}>{tr('Main goal', 'Главная цель', 'Asosiy maqsad')}</label>
+                <select id="profile-goal" name="goal" defaultValue={profile.goal || 'curiosity'} className={`${FIELD} [&>option]:bg-[var(--card)] [&>option]:text-[var(--text)]`}>
+                  {GOALS.map((goal) => (
+                    <option key={goal} value={goal}>{GOAL_LABEL[language][goal]}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
 
-          <motion.div variants={itemVariants} className="mt-10 space-y-4">
-            <label className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">My Interests</label>
-            <div className={`p-8 bg-[var(--input)] rounded-[2.5rem] border border-[var(--border)] grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4`}>
-              {INTERESTS.map((i, idx) => {
+          <fieldset className="mt-10 space-y-4">
+            <legend className="flex w-full items-baseline justify-between gap-4">
+              <span className="text-xs font-black uppercase text-[var(--muted)] tracking-widest">{tr('My Interests', 'Мои интересы', 'Qiziqishlarim')}</span>
+              <span className="text-xs font-bold text-[var(--muted)] tabular-nums">{selectedInterests.length} / {MAX_INTERESTS}</span>
+            </legend>
+            <p className="text-sm text-[var(--muted)]">{tr('The AI explains topics through these.', 'ИИ объясняет темы через них.', 'AI mavzularni shular orqali tushuntiradi.')}</p>
+            <div className="p-5 md:p-8 bg-[var(--input)] rounded-[2rem] md:rounded-[2.5rem] border border-[var(--border)] grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
+              {INTERESTS.map((i) => {
                 const isSelected = selectedInterests.includes(i);
+                const atLimit = !isSelected && selectedInterests.length >= MAX_INTERESTS;
                 return (
-                  <motion.div
+                  <button
+                    type="button"
                     key={i}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: idx * 0.05 }}
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
+                    aria-pressed={isSelected}
+                    disabled={atLimit}
                     onClick={() => toggleInterest(i)}
                     className={`
-                      relative flex items-center justify-center p-4 rounded-2xl border cursor-pointer transition-all duration-300
-                      ${isSelected 
-                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20' 
-                        : 'bg-black/20 border-white/5 text-[var(--muted)] hover:border-white/10'
+                      relative flex items-center justify-center p-4 min-h-14 rounded-2xl border cursor-pointer transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40
+                      ${isSelected
+                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20'
+                        : 'bg-black/20 border-white/5 text-[var(--muted)] hover:border-white/20 hover:text-[var(--text)]'
                       }
                     `}
                   >
-                    <span className="text-[10px] font-black uppercase tracking-widest text-center">{i}</span>
+                    <span className="text-xs font-black uppercase tracking-widest text-center">{interestLabel(language, i)}</span>
                     {isSelected && (
-                      <motion.div 
-                        layoutId="check"
-                        className="absolute -top-1 -right-1 bg-white rounded-full p-0.5"
-                      >
+                      <span className="absolute -top-1 -right-1 bg-white rounded-full p-0.5" aria-hidden="true">
                         <CheckCircle2 className="w-3 h-3 text-indigo-600" />
-                      </motion.div>
+                      </span>
                     )}
-                  </motion.div>
+                  </button>
                 );
               })}
             </div>
-          </motion.div>
+          </fieldset>
         </Card>
 
-        <motion.div variants={itemVariants} className="flex items-center gap-6">
-          <Button 
-            type="submit" 
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+          <Button
+            type="submit"
             disabled={isSaving}
             className="flex-1 h-20 rounded-[2rem] gap-3 text-lg relative overflow-hidden group"
           >
@@ -256,20 +249,15 @@ export const ProfileEditor: React.FC = () => {
             {isSaving ? <Loader2 className="w-6 h-6 animate-spin" /> : <Save className="w-6 h-6" />}
             {t.update}
           </Button>
-          <AnimatePresence>
-            {showSuccess && (
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="flex items-center gap-2 text-emerald-500 font-black uppercase tracking-widest text-xs"
-              >
-                <CheckCircle2 className="w-6 h-6" />
-                Saved!
-              </motion.div>
+          <div role="status" aria-live="polite" className="min-h-6">
+            {status && (
+              <div className={`flex items-start gap-2 font-black uppercase tracking-widest text-xs max-w-xs ${status.ok ? 'text-emerald-500' : 'text-rose-500'}`}>
+                {status.ok ? <CheckCircle2 className="w-5 h-5 shrink-0" aria-hidden="true" /> : <AlertCircle className="w-5 h-5 shrink-0" aria-hidden="true" />}
+                {status.text}
+              </div>
             )}
-          </AnimatePresence>
-        </motion.div >
+          </div>
+        </div>
       </form>
     </motion.div>
   );

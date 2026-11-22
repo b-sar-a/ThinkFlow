@@ -1,35 +1,53 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { useAuth } from './src/context/AuthContext';
 import { useTheme } from './src/context/ThemeContext';
 import { useLanguage } from './src/context/LanguageContext';
 import { Sidebar } from './src/components/Layout/Sidebar';
 import { Navbar } from './src/components/Layout/Navbar';
-import { Chat } from './src/components/Dashboard/Chat';
-import { Tasks } from './src/components/Dashboard/Tasks';
-import { PromoHub } from './src/components/Dashboard/PromoHub';
-import { Articles } from './src/components/Dashboard/Articles';
-import { Tips } from './src/components/Dashboard/Tips';
-import { Reviews } from './src/components/Dashboard/Reviews';
-import { ProfileEditor } from './src/components/Dashboard/ProfileEditor';
-import { Progress } from './src/components/Dashboard/Progress';
-import { Community } from './src/components/Dashboard/Community';
-import { Messages } from './src/components/Dashboard/Messages';
-import { Settings } from './src/components/Dashboard/Settings';
-import { Admin } from './src/components/Dashboard/Admin';
-import { GeniusLab } from './src/components/Dashboard/GeniusLab';
+const Chat = lazy(() => import('./src/components/Dashboard/Chat').then(m => ({ default: m.Chat })));
+const Tasks = lazy(() => import('./src/components/Dashboard/Tasks').then(m => ({ default: m.Tasks })));
+const PromoHub = lazy(() => import('./src/components/Dashboard/PromoHub').then(m => ({ default: m.PromoHub })));
+const Programs = lazy(() => import('./src/components/Dashboard/Programs').then(m => ({ default: m.Programs })));
+const Articles = lazy(() => import('./src/components/Dashboard/Articles').then(m => ({ default: m.Articles })));
+const Tips = lazy(() => import('./src/components/Dashboard/Tips').then(m => ({ default: m.Tips })));
+const Reviews = lazy(() => import('./src/components/Dashboard/Reviews').then(m => ({ default: m.Reviews })));
+const ProfileEditor = lazy(() => import('./src/components/Dashboard/ProfileEditor').then(m => ({ default: m.ProfileEditor })));
+const Progress = lazy(() => import('./src/components/Dashboard/Progress').then(m => ({ default: m.Progress })));
+const Community = lazy(() => import('./src/components/Dashboard/Community').then(m => ({ default: m.Community })));
+const Messages = lazy(() => import('./src/components/Dashboard/Messages').then(m => ({ default: m.Messages })));
+const Settings = lazy(() => import('./src/components/Dashboard/Settings').then(m => ({ default: m.Settings })));
+const Admin = lazy(() => import('./src/components/Dashboard/Admin').then(m => ({ default: m.Admin })));
+const GeniusLab = lazy(() => import('./src/components/Dashboard/GeniusLab').then(m => ({ default: m.GeniusLab })));
 import { Landing } from './src/components/Landing/Landing';
 import { AuthModal } from './src/components/Auth/AuthModal';
 import { GeniusBackground } from './src/components/UI/GeniusBackground';
+import { Onboarding } from './src/components/Onboarding/Onboarding';
 import { Loader2 } from 'lucide-react';
 
 const App: React.FC = () => {
-  const { user, profile, loading, isAuthReady } = useAuth();
+  const { user, profile, loading, isAuthReady, updateProfileData } = useAuth();
   const { theme } = useTheme();
-  const { t } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
   const [currentView, setCurrentView] = useState('genius_lab');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
+
+  // One source of truth for language: the saved profile wins at login, and later changes
+  // made in the UI are written back (the AI answers in profile.language).
+  const languageSynced = useRef(false);
+  useEffect(() => {
+    if (!profile) { languageSynced.current = false; return; }
+    if (!languageSynced.current) {
+      languageSynced.current = true;
+      if (profile.language && profile.language !== language) setLanguage(profile.language);
+    }
+  }, [profile]);
+  useEffect(() => {
+    if (profile && languageSynced.current && profile.language !== language) {
+      updateProfileData({ language }).catch(() => {});
+    }
+  }, [language]);
 
   // Close modal when user logs in
   useEffect(() => {
@@ -77,27 +95,32 @@ const App: React.FC = () => {
     );
   }
 
+  const needsOnboarding = !profile.onboarded && (profile.interests?.length ?? 0) === 0;
+
   const renderView = () => {
     switch (currentView) {
-      case 'genius_lab': return <GeniusLab />;
+      case 'genius_lab': return <GeniusLab onNavigate={setCurrentView} />;
       case 'community': return <Community />;
       case 'messages': return <Messages />;
       case 'tasks': return <Tasks />;
       case 'leaderboard': return <PromoHub />;
-      case 'articles': return <Articles />;
+      case 'programs': return <Programs onNavigate={setCurrentView} />;
+      case 'articles': return <Articles onNavigate={setCurrentView} />;
       case 'tips': return <Tips />;
       case 'reviews': return <Reviews />;
       case 'profile': return <ProfileEditor />;
-      case 'progress': return <Progress />;
+      case 'progress': return <Progress onNavigate={setCurrentView} />;
       case 'settings': return <Settings />;
       case 'admin': return <Admin />;
-      default: return <GeniusLab />;
+      default: return <GeniusLab onNavigate={setCurrentView} />;
     }
   };
 
   return (
     <div className="h-screen flex text-[var(--text)] transition-colors duration-500 relative overflow-hidden">
       <GeniusBackground />
+
+      {needsOnboarding && <Onboarding onDone={() => setCurrentView('genius_lab')} />}
       
       <Sidebar 
         currentView={currentView} 
@@ -107,11 +130,19 @@ const App: React.FC = () => {
       />
       
       <main className={`flex-1 flex flex-col min-w-0 transition-all duration-500 ${isSidebarOpen ? 'md:ml-0' : 'ml-0'} h-full relative z-10`}>
-        <Navbar onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
+        <Navbar onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} onViewChange={setCurrentView} />
         
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-10 scroll-smooth">
           <div className="max-w-7xl mx-auto flex flex-col pb-24">
-            {renderView()}
+            <Suspense
+              fallback={
+                <div className="flex justify-center py-32" role="status" aria-label="Loading">
+                  <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+                </div>
+              }
+            >
+              {renderView()}
+            </Suspense>
           </div>
         </div>
       </main>
