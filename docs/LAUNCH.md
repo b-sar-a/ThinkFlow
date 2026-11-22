@@ -72,7 +72,7 @@ Firebase console → Firestore → выберите базу `ai-studio-40c22e6e
 
 ## 6а. Свой домен и превью ссылок
 
-Когда у сайта будет свой домен: Vercel → Settings → Domains → добавьте его, затем Environment Variables → `SITE_URL` = `https://ваш-домен` → Redeploy. От этой переменной зависят картинка и адрес в превью ссылок (Telegram, WhatsApp, соцсети). Пока переменной нет, используется адрес `https://think-flow-two.vercel.app`. Картинка лежит в `public/og.jpg` (1200×630).
+Когда у сайта будет свой домен: Vercel → Settings → Domains → добавьте его, затем Environment Variables → `SITE_URL` = `https://ваш-домен` → Redeploy. От этой переменной зависят картинка и адрес в превью ссылок (Telegram, WhatsApp, соцсети). Пока переменной нет, используется адрес `https://mussthinkflow.vercel.app`. Картинка лежит в `public/og.jpg` (1200×630).
 
 ## 7. Юридическое
 

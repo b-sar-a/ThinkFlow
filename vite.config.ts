@@ -6,7 +6,7 @@ import tailwindcss from '@tailwindcss/vite';
 
 // Link previews (Telegram, WhatsApp, social networks) need absolute URLs. Set SITE_URL in Vercel when
 // the site gets its own domain; until then the current Vercel address is used.
-const SITE_URL = (process.env.SITE_URL || 'https://think-flow-two.vercel.app').replace(/[/]+$/, '');
+const SITE_URL = (process.env.SITE_URL || 'https://mussthinkflow.vercel.app').replace(/[/]+$/, '');
 
 export default defineConfig(() => {
   return {
