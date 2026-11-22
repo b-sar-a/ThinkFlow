@@ -27,6 +27,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick, onViewChange }) => 
     const list = [
       { id: 'genius_lab', label: t.geniusLab, keywords: 'lab laboratory course map topic лаборатория курс карта тема laboratoriya kurs' },
       { id: 'programs', label: tr('Programs', 'Программы', 'Dasturlar'), keywords: 'programs courses lessons sat ielts algebra physics exam программы курсы уроки алгебра физика экзамен dastur kurs dars' },
+      { id: 'family', label: tr('Parent cabinet', 'Кабинет родителя', 'Ota-ona kabineti'), keywords: 'parent family child code progress родитель семья ребёнок код ota-ona farzand' },
       { id: 'tasks', label: t.tasks, keywords: 'tasks problems practice задания задачи практика vazifa masala' },
       { id: 'progress', label: t.progress, keywords: 'progress xp level streak прогресс уровень серия daraja' },
       { id: 'community', label: t.community, keywords: 'community posts feed сообщество посты лента jamoa' },

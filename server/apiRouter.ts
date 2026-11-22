@@ -2,6 +2,7 @@ import express, { Router, type Request, type Response, type NextFunction } from 
 import { GoogleGenAI, Type } from "@google/genai";
 import { FieldPath, FieldValue } from "firebase-admin/firestore";
 import { accountCreatedAt, adminDb, hasAdminDb, verifyIdToken } from "./firebaseAdmin.js";
+import { FamilyError, createCode, linkWithCode, listChildren, listParents, unlink, type Db } from "./family.js";
 
 /**
  * Single source of truth for every /api route. Used by both the local dev server
@@ -440,9 +441,51 @@ Write "feedback" in one short sentence.`;
     res.json(result);
   });
 
+  // ---------- parent access (see server/family.ts) ----------
+
+  // Entering codes is the only guessable surface, so it gets its own, stricter limit.
+  const linkAttempts = new Map<string, number[]>();
+  const LINK_WINDOW_MS = 10 * 60_000;
+  const LINK_MAX_ATTEMPTS = 10;
+  function limitLinkAttempts(req: Request, res: Response, next: NextFunction) {
+    const uid: string = (req as any).uid;
+    const now = Date.now();
+    const recent = (linkAttempts.get(uid) || []).filter((t) => now - t < LINK_WINDOW_MS);
+    if (recent.length >= LINK_MAX_ATTEMPTS) return res.status(429).json({ error: "RATE_LIMITED" });
+    recent.push(now);
+    linkAttempts.set(uid, recent);
+    next();
+  }
+  const familyDb = (): Db => {
+    const db = adminDb();
+    if (!db) throw new HttpError(503, "FAMILY_UNAVAILABLE");
+    return db as unknown as Db;
+  };
+
+  router.post("/api/family/code", requireAuth, rateLimit, async (req, res) => {
+    res.json(await createCode(familyDb(), (req as any).uid));
+  });
+
+  router.post("/api/family/link", requireAuth, rateLimit, limitLinkAttempts, async (req, res) => {
+    res.json(await linkWithCode(familyDb(), (req as any).uid, req.body?.code));
+  });
+
+  router.post("/api/family/children", requireAuth, rateLimit, async (req, res) => {
+    res.json({ children: await listChildren(familyDb(), (req as any).uid) });
+  });
+
+  router.post("/api/family/parents", requireAuth, rateLimit, async (req, res) => {
+    res.json({ parents: await listParents(familyDb(), (req as any).uid) });
+  });
+
+  router.post("/api/family/unlink", requireAuth, rateLimit, async (req, res) => {
+    await unlink(familyDb(), (req as any).uid, req.body?.childUid, req.body?.parentUid);
+    res.json({ ok: true });
+  });
+
   // Errors from async handlers: Express 5 forwards rejected promises here.
   router.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    if (err instanceof HttpError) return res.status(err.status).json({ error: err.message });
+    if (err instanceof HttpError || err instanceof FamilyError) return res.status(err.status).json({ error: err.message });
     if (err?.type === "entity.too.large") return res.status(413).json({ error: "Request is too large" });
     if (err?.type === "entity.parse.failed") return res.status(400).json({ error: "Invalid JSON" });
     const status = Number(err?.status);
