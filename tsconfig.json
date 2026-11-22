@@ -26,5 +26,12 @@
     },
     "allowImportingTsExtensions": true,
     "noEmit": true
-  }
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    ".tmp-boot",
+    ".tmp-api",
+    "_local_migrated_prompt_history"
+  ]
 }
