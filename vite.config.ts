@@ -4,9 +4,17 @@ import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
+// Link previews (Telegram, WhatsApp, social networks) need absolute URLs. Set SITE_URL in Vercel when
+// the site gets its own domain; until then the current Vercel address is used.
+const SITE_URL = (process.env.SITE_URL || 'https://think-flow-two.vercel.app').replace(/[/]+$/, '');
+
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      { name: 'site-url', transformIndexHtml: (html: string) => html.split('__SITE_URL__').join(SITE_URL) },
+    ],
     resolve: {
       alias: {
         '@': path.resolve(process.cwd(), '.'),
