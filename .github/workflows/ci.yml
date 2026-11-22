@@ -37,3 +37,26 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  rules:
+    name: Firestore rules (emulator)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      # The Firestore emulator needs Java
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - name: Firestore rules tests
+        run: npm run test:rules
