@@ -29,3 +29,6 @@ dist-ssr
 !.env.example
 *service-account*.json
 .vercel
+
+# test scratch output
+.tmp-boot/

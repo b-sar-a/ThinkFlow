@@ -219,7 +219,7 @@ export function createApiRouter(): Router {
   router.use(express.json({ limit: "6mb" }));
 
   router.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", aiKeyLoaded: !!getApiKey(), quotaEnforced: hasAdminDb() });
+    res.json({ status: "ok", node: process.version, aiKeyLoaded: !!getApiKey(), quotaEnforced: hasAdminDb() });
   });
 
   const guarded = [requireAuth, rateLimit];
