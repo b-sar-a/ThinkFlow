@@ -1,450 +1,528 @@
-
-import React, { useState, useEffect } from 'react';
-import { ShieldAlert, Users, MessageSquare, Trash2, CheckCircle, Loader2, TrendingUp, Flame, Award, Calendar, DollarSign, Zap } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ShieldAlert, Users, Trash2, Loader2, Flame, Star, Search, TrendingUp } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import { useLanguage } from '../../context/LanguageContext';
 import { db } from '../../lib/firebase';
 import { collection, query, orderBy, limit, onSnapshot, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { UserProfile, Review } from '../../types';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
+import { ConfirmDialog } from '../Safety/Safety';
+
+type Tab = 'users' | 'reports' | 'reviews' | 'analytics';
+type ReportFilter = 'open' | 'resolved';
+
+const USERS_LIMIT = 500;
+const REVIEWS_LIMIT = 200;
+const ACTIVITY_LIMIT = 2000;
+
+interface ConfirmState {
+  title: string;
+  text?: string;
+  confirmLabel: string;
+  danger?: boolean;
+  run: () => Promise<void>;
+}
 
 export const Admin: React.FC = () => {
-  const { profile } = useAuth();
+  const { user, profile } = useAuth();
+  const { language } = useLanguage();
+  // The admin panel is for the team: English and Russian only (Uzbek falls back to English).
+  const tr = (en: string, ru: string) => (language === 'ru' ? ru : en);
+
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'reviews' | 'reports' | 'investor_analytics'>('users');
   const [reports, setReports] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>('users');
+  const [search, setSearch] = useState('');
+  const [reportFilter, setReportFilter] = useState<ReportFilter>('open');
+  const [confirm, setConfirm] = useState<ConfirmState | null>(null);
+
+  const isAdmin = profile?.role === 'admin';
 
   useEffect(() => {
-    if (profile?.role !== 'admin') return;
+    if (!isAdmin) return;
 
-    const usersRef = collection(db, 'users');
-    const unsubscribeUsers = onSnapshot(usersRef, (snapshot) => {
-      const usersData = snapshot.docs.map(doc => doc.data() as UserProfile);
-      setUsers(usersData);
-    });
-
-    const reviewsRef = collection(db, 'reviews');
-    const qReviews = query(reviewsRef, orderBy('timestamp', 'desc'));
-    const unsubscribeReviews = onSnapshot(qReviews, (snapshot) => {
-      const reviewsData = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Review));
-      setReviews(reviewsData);
+    const fail = (what: string) => (error: unknown) => {
+      console.warn(`Admin: could not load ${what}:`, error);
+      setLoadError(true);
       setLoading(false);
-    });
-
-    const activitiesRef = collection(db, 'genius_lab_activities');
-    const unsubscribeActivities = onSnapshot(activitiesRef, (snapshot) => {
-      const activitiesData = snapshot.docs.map(doc => doc.data());
-      setActivities(activitiesData);
-    });
-
-    const unsubscribeReports = onSnapshot(
-      query(collection(db, 'reports'), orderBy('createdAt', 'desc'), limit(100)),
-      (snapshot) => setReports(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))),
-      (error) => console.warn('Could not load reports:', error)
-    );
-
-    return () => {
-      unsubscribeUsers();
-      unsubscribeReviews();
-      unsubscribeActivities();
-      unsubscribeReports();
     };
-  }, [profile]);
+
+    const unsubscribers = [
+      onSnapshot(
+        query(collection(db, 'users'), limit(USERS_LIMIT)),
+        (snapshot) => {
+          setUsers(snapshot.docs.map((d) => d.data() as UserProfile));
+          setLoading(false);
+        },
+        fail('users')
+      ),
+      onSnapshot(
+        query(collection(db, 'reviews'), orderBy('timestamp', 'desc'), limit(REVIEWS_LIMIT)),
+        (snapshot) => setReviews(snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as Review))),
+        fail('reviews')
+      ),
+      onSnapshot(
+        query(collection(db, 'genius_lab_activities'), orderBy('timestamp', 'desc'), limit(ACTIVITY_LIMIT)),
+        (snapshot) => setActivities(snapshot.docs.map((d) => d.data())),
+        fail('activity')
+      ),
+      onSnapshot(
+        query(collection(db, 'reports'), orderBy('createdAt', 'desc'), limit(100)),
+        (snapshot) => setReports(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))),
+        fail('reports')
+      ),
+    ];
+    return () => unsubscribers.forEach((u) => u());
+  }, [isAdmin]);
+
+  const userById = useMemo(() => {
+    const map = new Map<string, UserProfile>();
+    users.forEach((u) => map.set(u.uid, u));
+    return map;
+  }, [users]);
+
+  const nameOf = (uid?: string) => {
+    if (!uid) return '—';
+    const u = userById.get(uid);
+    return u ? `${u.name} (${u.email})` : uid;
+  };
+
+  // These throw on failure so the confirm dialog can show "try again".
+  const resolveReport = async (id: string) => {
+    await updateDoc(doc(db, 'reports', id), { status: 'resolved' });
+  };
+
+  const deleteReported = async (r: any) => {
+    if (r.targetType === 'post') await deleteDoc(doc(db, 'posts', r.targetId));
+    else if (r.targetType === 'comment' && r.postId) await deleteDoc(doc(db, 'posts', r.postId, 'comments', r.targetId));
+    await resolveReport(r.id);
+  };
 
   const deleteReview = async (id: string) => {
-    try {
-      await deleteDoc(doc(db, 'reviews', id));
-    } catch (error) {
-      console.error("Delete review error:", error);
-    }
+    await deleteDoc(doc(db, 'reviews', id));
   };
 
-  const resolveReport = async (id: string) => {
-    try {
-      await updateDoc(doc(db, 'reports', id), { status: 'resolved' });
-    } catch (error) {
-      console.error('Resolve report error:', error);
-    }
+  const setRole = async (uid: string, role: 'student' | 'admin') => {
+    await updateDoc(doc(db, 'users', uid), { role });
   };
 
-  // Removes the reported post or comment, then closes the report.
-  const deleteReported = async (r: any) => {
-    try {
-      if (r.targetType === 'post') await deleteDoc(doc(db, 'posts', r.targetId));
-      else if (r.targetType === 'comment' && r.postId) await deleteDoc(doc(db, 'posts', r.postId, 'comments', r.targetId));
-      await resolveReport(r.id);
-    } catch (error) {
-      console.error('Delete reported content error:', error);
-    }
+  const askRole = (u: UserProfile) => {
+    const makeAdmin = u.role !== 'admin';
+    setConfirm({
+      title: makeAdmin ? tr('Make this person an admin?', 'Сделать администратором?') : tr('Revoke admin rights?', 'Забрать права администратора?'),
+      text: makeAdmin
+        ? tr(`${u.name} will be able to read all student data, delete content and change roles.`, `${u.name} сможет читать данные всех учеников, удалять контент и менять роли.`)
+        : tr(`${u.name} will become a regular student.`, `${u.name} станет обычным учеником.`),
+      confirmLabel: makeAdmin ? tr('Make admin', 'Сделать админом') : tr('Revoke', 'Забрать права'),
+      danger: !makeAdmin,
+      run: () => setRole(u.uid, makeAdmin ? 'admin' : 'student'),
+    });
   };
 
-  const toggleAdmin = async (uid: string, currentRole: string) => {
-    try {
-      await updateDoc(doc(db, 'users', uid), { 
-        role: currentRole === 'admin' ? 'student' : 'admin' 
-      });
-    } catch (error) {
-      console.error("Toggle admin error:", error);
-    }
-  };
-
-  const computeRetention = () => {
-    const activeDataList = activities;
-
-    const userDates: Record<string, { name: string; email: string; dates: Set<string> }> = {};
-    activeDataList.forEach(act => {
-      if (!act.userId) return;
-      if (!userDates[act.userId]) {
-        userDates[act.userId] = {
-          name: act.userName || 'User',
-          email: act.email || 'user@thinkflow.ai',
-          dates: new Set<string>()
-        };
-      }
-      if (act.dateString) {
-        userDates[act.userId].dates.add(act.dateString);
-      }
+  const retention = useMemo(() => {
+    const byUser: Record<string, Set<string>> = {};
+    activities.forEach((a) => {
+      if (!a.userId || !a.dateString) return;
+      (byUser[a.userId] ??= new Set<string>()).add(a.dateString);
     });
 
-    let retainedCount = 0;
-    const totalUsers = Object.keys(userDates).length;
-    const userStreaks: { name: string; email: string; streak: number; isRetained: boolean }[] = [];
-
-    Object.keys(userDates).forEach(uid => {
-      const u = userDates[uid];
-      const sortedDates = Array.from(u.dates).sort();
-      
-      let currentStreak = 0;
-      let maxStreak = 0;
-      let has3ConsecutiveDays = false;
-      
-      if (sortedDates.length > 0) {
-        currentStreak = 1;
-        maxStreak = 1;
-        
-        for (let i = 0; i < sortedDates.length - 1; i++) {
-          const d1 = new Date(sortedDates[i]).getTime();
-          const d2 = new Date(sortedDates[i+1]).getTime();
-          const diff = (d2 - d1) / (1000 * 60 * 60 * 24);
-          
-          if (Math.round(diff) === 1) {
-            currentStreak++;
-            if (currentStreak > maxStreak) {
-              maxStreak = currentStreak;
-            }
-          } else if (Math.round(diff) > 1) {
-            currentStreak = 1;
-          }
-        }
+    const rows = Object.entries(byUser).map(([uid, dates]) => {
+      const sorted = Array.from(dates).sort();
+      let current = 1;
+      let max = 1;
+      for (let i = 1; i < sorted.length; i++) {
+        const diff = Math.round((new Date(sorted[i]).getTime() - new Date(sorted[i - 1]).getTime()) / 86400000);
+        current = diff === 1 ? current + 1 : 1;
+        if (current > max) max = current;
       }
-
-      if (maxStreak >= 3) {
-        has3ConsecutiveDays = true;
-        retainedCount++;
-      }
-
-      userStreaks.push({
-        name: u.name,
-        email: u.email,
-        streak: maxStreak,
-        isRetained: has3ConsecutiveDays
-      });
+      return { uid, streak: max, retained: max >= 3 };
     });
 
-    const retentionRate = totalUsers > 0 ? Math.round((retainedCount / totalUsers) * 100) : 0;
-    
-    // Growth KPIs based on real users (no revenue while the product is free)
-    const totalUsersCount = users.length;
-    const activatedCount = users.filter(u => (u.xp || 0) > 0).length;
-    const activationRate = totalUsersCount > 0 ? Math.round((activatedCount / totalUsersCount) * 100) : 0;
-
+    const retained = rows.filter((r) => r.retained).length;
     return {
-      retentionRate,
-      totalAuditedUsers: totalUsers,
-      retainedUsers: retainedCount,
-      activeRecords: activeDataList.length,
-      userStreaks: userStreaks.sort((a, b) => b.streak - a.streak),
-      totalUsersCount,
-      activatedCount,
-      activationRate
+      rows: rows.sort((a, b) => b.streak - a.streak),
+      retained,
+      total: rows.length,
+      rate: rows.length ? Math.round((retained / rows.length) * 100) : 0,
     };
-  };
+  }, [activities]);
 
-  const retentionData = computeRetention();
+  const funnel = useMemo(() => {
+    const total = users.length;
+    const steps = [
+      { key: 'reg', label: tr('Registered', 'Зарегистрировались'), count: total },
+      { key: 'onb', label: tr('Finished onboarding', 'Прошли онбординг'), count: users.filter((u) => u.onboarded || (u.interests?.length ?? 0) > 0).length },
+      { key: 'xp', label: tr('Earned XP', 'Заработали XP'), count: users.filter((u) => (u.xp || 0) > 0).length },
+      { key: 'streak', label: tr('3-day streak', 'Серия 3 дня'), count: users.filter((u) => (u.longestStreak || 0) >= 3).length },
+    ];
+    return steps.map((s) => ({ ...s, pct: total ? Math.round((s.count / total) * 100) : 0 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [users, language]);
 
-  if (profile?.role !== 'admin') {
+  const visibleUsers = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return users
+      .filter((u) => !q || u.name?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q))
+      .sort((a, b) => (b.xp || 0) - (a.xp || 0));
+  }, [users, search]);
+
+  const openReports = reports.filter((r) => r.status !== 'resolved');
+  const handledReports = reports.filter((r) => r.status === 'resolved');
+  const shownReports = reportFilter === 'open' ? openReports : handledReports;
+
+  if (!isAdmin) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center p-10">
-        <ShieldAlert className="w-20 h-20 text-rose-500 mb-6" />
-        <h2 className="text-4xl font-black uppercase tracking-tighter text-[var(--text)]">Access Denied</h2>
-        <p className="text-[var(--muted)] mt-2">You do not have administrative privileges.</p>
+        <ShieldAlert className="w-16 h-16 text-rose-500 mb-6" aria-hidden="true" />
+        <h1 className="text-3xl font-black uppercase tracking-tighter text-[var(--text)]">{tr('Access denied', 'Нет доступа')}</h1>
+        <p className="text-[var(--muted)] mt-2">{tr('You do not have administrator rights.', 'У вас нет прав администратора.')}</p>
       </div>
     );
   }
 
+  const tabs: { id: Tab; label: string; count?: number; active: string }[] = [
+    { id: 'users', label: tr('Users', 'Ученики'), count: users.length, active: 'bg-indigo-600' },
+    { id: 'reports', label: tr('Reports', 'Жалобы'), count: openReports.length, active: 'bg-rose-600' },
+    { id: 'reviews', label: tr('Reviews', 'Отзывы'), count: reviews.length, active: 'bg-indigo-600' },
+    { id: 'analytics', label: tr('Analytics', 'Аналитика'), active: 'bg-emerald-600' },
+  ];
+
   return (
-    <div className="max-w-6xl mx-auto space-y-12 animate-in fade-in duration-700">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-5xl font-black uppercase tracking-tighter text-[var(--text)]">
-            Admin Panel
-          </h2>
-          <p className="text-[var(--muted)] font-medium mt-2">
-            System management and oversight.
-          </p>
-        </div>
-        <div className="flex gap-4 flex-wrap">
-          <button 
-            onClick={() => setActiveTab('users')}
-            className={`px-8 h-14 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'users' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-505/20' : 'bg-[var(--input)] text-[var(--muted)]'}`}
-          >
-            Users ({users.length})
-          </button>
-          <button 
-            onClick={() => setActiveTab('reviews')}
-            className={`px-8 h-14 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'reviews' ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-505/20' : 'bg-[var(--input)] text-[var(--muted)]'}`}
-          >
-            Reviews ({reviews.length})
-          </button>
-          <button
-            onClick={() => setActiveTab('reports')}
-            className={`px-8 h-14 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'reports' ? 'bg-rose-600 text-white shadow-lg shadow-rose-500/20' : 'bg-[var(--input)] text-[var(--muted)]'}`}
-          >
-            Reports ({reports.filter((r) => r.status === 'open').length})
-          </button>
-          <button
-            onClick={() => setActiveTab('investor_analytics')}
-            className={`px-8 h-14 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'investor_analytics' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-505/20' : 'bg-[var(--input)] text-[var(--muted)]'}`}
-          >
-            📈 Investor Analytics (VC Metric)
-          </button>
-        </div>
+    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700">
+      <div className="space-y-2">
+        <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)]">{tr('Admin panel', 'Админ-панель')}</h1>
+        <p className="text-[var(--muted)] font-medium">{tr('Students, reports, reviews and product health.', 'Ученики, жалобы, отзывы и состояние продукта.')}</p>
       </div>
 
-      {loading ? (
-        <div className="py-20 flex justify-center"><Loader2 className="w-10 h-10 animate-spin text-indigo-500" /></div>
-      ) : activeTab === 'users' ? (
-        <div className="grid grid-cols-1 gap-4">
-          {users.map(u => (
-            <Card key={u.uid} className="p-6 rounded-3xl border border-[var(--border)] flex items-center justify-between animate-in slide-in-from-bottom duration-300">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-indigo-500/10 rounded-xl flex items-center justify-center font-black text-indigo-500 border border-indigo-500/25">
-                  {u.name?.[0]?.toUpperCase() || 'S'}
-                </div>
-                <div>
-                  <h4 className="font-black uppercase text-sm text-[var(--text)] flex items-center gap-2">
-                    {u.name}
-                  </h4>
-                  <p className="text-[10px] font-black uppercase text-[var(--muted)] tracking-widest">{u.email} • {u.role}</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="text-right mr-4">
-                  <p className="text-xs font-black text-[var(--text)]">{u.xp} XP</p>
-                  <p className="text-[9px] font-black uppercase text-[var(--muted)]">Level {u.level}</p>
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  onClick={() => toggleAdmin(u.uid, u.role)}
-                  className={`rounded-xl h-10 px-4 text-[10px] ${u.role === 'admin' ? 'border-rose-500 text-rose-500' : 'border-indigo-500 text-indigo-500'}`}
-                >
-                  {u.role === 'admin' ? 'Revoke Admin' : 'Make Admin'}
-                </Button>
-              </div>
-            </Card>
-          ))}
-        </div>
-      ) : activeTab === 'reports' ? (
-        <div className="space-y-4">
-          {reports.length === 0 ? (
-            <div className="text-center py-12 bg-white/5 border border-white/10 rounded-[2.5rem] text-[var(--muted)]">
-              <ShieldAlert className="w-12 h-12 text-indigo-500/40 mx-auto mb-3" />
-              <p className="text-sm font-semibold">No reports yet.</p>
-            </div>
-          ) : (
-            reports.map((r) => (
-              <Card key={r.id} className={`p-6 rounded-3xl border border-[var(--border)] space-y-4 ${r.status === 'resolved' ? 'opacity-60' : ''}`}>
-                <div className="flex flex-wrap items-center gap-3">
-                  <span className="px-3 py-1 rounded-full bg-rose-500/10 text-rose-500 text-xs font-black uppercase tracking-widest">{r.reason}</span>
-                  <span className="text-xs font-bold text-[var(--muted)] uppercase tracking-widest">{r.targetType}</span>
-                  <span className="text-xs text-[var(--muted)]">{new Date(r.createdAt).toLocaleString()}</span>
-                  {r.status === 'resolved' && <span className="text-xs font-black text-emerald-500 uppercase">handled</span>}
-                </div>
-                {r.text && <p className="text-sm text-[var(--text)] whitespace-pre-wrap break-words p-4 rounded-2xl bg-[var(--input)]">{r.text}</p>}
-                {r.details && <p className="text-sm text-[var(--muted)] break-words">“{r.details}”</p>}
-                <p className="text-xs text-[var(--muted)] break-all">reporter: {r.reporterId} · reported user: {r.targetUserId}</p>
-                {r.status !== 'resolved' && (
-                  <div className="flex flex-wrap gap-3">
-                    {(r.targetType === 'post' || r.targetType === 'comment') && (
-                      <Button variant="outline" size="sm" onClick={() => deleteReported(r)} className="rounded-xl border-rose-500 text-rose-500 hover:bg-rose-500 hover:text-white">
-                        Delete content
-                      </Button>
-                    )}
-                    <Button variant="outline" size="sm" onClick={() => resolveReport(r.id)} className="rounded-xl">
-                      Mark handled
-                    </Button>
-                  </div>
-                )}
-              </Card>
-            ))
-          )}
-        </div>
-      ) : activeTab === 'reviews' ? (
-        <div className="grid grid-cols-1 gap-4">
-          {reviews.map(r => (
-            <Card key={r.id} className="p-6 rounded-3xl border border-[var(--border)] flex items-center justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-3 mb-2">
-                  <span className="font-black uppercase text-xs text-[var(--text)]">{r.userName}</span>
-                  <div className="flex text-yellow-500">
-                    {Array.from({ length: r.rating }).map((_, i) => <CheckCircle key={i} className="w-3 h-3 fill-current" />)}
-                  </div>
-                </div>
-                <p className="text-sm text-[var(--muted)] italic">"{r.text}"</p>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => deleteReview(r.id!)}
-                className="rounded-xl h-10 w-10 p-0 border-rose-500 text-rose-500 hover:bg-rose-500 hover:text-white"
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        /* --- HIGH IMPACT INVESTOR RETENTION PANEL (VC COHORT metric) --- */
-        <div className="space-y-8 animate-in fade-in duration-500">
-          {/* Top Row - KPI Overview */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* The Big Retention Circular Widget */}
-            <Card className="p-8 rounded-[2.5rem] border border-emerald-500/20 bg-emerald-950/5 relative overflow-hidden md:col-span-2 flex flex-col md:flex-row items-center gap-8">
-              <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/5 blur-[80px] rounded-full pointer-events-none" />
-              
-              <div className="relative shrink-0 flex items-center justify-center">
-                <svg className="w-44 h-44">
-                  <circle cx="88" cy="88" r="76" className="stroke-white/5" strokeWidth="12" fill="transparent" />
-                  <circle 
-                    cx="88" 
-                    cy="88" 
-                    r="76" 
-                    className="stroke-emerald-500 drop-shadow-[0_0_20px_rgba(16,185,129,0.4)]" 
-                    strokeWidth="14" 
-                    fill="transparent" 
-                    strokeDasharray={2 * Math.PI * 76}
-                    strokeDashoffset={2 * Math.PI * 76 * (1 - retentionData.retentionRate / 100)}
-                    strokeLinecap="round"
-                    transform="rotate(-90 88 88)"
-                  />
-                </svg>
-                <div className="absolute flex flex-col items-center">
-                  <span className="text-4xl font-black text-white italic leading-none">{retentionData.retentionRate}%</span>
-                  <span className="text-[8px] font-black tracking-widest text-emerald-400 uppercase mt-1">3-Day Retention</span>
-                </div>
-              </div>
+      <div role="tablist" aria-label={tr('Admin sections', 'Разделы админки')} className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            id={`admin-tab-${tab.id}`}
+            aria-selected={activeTab === tab.id}
+            aria-controls="admin-panel"
+            onClick={() => setActiveTab(tab.id)}
+            className={`h-11 px-5 shrink-0 rounded-2xl font-black uppercase text-xs tracking-wider transition-colors ${
+              activeTab === tab.id ? `${tab.active} text-white shadow-lg` : 'bg-[var(--input)] text-[var(--muted)] hover:text-[var(--text)]'
+            }`}
+          >
+            {tab.label}
+            {tab.count !== undefined && <span className="ml-2 opacity-70">{tab.count}</span>}
+          </button>
+        ))}
+      </div>
 
-              <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-[9px] font-black rounded-full uppercase tracking-widest">
-                  <TrendingUp className="w-3.5 h-3.5" /> High-Habit Cohort
-                </div>
-                <h3 className="text-2xl font-black uppercase text-white italic tracking-tight">
-                  Habitual Retention Metric
-                </h3>
-                <p className="text-xs text-gray-400 leading-relaxed max-w-md">
-                  Tracks the exact percentage of users who logged into Genius Lab for at least <b>3 consecutive days</b>. EdTech VCs buy this parameter because consecutive learning indicates a high habit formation index and near-zero churn rates.
-                </p>
-                <div className="grid grid-cols-2 gap-4 pt-2">
-                  <div className="p-3 bg-white/5 border border-white/5 rounded-2xl text-center">
-                    <span className="text-[9px] font-black text-gray-500 block uppercase">Retained Kids</span>
-                    <span className="text-lg font-black text-white">{retentionData.retainedUsers}</span>
-                  </div>
-                  <div className="p-3 bg-white/5 border border-white/5 rounded-2xl text-center">
-                    <span className="text-[9px] font-black text-gray-500 block uppercase">Audited Users</span>
-                    <span className="text-lg font-black text-white">{retentionData.totalAuditedUsers}</span>
-                  </div>
-                </div>
-              </div>
-            </Card>
+      {loadError && (
+        <div role="alert" className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-sm font-semibold">
+          {tr('Some data could not be loaded. Check the Firestore rules and your connection.', 'Часть данных не загрузилась. Проверьте правила Firestore и соединение.')}
+        </div>
+      )}
 
-            {/* General VC pitch metric cards */}
-            <div className="flex flex-col gap-4">
-              <Card className="p-6 rounded-[2rem] border border-indigo-500/20 bg-indigo-950/5 relative overflow-hidden flex flex-col justify-between flex-1">
-                <div className="flex justify-between items-center">
-                  <span className="text-[9px] font-black text-indigo-400 tracking-wider uppercase">Registered Students</span>
-                  <Users className="w-4 h-4 text-indigo-400" />
-                </div>
-                <div>
-                  <h4 className="text-3xl font-black text-white italic">{retentionData.totalUsersCount}</h4>
-                  <p className="text-[10px] text-gray-400 mt-1">Total accounts created on the platform.</p>
-                </div>
-              </Card>
-
-              <Card className="p-6 rounded-[2rem] border border-amber-500/20 bg-amber-950/5 relative overflow-hidden flex flex-col justify-between flex-1">
-                <div className="flex justify-between items-center">
-                  <span className="text-[9px] font-black text-amber-400 tracking-wider uppercase">Activation Rate</span>
-                  <Award className="w-4 h-4 text-amber-400" />
-                </div>
-                <div>
-                  <h4 className="text-3xl font-black text-white italic">{retentionData.activationRate}%</h4>
-                  <p className="text-[10px] text-gray-400 mt-1">{retentionData.activatedCount} students earned XP at least once.</p>
-                </div>
-              </Card>
-            </div>
+      <div id="admin-panel" role="tabpanel" aria-labelledby={`admin-tab-${activeTab}`}>
+        {loading ? (
+          <div className="py-20 flex justify-center" role="status" aria-label={tr('Loading', 'Загрузка')}>
+            <Loader2 className="w-10 h-10 animate-spin text-indigo-500" />
           </div>
-
-          {/* Bottom Table - Cohort List and streaks */}
+        ) : activeTab === 'users' ? (
           <div className="space-y-4">
-            <h4 className="text-xs font-black uppercase text-gray-400 tracking-widest pl-2">
-              🔥 USER DAILY ACTIVE STREAKS (GENIUS LAB)
-            </h4>
-            <div className="grid grid-cols-1 gap-4">
-              {retentionData.userStreaks.length > 0 ? (
-                retentionData.userStreaks.map((u, i) => (
-                  <Card key={i} className="p-5 rounded-[2rem] border border-white/5 flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black ${
-                        u.isRetained ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-white/5 text-gray-400'
-                      }`}>
-                        {u.name[0]?.toUpperCase() || 'U'}
-                      </div>
-                      <div>
-                        <h5 className="font-black uppercase text-xs text-white">{u.name}</h5>
-                        <p className="text-[9px] font-black uppercase text-gray-500 tracking-widest">{u.email}</p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs font-black text-amber-400">
-                          <Flame className="w-3.5 h-3.5 fill-current animate-pulse" /> {u.streak} {profile?.language === 'ru' ? 'дн. подряд' : 'consecutive days'}
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--muted)]" aria-hidden="true" />
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label={tr('Search by name or email', 'Поиск по имени или email')}
+                placeholder={tr('Search by name or email', 'Поиск по имени или email')}
+                className="w-full h-12 pl-11 pr-4 bg-[var(--input)] border border-[var(--border)] rounded-2xl text-sm text-[var(--text)] outline-none focus:border-indigo-500 placeholder:text-[var(--muted)] placeholder:opacity-60"
+              />
+            </div>
+            {users.length >= USERS_LIMIT && (
+              <p className="text-xs text-[var(--muted)]">{tr(`Showing the first ${USERS_LIMIT} accounts.`, `Показаны первые ${USERS_LIMIT} аккаунтов.`)}</p>
+            )}
+            {visibleUsers.length === 0 && (
+              <p className="py-10 text-center text-[var(--muted)]">{tr('Nobody found.', 'Никого не найдено.')}</p>
+            )}
+            <ul className="space-y-3">
+              {visibleUsers.map((u) => {
+                const self = u.uid === user?.uid;
+                return (
+                  <li key={u.uid}>
+                    <Card className="p-4 md:p-5 rounded-3xl border border-[var(--border)] flex flex-col sm:flex-row sm:items-center gap-4">
+                      <div className="flex items-center gap-4 min-w-0 flex-1">
+                        <div className="w-11 h-11 bg-indigo-500/10 rounded-xl flex items-center justify-center font-black text-indigo-500 border border-indigo-500/25 shrink-0" aria-hidden="true">
+                          {u.name?.[0]?.toUpperCase() || 'S'}
+                        </div>
+                        <div className="min-w-0">
+                          <h2 className="font-black text-sm text-[var(--text)] truncate">
+                            {u.name}
+                            {u.role === 'admin' && (
+                              <span className="ml-2 px-2 py-0.5 rounded-full bg-rose-500/10 text-rose-500 text-xs font-black uppercase">admin</span>
+                            )}
+                          </h2>
+                          <p className="text-xs text-[var(--muted)] truncate">{u.email}</p>
                         </div>
                       </div>
-                      <div className={`text-[9px] font-black uppercase px-3 py-1 rounded-full ${
-                        u.isRetained ? 'bg-emerald-500/20 text-emerald-400' : 'bg-white/5 text-gray-500'
-                      }`}>
-                        {u.isRetained ? 'RETAINED' : 'ACTIVE'}
+                      <div className="flex items-center justify-between sm:justify-end gap-4">
+                        <div className="text-left sm:text-right">
+                          <p className="text-sm font-black text-[var(--text)]">{u.xp || 0} XP</p>
+                          <p className="text-xs text-[var(--muted)]">{tr('Level', 'Уровень')} {u.level || 1}{u.streakDays ? ` · ${u.streakDays} ${tr('d streak', 'дн. серия')}` : ''}</p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={self}
+                          title={self ? tr('You cannot change your own role', 'Свою роль менять нельзя') : undefined}
+                          onClick={() => askRole(u)}
+                          className={`rounded-xl h-11 px-4 text-xs shrink-0 ${u.role === 'admin' ? 'border-rose-500 text-rose-500' : 'border-indigo-500 text-indigo-500'}`}
+                        >
+                          {u.role === 'admin' ? tr('Revoke admin', 'Забрать права') : tr('Make admin', 'Сделать админом')}
+                        </Button>
                       </div>
+                    </Card>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ) : activeTab === 'reports' ? (
+          <div className="space-y-4">
+            <div className="flex gap-2">
+              {(['open', 'resolved'] as ReportFilter[]).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  aria-pressed={reportFilter === f}
+                  onClick={() => setReportFilter(f)}
+                  className={`h-10 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-colors ${
+                    reportFilter === f ? 'bg-[var(--text)] text-[var(--bg)]' : 'bg-[var(--input)] text-[var(--muted)] hover:text-[var(--text)]'
+                  }`}
+                >
+                  {f === 'open' ? tr('Open', 'Открытые') : tr('Handled', 'Обработанные')} ({f === 'open' ? openReports.length : handledReports.length})
+                </button>
+              ))}
+            </div>
+
+            {shownReports.length === 0 ? (
+              <div className="text-center py-12 border border-dashed border-[var(--border)] rounded-[2rem] text-[var(--muted)]">
+                <ShieldAlert className="w-10 h-10 text-indigo-500/50 mx-auto mb-3" aria-hidden="true" />
+                <p className="text-sm font-semibold">
+                  {reportFilter === 'open' ? tr('No open reports.', 'Открытых жалоб нет.') : tr('No handled reports yet.', 'Обработанных жалоб пока нет.')}
+                </p>
+              </div>
+            ) : (
+              shownReports.map((r) => (
+                <Card key={r.id} className="p-5 md:p-6 rounded-3xl border border-[var(--border)] space-y-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <span className="px-3 py-1 rounded-full bg-rose-500/10 text-rose-500 text-xs font-black uppercase tracking-wider">{r.reason}</span>
+                    <span className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">{r.targetType}</span>
+                    <span className="text-xs text-[var(--muted)]">{new Date(r.createdAt).toLocaleString(language === 'ru' ? 'ru-RU' : 'en-US')}</span>
+                  </div>
+                  {r.text && <p className="text-sm text-[var(--text)] whitespace-pre-wrap break-words p-4 rounded-2xl bg-[var(--input)]">{r.text}</p>}
+                  {r.details && <p className="text-sm text-[var(--muted)] break-words">“{r.details}”</p>}
+                  <p className="text-xs text-[var(--muted)] break-words">
+                    {tr('Reported by', 'Пожаловался')}: {nameOf(r.reporterId)} · {tr('About', 'На')}: {nameOf(r.targetUserId)}
+                  </p>
+                  {r.status !== 'resolved' && (
+                    <div className="flex flex-wrap gap-3">
+                      {(r.targetType === 'post' || r.targetType === 'comment') && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() =>
+                            setConfirm({
+                              title: tr('Delete the reported content?', 'Удалить контент, на который пожаловались?'),
+                              text: tr('It will be removed for everyone and the report will be marked as handled.', 'Он исчезнет у всех, а жалоба будет отмечена обработанной.'),
+                              confirmLabel: tr('Delete', 'Удалить'),
+                              danger: true,
+                              run: () => deleteReported(r),
+                            })
+                          }
+                          className="rounded-xl h-11 border-rose-500 text-rose-500 hover:bg-rose-500 hover:text-white"
+                        >
+                          {tr('Delete content', 'Удалить контент')}
+                        </Button>
+                      )}
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => resolveReport(r.id).catch((e) => console.error('Resolve report error:', e))}
+                        className="rounded-xl h-11"
+                      >
+                        {tr('Mark handled', 'Отметить обработанной')}
+                      </Button>
                     </div>
-                  </Card>
-                ))
+                  )}
+                </Card>
+              ))
+            )}
+          </div>
+        ) : activeTab === 'reviews' ? (
+          <ul className="space-y-3">
+            {reviews.length === 0 && <li className="py-10 text-center text-[var(--muted)]">{tr('No reviews yet.', 'Отзывов пока нет.')}</li>}
+            {reviews.map((r) => (
+              <li key={r.id}>
+                <Card className="p-5 rounded-3xl border border-[var(--border)] flex items-start justify-between gap-4">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <span className="font-black text-sm text-[var(--text)] truncate">{r.userName}</span>
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-yellow-500" aria-label={`${r.rating} / 5`}>
+                        <Star className="w-3.5 h-3.5 fill-current" aria-hidden="true" /> {r.rating}
+                      </span>
+                    </div>
+                    <p className="text-sm text-[var(--muted)] whitespace-pre-wrap break-words">{r.text}</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    aria-label={tr('Delete review', 'Удалить отзыв')}
+                    onClick={() =>
+                      setConfirm({
+                        title: tr('Delete this review?', 'Удалить этот отзыв?'),
+                        text: tr('This cannot be undone.', 'Это нельзя отменить.'),
+                        confirmLabel: tr('Delete', 'Удалить'),
+                        danger: true,
+                        run: () => deleteReview(r.id!),
+                      })
+                    }
+                    className="rounded-xl h-11 w-11 p-0 shrink-0 border-rose-500 text-rose-500 hover:bg-rose-500 hover:text-white"
+                  >
+                    <Trash2 className="w-4 h-4" aria-hidden="true" />
+                  </Button>
+                </Card>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <Card className="p-6 md:p-8 rounded-[2rem] border border-emerald-500/20 relative overflow-hidden md:col-span-2 flex flex-col sm:flex-row items-center gap-8">
+                <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/5 blur-[80px] rounded-full pointer-events-none" />
+                <div className="relative shrink-0 flex items-center justify-center">
+                  <svg className="w-40 h-40" viewBox="0 0 176 176" role="img" aria-label={`${retention.rate}%`}>
+                    <circle cx="88" cy="88" r="76" stroke="var(--border)" strokeWidth="12" fill="transparent" />
+                    <circle
+                      cx="88"
+                      cy="88"
+                      r="76"
+                      className="stroke-emerald-500"
+                      strokeWidth="12"
+                      fill="transparent"
+                      strokeDasharray={2 * Math.PI * 76}
+                      strokeDashoffset={2 * Math.PI * 76 * (1 - retention.rate / 100)}
+                      strokeLinecap="round"
+                      transform="rotate(-90 88 88)"
+                    />
+                  </svg>
+                  <div className="absolute flex flex-col items-center">
+                    <span className="text-4xl font-black text-[var(--text)] leading-none">{retention.rate}%</span>
+                    <span className="text-xs font-black tracking-wider text-emerald-500 uppercase mt-1">{tr('3-day streak', 'Серия 3 дня')}</span>
+                  </div>
+                </div>
+                <div className="space-y-3 relative">
+                  <h2 className="text-xl font-black uppercase tracking-tight text-[var(--text)]">{tr('Habit: 3 days in a row', 'Привычка: 3 дня подряд')}</h2>
+                  <p className="text-sm text-[var(--muted)] leading-relaxed max-w-md">
+                    {tr(
+                      `Share of students with Genius Lab activity who were active on 3 consecutive days. Based on the latest ${ACTIVITY_LIMIT} activity records.`,
+                      `Доля учеников с активностью в Лаборатории, которые занимались 3 дня подряд. Считается по последним ${ACTIVITY_LIMIT} записям активности.`
+                    )}
+                  </p>
+                  <p className="text-sm text-[var(--text)] font-bold">
+                    {retention.retained} {tr('of', 'из')} {retention.total} {tr('active students', 'активных учеников')}
+                  </p>
+                </div>
+              </Card>
+
+              <Card className="p-6 rounded-[2rem] border border-indigo-500/20 flex flex-col justify-between gap-4">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-black text-indigo-400 tracking-wider uppercase">{tr('Accounts', 'Аккаунтов')}</span>
+                  <Users className="w-4 h-4 text-indigo-400" aria-hidden="true" />
+                </div>
+                <div>
+                  <p className="text-4xl font-black text-[var(--text)]">{users.length}</p>
+                  <p className="text-xs text-[var(--muted)] mt-1">{tr('Total registered on the platform.', 'Всего зарегистрировано на платформе.')}</p>
+                </div>
+              </Card>
+            </div>
+
+            <Card className="p-6 md:p-8 rounded-[2rem] border border-[var(--border)] space-y-5">
+              <h2 className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-indigo-400">
+                <TrendingUp className="w-4 h-4" aria-hidden="true" />
+                {tr('Student funnel', 'Воронка учеников')}
+              </h2>
+              <ul className="space-y-4">
+                {funnel.map((s) => (
+                  <li key={s.key} className="space-y-1.5">
+                    <div className="flex justify-between text-sm">
+                      <span className="font-bold text-[var(--text)]">{s.label}</span>
+                      <span className="text-[var(--muted)]">{s.count} · {s.pct}%</span>
+                    </div>
+                    <div className="h-2 rounded-full bg-[var(--input)] overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full" style={{ width: `${s.pct}%` }} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-[var(--muted)]">
+                {tr('Built from student profiles. Page-level events (sign-up clicks, first task) are not tracked yet.', 'Считается по профилям учеников. События по экранам (клики регистрации, первое задание) пока не отслеживаются.')}
+              </p>
+            </Card>
+
+            <div className="space-y-3">
+              <h2 className="text-xs font-black uppercase text-[var(--muted)] tracking-[0.2em] pl-1">
+                {tr('Longest daily streaks in Genius Lab', 'Лучшие серии занятий в Лаборатории')}
+              </h2>
+              {retention.rows.length > 0 ? (
+                <ul className="space-y-3">
+                  {retention.rows.slice(0, 50).map((row) => {
+                    const u = userById.get(row.uid);
+                    const name = u?.name || '—';
+                    return (
+                      <li key={row.uid}>
+                        <Card className="p-4 rounded-3xl border border-[var(--border)] flex items-center justify-between gap-4">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black shrink-0 ${row.retained ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-[var(--input)] text-[var(--muted)]'}`} aria-hidden="true">
+                              {name[0]?.toUpperCase()}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-black text-sm text-[var(--text)] truncate">{name}</p>
+                              <p className="text-xs text-[var(--muted)] truncate">{u?.email || row.uid}</p>
+                            </div>
+                          </div>
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black shrink-0 ${row.retained ? 'bg-emerald-500/10 text-emerald-500' : 'bg-amber-500/10 text-amber-500'}`}>
+                            <Flame className="w-3.5 h-3.5" aria-hidden="true" /> {row.streak} {row.streak === 1 ? tr('day', 'дн.') : tr('days', 'дн.')}
+                          </span>
+                        </Card>
+                      </li>
+                    );
+                  })}
+                </ul>
               ) : (
-                <div className="text-center py-12 bg-white/5 border border-white/10 rounded-[2.5rem] text-[var(--muted)]">
-                  <Flame className="w-12 h-12 text-indigo-500/40 mx-auto mb-3" />
-                  <p className="text-sm font-semibold">No active student streaks recorded yet.</p>
-                  <p className="text-[10px] mt-1 max-w-sm mx-auto">Real-time daily active streaks will sync here automatically once students start launching presets and completing knowledge trees in the Genius Lab.</p>
+                <div className="text-center py-10 border border-dashed border-[var(--border)] rounded-[2rem] text-[var(--muted)]">
+                  <Flame className="w-10 h-10 text-indigo-500/50 mx-auto mb-3" aria-hidden="true" />
+                  <p className="text-sm font-semibold">{tr('No activity recorded yet.', 'Активности пока нет.')}</p>
                 </div>
               )}
             </div>
           </div>
-        </div>
+        )}
+      </div>
+
+      {confirm && (
+        <ConfirmDialog
+          title={confirm.title}
+          text={confirm.text}
+          confirmLabel={confirm.confirmLabel}
+          danger={confirm.danger}
+          onConfirm={confirm.run}
+          onClose={() => setConfirm(null)}
+        />
       )}
     </div>
   );
