@@ -1,7 +1,8 @@
 import express, { Router, type Request, type Response, type NextFunction } from "express";
 import { GoogleGenAI, Type } from "@google/genai";
 import { FieldPath, FieldValue } from "firebase-admin/firestore";
-import { accountCreatedAt, adminDb, hasAdminDb, verifyIdToken } from "./firebaseAdmin.js";
+import { accountCreatedAt, adminDb, deleteAuthUser, hasAdminDb, verifyIdToken } from "./firebaseAdmin.js";
+import { deleteAccountData, type DeletionDb } from "./accountDeletion.js";
 import { cleanEvent, computeFunnel, recordEvent, type StoredEvent } from "./analytics.js";
 import { FamilyError, createCode, linkWithCode, listChildren, listParents, unlink, type Db } from "./family.js";
 
@@ -91,6 +92,7 @@ async function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const decoded = await verifyIdToken(match[1]);
     (req as any).uid = decoded.uid;
+    (req as any).authTime = decoded.auth_time; // seconds; when the person last signed in
     next();
   } catch {
     res.status(401).json({ error: "AUTH_INVALID" });
@@ -482,6 +484,25 @@ Write "feedback" in one short sentence.`;
   router.post("/api/family/unlink", requireAuth, rateLimit, async (req, res) => {
     await unlink(familyDb(), (req as any).uid, req.body?.childUid, req.body?.parentUid);
     res.json({ ok: true });
+  });
+
+  // ---------- account deletion (see server/accountDeletion.ts) ----------
+
+  // Irreversible, so: an explicit confirmation word and a sign-in within the last 10 minutes.
+  const REAUTH_WINDOW_SECONDS = 600;
+  router.post("/api/account/delete", requireAuth, rateLimit, async (req, res) => {
+    const uid: string = (req as any).uid;
+    if (req.body?.confirm !== "DELETE") throw new HttpError(400, "CONFIRM_REQUIRED");
+    const authTime = Number((req as any).authTime) || 0;
+    if (Date.now() / 1000 - authTime > REAUTH_WINDOW_SECONDS) throw new HttpError(401, "REAUTH_REQUIRED");
+    const db = adminDb();
+    if (!db) throw new HttpError(503, "DELETE_UNAVAILABLE");
+
+    const report = await deleteAccountData(db as unknown as DeletionDb, uid);
+    // Data first, login last: if this fails the person can sign in and simply try again.
+    await deleteAuthUser(uid);
+    if (report.skipped.length) console.warn("[ACCOUNT] deleted with leftovers:", uid, report.skipped);
+    res.json({ ok: true, skipped: report.skipped });
   });
 
   // ---------- funnel analytics (see server/analytics.ts) ----------

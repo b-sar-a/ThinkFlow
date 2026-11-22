@@ -45,8 +45,9 @@ export const Settings: React.FC<{ onNavigate?: (view: string) => void }> = ({ on
   const { signOut, deleteAccount, geniusMode, setGeniusMode, profile, updateProfileData } = useAuth();
   const { blocked, unblock } = useSafety();
   const [isDeleting, setIsDeleting] = useState(false);
-  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
-  const [deleteFailed, setDeleteFailed] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmText, setConfirmText] = useState('');
+  const [deleteError, setDeleteError] = useState<'reauth' | 'unavailable' | 'generic' | null>(null);
   const tr = (en: string, ru: string, uz: string) => (language === 'ru' ? ru : language === 'uz' ? uz : en);
 
   const DEPTH_LABEL: Record<string, Record<string, string>> = {
@@ -65,15 +66,15 @@ export const Settings: React.FC<{ onNavigate?: (view: string) => void }> = ({ on
     { id: 'uz', name: 'Oʻzbekcha' },
   ];
 
-  // "Delete account" only hides the profile and signs out (the data stays until we remove it on request),
-  // so the screen says exactly that.
-  const handleDeactivate = async () => {
+  // Real deletion: the server removes the data and the login. Needs a recent sign-in.
+  const handleDelete = async () => {
     setIsDeleting(true);
-    setDeleteFailed(false);
+    setDeleteError(null);
     try {
       await deleteAccount();
     } catch (error) {
-      setDeleteFailed(true);
+      const code = String((error as Error)?.message || '');
+      setDeleteError(code === 'REAUTH_REQUIRED' ? 'reauth' : code === 'DELETE_UNAVAILABLE' ? 'unavailable' : 'generic');
       setIsDeleting(false);
     }
   };
@@ -200,36 +201,85 @@ export const Settings: React.FC<{ onNavigate?: (view: string) => void }> = ({ on
             </div>
             <div>
               <h4 className="font-black uppercase text-sm tracking-tighter text-rose-500">{tr('Account', 'Аккаунт', 'Hisob')}</h4>
-              <p className="text-xs font-bold text-rose-500/70 tracking-wide mt-0.5">{tr('Sign out or deactivate your profile', 'Выход и деактивация профиля', 'Chiqish va profilni faolsizlantirish')}</p>
+              <p className="text-xs font-bold text-rose-500/70 tracking-wide mt-0.5">{tr('Sign out or delete your account', 'Выход и удаление аккаунта', 'Chiqish va hisobni o‘chirish')}</p>
             </div>
           </div>
 
-          {confirmDeactivate ? (
-            <div role="alertdialog" aria-label={tr('Deactivate the account?', 'Деактивировать аккаунт?', 'Hisob faolsizlantirilsinmi?')} className="p-5 rounded-3xl border border-rose-500/30 bg-rose-500/5 space-y-4">
-              <p className="text-sm font-medium text-[var(--text)] leading-relaxed">
+          {confirmDelete ? (
+            <div role="alertdialog" aria-label={tr('Delete the account?', 'Удалить аккаунт?', 'Hisob o‘chirilsinmi?')} className="p-5 rounded-3xl border border-rose-500/30 bg-rose-500/5 space-y-4">
+              <p className="text-sm font-bold text-[var(--text)]">{tr('This permanently deletes:', 'Это навсегда удалит:', 'Bu butunlay o‘chiradi:')}</p>
+              <ul className="list-disc pl-5 text-sm text-[var(--muted)] leading-relaxed space-y-1">
+                <li>{tr('your profile, progress, XP and streaks', 'профиль, прогресс, XP и серии', 'profil, progress, XP va seriyalar')}</li>
+                <li>{tr('your tasks, AI chats, reviews, posts and comments', 'задания, чаты с ИИ, отзывы, посты и комментарии', 'vazifalar, AI suhbatlari, sharhlar, postlar va izohlar')}</li>
+                <li>{tr('your messages (your name is hidden in chats with others)', 'твои сообщения (в чатах с другими твоё имя скрывается)', 'xabarlaringiz (boshqalar bilan chatlarda ismingiz yashiriladi)')}</li>
+                <li>{tr('parent access and your sign-in', 'доступ родителей и вход в аккаунт', 'ota-ona kirishi va akkauntga kirish')}</li>
+              </ul>
+              <p className="text-xs text-[var(--muted)] leading-relaxed">
                 {tr(
-                  'Your profile will be hidden and you will be signed out. Your data stays stored until you ask us to remove it.',
-                  'Профиль будет скрыт, и ты выйдешь из аккаунта. Данные останутся, пока ты не попросишь удалить их.',
-                  'Profil yashiriladi va siz hisobdan chiqasiz. Ma’lumotlar siz o‘chirishni so‘ramaguncha saqlanadi.'
-                )}{' '}
-                <a href={TELEGRAM} target="_blank" rel="noopener noreferrer" className="text-indigo-400 underline underline-offset-4 hover:text-indigo-300">
-                  {tr('Ask us to delete everything', 'Попросить удалить всё', 'Hammasini o‘chirishni so‘rash')}
-                </a>
+                  'Abuse reports are kept to protect other students. This cannot be undone.',
+                  'Жалобы на нарушения сохраняются для защиты других учеников. Отменить это нельзя.',
+                  'Qoidabuzarlik haqidagi shikoyatlar boshqa o‘quvchilarni himoya qilish uchun saqlanadi. Buni bekor qilib bo‘lmaydi.'
+                )}
               </p>
-              {deleteFailed && (
-                <p role="alert" className="flex items-center gap-2 text-sm font-bold text-rose-500">
-                  <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
-                  {tr('Could not deactivate. Sign in again and retry.', 'Не удалось деактивировать. Войди заново и повтори.', 'Faolsizlantirib bo‘lmadi. Qayta kirib, urinib ko‘ring.')}
-                </p>
-              )}
+              <div className="space-y-2">
+                <label htmlFor="delete-confirm" className="text-xs font-black uppercase tracking-wider text-[var(--muted)] block">
+                  {tr('Type DELETE to confirm', 'Введи DELETE для подтверждения', 'Tasdiqlash uchun DELETE yozing')}
+                </label>
+                <input
+                  id="delete-confirm"
+                  type="text"
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  value={confirmText}
+                  onChange={(e) => setConfirmText(e.target.value)}
+                  className="w-full h-12 px-4 bg-[var(--input)] border border-[var(--border)] rounded-2xl text-sm font-mono tracking-widest text-[var(--text)] outline-none focus:border-rose-500"
+                />
+              </div>
+              <div role="status" aria-live="polite">
+                {deleteError === 'reauth' && (
+                  <p role="alert" className="text-sm font-bold text-rose-500 space-y-2">
+                    {tr(
+                      'For your safety the sign-in must be recent. Sign out, sign in again and delete the account within 10 minutes.',
+                      'Для безопасности вход должен быть свежим. Выйди, войди заново и удали аккаунт в течение 10 минут.',
+                      'Xavfsizlik uchun kirish yaqinda bo‘lishi kerak. Chiqing, qayta kiring va 10 daqiqa ichida hisobni o‘chiring.'
+                    )}
+                  </p>
+                )}
+                {deleteError === 'unavailable' && (
+                  <p role="alert" className="text-sm font-bold text-rose-500">
+                    {tr('Deletion is not available right now. ', 'Удаление сейчас недоступно. ', 'O‘chirish hozir mavjud emas. ')}
+                    <a href={TELEGRAM} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">
+                      {tr('Ask us to delete everything', 'Попросить удалить всё', 'Hammasini o‘chirishni so‘rash')}
+                    </a>
+                  </p>
+                )}
+                {deleteError === 'generic' && (
+                  <p role="alert" className="flex items-center gap-2 text-sm font-bold text-rose-500">
+                    <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+                    {tr('Something went wrong. Nothing else was changed; try again.', 'Что-то пошло не так. Попробуй ещё раз.', 'Xatolik yuz berdi. Qayta urinib ko‘ring.')}
+                  </p>
+                )}
+              </div>
               <div className="flex flex-col sm:flex-row gap-3">
-                <Button variant="outline" onClick={handleDeactivate} disabled={isDeleting} className="border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white h-14 rounded-2xl gap-3 flex-1">
+                <Button
+                  variant="outline"
+                  onClick={handleDelete}
+                  disabled={isDeleting || confirmText.trim() !== 'DELETE'}
+                  className="border-rose-500/30 text-rose-500 hover:bg-rose-500 hover:text-white h-14 rounded-2xl gap-3 flex-1 disabled:opacity-50"
+                >
                   <Trash2 className="w-5 h-5" />
-                  {isDeleting ? tr('Working...', 'Подожди...', 'Kuting...') : tr('Deactivate and sign out', 'Деактивировать и выйти', 'Faolsizlantirish va chiqish')}
+                  {isDeleting ? tr('Deleting...', 'Удаляем...', 'O‘chirilmoqda...') : tr('Delete forever', 'Удалить навсегда', 'Butunlay o‘chirish')}
                 </Button>
-                <Button variant="ghost" onClick={() => setConfirmDeactivate(false)} disabled={isDeleting} className="h-14 rounded-2xl flex-1">
-                  {tr('Cancel', 'Отмена', 'Bekor qilish')}
-                </Button>
+                {deleteError === 'reauth' ? (
+                  <Button variant="outline" onClick={() => signOut()} className="h-14 rounded-2xl flex-1">
+                    {tr('Sign out', 'Выйти', 'Chiqish')}
+                  </Button>
+                ) : (
+                  <Button variant="ghost" onClick={() => { setConfirmDelete(false); setConfirmText(''); setDeleteError(null); }} disabled={isDeleting} className="h-14 rounded-2xl flex-1">
+                    {tr('Cancel', 'Отмена', 'Bekor qilish')}
+                  </Button>
+                )}
               </div>
             </div>
           ) : (
@@ -237,10 +287,10 @@ export const Settings: React.FC<{ onNavigate?: (view: string) => void }> = ({ on
               <Button
                 variant="outline"
                 className="border-rose-500/20 text-rose-500 hover:bg-rose-500 hover:text-white flex-1 h-16 rounded-2xl gap-3 transition-all"
-                onClick={() => setConfirmDeactivate(true)}
+                onClick={() => setConfirmDelete(true)}
               >
                 <Trash2 className="w-5 h-5" />
-                {tr('Deactivate account', 'Деактивировать аккаунт', 'Hisobni faolsizlantirish')}
+                {tr('Delete account', 'Удалить аккаунт', 'Hisobni o‘chirish')}
               </Button>
               <Button
                 variant="outline"
