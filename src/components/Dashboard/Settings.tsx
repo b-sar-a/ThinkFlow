@@ -6,6 +6,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
+import { useSafety } from '../../lib/safety';
 
 const TELEGRAM = 'https://t.me/b_sar_a';
 
@@ -41,6 +42,7 @@ export const Settings: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const { signOut, deleteAccount, geniusMode, setGeniusMode, profile, updateProfileData } = useAuth();
+  const { blocked, unblock } = useSafety();
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
   const [deleteFailed, setDeleteFailed] = useState(false);
@@ -171,6 +173,22 @@ export const Settings: React.FC = () => {
             </div>
           </Row>
         </Card>
+
+        {Object.keys(blocked).length > 0 && (
+          <Card className="p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] border border-[var(--border)] space-y-6">
+            <h3 className="text-xs font-black uppercase tracking-[0.3em] text-indigo-400">{tr('Blocked people', 'Заблокированные', 'Bloklanganlar')}</h3>
+            <ul className="space-y-3">
+              {Object.entries(blocked).map(([uid, name]) => (
+                <li key={uid} className="flex items-center justify-between gap-4">
+                  <span className="font-bold text-[var(--text)] truncate">{name || uid.slice(0, 6)}</span>
+                  <Button variant="outline" onClick={() => unblock(uid)} className="h-11 px-5 rounded-xl shrink-0">
+                    <span className="font-black uppercase text-xs tracking-widest">{tr('Unblock', 'Разблокировать', 'Blokdan chiqarish')}</span>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          </Card>
+        )}
 
         <Card className="p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] border border-rose-500/20 bg-rose-500/5 space-y-6">
           <div className="flex items-center gap-5">

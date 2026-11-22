@@ -1,57 +1,70 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { 
-  Search, 
-  Send, 
-  MoreHorizontal, 
+import {
+  Search,
+  Send,
   ArrowLeft,
   Loader2,
   User,
   Plus,
   MessageSquare,
-  Image as ImageIcon
+  ShieldCheck,
+  AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
-import { ChatThread, DirectMessage, UserProfile } from '../../types';
+import { ChatThread, DirectMessage } from '../../types';
 import { db } from '../../lib/firebase';
-import { 
-  collection, 
-  query, 
-  where, 
-  orderBy, 
-  onSnapshot, 
-  addDoc, 
-  updateDoc, 
-  doc, 
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  doc,
   setDoc,
   getDocs,
   getDoc,
-  serverTimestamp,
   limit
 } from 'firebase/firestore';
 import { Button } from '../UI/Button';
 import { Card } from '../UI/Card';
-import { motion, AnimatePresence } from 'framer-motion';
+import { useSafety } from '../../lib/safety';
+import { ConfirmDialog, ContentMenu, ReportDialog } from '../Safety/Safety';
+
+/** What other students can see about a person: name and photo only (never email or age). */
+interface PublicProfile {
+  uid: string;
+  name: string;
+  photoURL?: string | null;
+}
 
 export const Messages: React.FC = () => {
   const { user, profile } = useAuth();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const tr = (en: string, ru: string, uz: string) => (language === 'ru' ? ru : language === 'uz' ? uz : en);
+  const { blocked, isBlocked, block, unblock, report } = useSafety();
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
   const [selectedThread, setSelectedThread] = useState<ChatThread | null>(null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [sendError, setSendError] = useState(false);
+  const [chatError, setChatError] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+  const [searchResults, setSearchResults] = useState<PublicProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [dialog, setDialog] = useState<null | 'report' | 'block' | 'unblock'>(null);
+  const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!user) return;
 
     const q = query(
-      collection(db, 'chats'), 
+      collection(db, 'chats'),
       where('participants', 'array-contains', user.uid),
       orderBy('lastTimestamp', 'desc')
     );
@@ -59,6 +72,11 @@ export const Messages: React.FC = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const threadsData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as ChatThread));
       setThreads(threadsData);
+      setLoadError(false);
+      setLoading(false);
+    }, (error) => {
+      console.error("Threads fetch error:", error);
+      setLoadError(true);
       setLoading(false);
     });
 
@@ -77,84 +95,96 @@ export const Messages: React.FC = () => {
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const messagesData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as DirectMessage));
       setMessages(messagesData);
-      scrollToBottom();
     });
 
     return () => unsubscribe();
   }, [selectedThread]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  useEffect(() => {
+    logRef.current?.scrollTo({ top: logRef.current.scrollHeight });
+  }, [messages]);
 
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
+  // Search by name as the student types (debounced), in the public profiles only.
+  useEffect(() => {
+    const text = searchQuery.trim();
+    if (!text) {
       setSearchResults([]);
       return;
     }
-    setIsSearching(true);
-    try {
-      const q = query(
-        collection(db, 'users'),
-        where('name', '>=', searchQuery),
-        where('name', '<=', searchQuery + '\uf8ff'),
-        limit(5)
-      );
-      const snapshot = await getDocs(q);
-      const results = snapshot.docs
-        .map(doc => ({ uid: doc.id, ...doc.data() } as UserProfile))
-        .filter(u => u.uid !== user?.uid);
-      setSearchResults(results);
-    } catch (error) {
-      console.error("Search error:", error);
-    } finally {
-      setIsSearching(false);
-    }
-  };
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const q = query(
+          collection(db, 'publicProfiles'),
+          where('name', '>=', text),
+          where('name', '<=', text + ''),
+          limit(8)
+        );
+        const snapshot = await getDocs(q);
+        setSearchResults(
+          snapshot.docs
+            .map(d => ({ uid: d.id, ...d.data() } as PublicProfile))
+            .filter(u => u.uid !== user?.uid && !isBlocked(u.uid))
+            .slice(0, 5)
+        );
+      } catch (error) {
+        console.error("Search error:", error);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery, user?.uid, blocked]);
 
-  const startNewChat = async (targetUser: UserProfile) => {
+  const startNewChat = async (targetUser: PublicProfile) => {
     if (!user || !profile) return;
-    
-    // Check if thread exists
-    const threadId = [user.uid, targetUser.uid].sort().join('_');
-    const threadRef = doc(db, 'chats', threadId);
-    const threadSnap = await getDoc(threadRef);
+    setChatError(false);
+    try {
+      // Check if thread exists
+      const threadId = [user.uid, targetUser.uid].sort().join('_');
+      const threadRef = doc(db, 'chats', threadId);
+      const threadSnap = await getDoc(threadRef);
 
-    if (!threadSnap.exists()) {
-      const newThread: Partial<ChatThread> = {
-        participants: [user.uid, targetUser.uid],
-        participantNames: {
-          [user.uid]: profile.name,
-          [targetUser.uid]: targetUser.name
-        },
-        participantPhotos: {
+      if (!threadSnap.exists()) {
+        const newThread: Partial<ChatThread> = {
+          participants: [user.uid, targetUser.uid],
+          participantNames: {
+            [user.uid]: profile.name,
+            [targetUser.uid]: targetUser.name
+          },
+          participantPhotos: {
+            [user.uid]: profile.photoURL || null,
+            [targetUser.uid]: targetUser.photoURL || null
+          },
+          lastMessage: tr('New conversation', 'Новый разговор', 'Yangi suhbat'),
+          lastTimestamp: Date.now()
+        };
+        await setDoc(threadRef, newThread);
+        setSelectedThread({ id: threadId, ...newThread } as ChatThread);
+      } else {
+        // Update photos if they exist but might be outdated
+        const existingData = threadSnap.data() as ChatThread;
+        const updatedPhotos = {
+          ...existingData.participantPhotos,
           [user.uid]: profile.photoURL || null,
           [targetUser.uid]: targetUser.photoURL || null
-        },
-        lastMessage: 'Начат новый разговор',
-        lastTimestamp: Date.now()
-      };
-      await setDoc(threadRef, newThread);
-      setSelectedThread({ id: threadId, ...newThread } as ChatThread);
-    } else {
-      // Update photos if they exist but might be outdated
-      const existingData = threadSnap.data() as ChatThread;
-      const updatedPhotos = {
-        ...existingData.participantPhotos,
-        [user.uid]: profile.photoURL || null,
-        [targetUser.uid]: targetUser.photoURL || null
-      };
-      await updateDoc(threadRef, { participantPhotos: updatedPhotos });
-      setSelectedThread({ id: threadId, ...existingData, participantPhotos: updatedPhotos } as ChatThread);
+        };
+        await updateDoc(threadRef, { participantPhotos: updatedPhotos });
+        setSelectedThread({ id: threadId, ...existingData, participantPhotos: updatedPhotos } as ChatThread);
+      }
+      setSearchQuery('');
+      setSearchResults([]);
+    } catch (error) {
+      console.error("Start chat error:", error);
+      setChatError(true);
     }
-    setSearchQuery('');
-    setSearchResults([]);
   };
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !selectedThread || !user) return;
-    const text = newMessage;
+    const text = newMessage.trim();
     setNewMessage('');
+    setSendError(false);
     try {
       await addDoc(collection(db, 'chats', selectedThread.id, 'messages'), {
         chatId: selectedThread.id,
@@ -168,110 +198,128 @@ export const Messages: React.FC = () => {
       });
     } catch (error) {
       console.error("Send error:", error);
+      setNewMessage(text);
+      setSendError(true);
     }
   };
 
+  const otherId = (thread: ChatThread) => thread.participants.find(id => id !== user?.uid);
   const getOtherParticipantName = (thread: ChatThread) => {
-    const otherId = thread.participants.find(id => id !== user?.uid);
-    return otherId ? thread.participantNames[otherId] : 'User';
+    const id = otherId(thread);
+    return id ? thread.participantNames[id] : 'User';
+  };
+  const getOtherParticipantPhoto = (thread: ChatThread) => {
+    const id = otherId(thread);
+    return id ? thread.participantPhotos?.[id] : null;
   };
 
-  const getOtherParticipantPhoto = (thread: ChatThread) => {
-    const otherId = thread.participants.find(id => id !== user?.uid);
-    return otherId ? thread.participantPhotos?.[otherId] : null;
-  };
+  const formatTime = (timestamp: number) =>
+    new Date(timestamp).toLocaleTimeString(language === 'ru' ? 'ru-RU' : language === 'uz' ? 'uz-UZ' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  const Avatar: React.FC<{ name: string; photo?: string | null; size: string; light?: boolean }> = ({ name, photo, size, light }) => (
+    <div className={`${size} shrink-0 flex items-center justify-center font-black overflow-hidden shadow-lg shadow-indigo-500/10 ${light ? 'bg-white/20 text-white' : 'bg-indigo-600 text-white'}`} aria-hidden="true">
+      {photo ? <img src={photo} alt="" className="w-full h-full object-cover" /> : name[0]}
+    </div>
+  );
 
   if (loading) {
     return (
-      <div className="h-full flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" />
+      <div className="h-full flex items-center justify-center py-24" role="status">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" aria-label={tr('Loading', 'Загрузка', 'Yuklanmoqda')} />
       </div>
     );
   }
 
+  const selectedPeer = selectedThread ? otherId(selectedThread) : undefined;
+  const peerName = selectedThread ? getOtherParticipantName(selectedThread) : '';
+  const peerBlocked = isBlocked(selectedPeer);
+  const lastIncoming = messages.filter((m) => m.senderId !== user?.uid).slice(-3).map((m) => m.text).join(' | ');
+
   return (
-    <div className="h-[calc(100vh-160px)] flex gap-6 animate-in fade-in duration-700">
+    <div className="h-[calc(100dvh-12rem)] min-h-[440px] flex gap-6 animate-in fade-in duration-700">
       {/* Sidebar Threads List */}
       <div className={`
-        flex-col w-full md:w-80 bg-[var(--card)] border border-[var(--border)] rounded-[2.5rem] overflow-hidden flex
+        flex-col w-full md:w-80 bg-[var(--card)] border border-[var(--border)] rounded-[2rem] md:rounded-[2.5rem] overflow-hidden flex
         ${selectedThread ? 'hidden md:flex' : 'flex'}
       `}>
-        <div className="p-6 border-b border-[var(--border)] space-y-4">
-          <h2 className="text-2xl font-black uppercase tracking-tight text-[var(--text)]">Чаты</h2>
-          <div className="relative">
-            <input 
+        <div className="p-5 md:p-6 border-b border-[var(--border)] space-y-4">
+          <h2 className="text-2xl font-black uppercase tracking-tight text-[var(--text)]">{t.messages}</h2>
+          <label className="relative block">
+            <span className="sr-only">{tr('Find a person by name', 'Найти человека по имени', 'Ism bo‘yicha qidirish')}</span>
+            <input
               type="text"
-              placeholder="Поиск собеседника..."
+              placeholder={tr('Find a person…', 'Найти человека…', 'Odam qidirish…')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyUp={(e) => e.key === 'Enter' && handleSearch()}
-              className="w-full bg-[var(--input)] border border-[var(--border)] rounded-2xl py-3 pl-10 pr-4 text-xs font-bold text-[var(--text)] focus:outline-none focus:border-indigo-500/50 transition-all"
+              autoComplete="off"
+              className="w-full bg-[var(--input)] border border-[var(--border)] rounded-2xl py-3 pl-10 pr-4 text-sm font-bold text-[var(--text)] focus:outline-none focus:border-indigo-500/50 transition-all"
             />
-            <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-          </div>
-          
-          {/* Search Results */}
-          <AnimatePresence>
-            {searchResults.length > 0 && (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="absolute left-6 right-6 top-48 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-2xl z-50 overflow-hidden"
-              >
-                {searchResults.map(u => (
-                  <button 
-                    key={u.uid}
+            <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true" />
+          </label>
+
+          {chatError && (
+            <p role="alert" className="flex items-center gap-2 text-xs font-bold text-rose-500">
+              <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+              {tr('Could not start the chat.', 'Не удалось начать чат.', 'Chatni boshlab bo‘lmadi.')}
+            </p>
+          )}
+
+          {searchQuery.trim() && (
+            <ul className="bg-[var(--card)] border border-[var(--border)] rounded-2xl overflow-hidden">
+              {searchResults.map(u => (
+                <li key={u.uid}>
+                  <button
+                    type="button"
                     onClick={() => startNewChat(u)}
-                    className="w-full p-4 flex items-center gap-3 hover:bg-[var(--input)] transition-all border-b border-[var(--border)] last:border-none"
+                    className="w-full p-3 flex items-center gap-3 hover:bg-[var(--input)] transition-all border-b border-[var(--border)] last:border-none"
                   >
-                    <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black overflow-hidden bg-indigo-600 shadow-lg shadow-indigo-500/10">
-                      {u.photoURL ? (
-                        <img src={u.photoURL} alt={u.name} className="w-full h-full object-cover" />
-                      ) : (
-                        u.name[0]
-                      )}
-                    </div>
-                    <div className="text-left">
-                      <p className="font-bold text-xs text-[var(--text)]">{u.name}</p>
-                    </div>
-                    <Plus className="w-4 h-4 ml-auto text-indigo-500" />
+                    <Avatar name={u.name} photo={u.photoURL} size="w-10 h-10 rounded-xl" />
+                    <p className="font-bold text-sm text-[var(--text)] truncate text-left">{u.name}</p>
+                    <Plus className="w-4 h-4 ml-auto shrink-0 text-indigo-500" aria-hidden="true" />
                   </button>
-                ))}
-              </motion.div>
-            )}
-          </AnimatePresence>
+                </li>
+              ))}
+              {!isSearching && searchResults.length === 0 && (
+                <li className="p-4 text-sm font-bold text-[var(--muted)]">{tr('Nobody found.', 'Никого не нашли.', 'Hech kim topilmadi.')}</li>
+              )}
+            </ul>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-2">
-          {threads.map(thread => (
-            <button
-              key={thread.id}
-              onClick={() => setSelectedThread(thread)}
-              className={`
-                w-full p-4 rounded-[1.5rem] flex items-center gap-3 transition-all
-                ${selectedThread?.id === thread.id ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-500/20' : 'hover:bg-[var(--input)] text-[var(--text)]'}
-              `}
-            >
-              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black overflow-hidden shadow-lg shadow-indigo-500/10 ${selectedThread?.id === thread.id ? 'bg-white/20 text-white' : 'bg-indigo-600 text-white'}`}>
-                {getOtherParticipantPhoto(thread) ? (
-                  <img src={getOtherParticipantPhoto(thread)!} alt={getOtherParticipantName(thread)} className="w-full h-full object-cover" />
-                ) : (
-                  getOtherParticipantName(thread)[0]
-                )}
-              </div>
-              <div className="flex-1 text-left overflow-hidden">
-                <p className="font-black text-sm truncate">{getOtherParticipantName(thread)}</p>
-                <p className={`text-[10px] truncate ${selectedThread?.id === thread.id ? 'text-white/60' : 'text-gray-500'} font-bold`}>
-                  {thread.lastMessage}
-                </p>
-              </div>
-            </button>
-          ))}
-          {threads.length === 0 && (
-            <div className="p-10 text-center opacity-30">
-              <User className="w-12 h-12 mx-auto mb-4" />
-              <p className="text-[10px] font-black uppercase tracking-widest">Нет активных чатов</p>
+          {loadError && (
+            <p role="alert" className="p-4 text-sm font-bold text-rose-500">
+              {tr('Could not load your chats. Reload the page.', 'Не удалось загрузить чаты. Обнови страницу.', 'Chatlarni yuklab bo‘lmadi. Sahifani yangilang.')}
+            </p>
+          )}
+          {threads.map(thread => {
+            const active = selectedThread?.id === thread.id;
+            const isBlockedThread = isBlocked(otherId(thread));
+            return (
+              <button
+                type="button"
+                key={thread.id}
+                onClick={() => setSelectedThread(thread)}
+                aria-current={active ? 'true' : undefined}
+                className={`
+                  w-full p-4 rounded-[1.5rem] flex items-center gap-3 transition-all
+                  ${active ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-500/20' : 'hover:bg-[var(--input)] text-[var(--text)]'}
+                `}
+              >
+                <Avatar name={getOtherParticipantName(thread)} photo={getOtherParticipantPhoto(thread)} size="w-12 h-12 rounded-2xl" light={active} />
+                <div className="flex-1 text-left overflow-hidden">
+                  <p className="font-black text-sm truncate">{getOtherParticipantName(thread)}</p>
+                  <p className={`text-xs truncate ${active ? 'text-white/80' : 'text-[var(--muted)]'} font-bold`}>
+                    {isBlockedThread ? tr('Blocked', 'Заблокирован', 'Bloklangan') : thread.lastMessage}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+          {threads.length === 0 && !loadError && (
+            <div className="p-10 text-center opacity-60">
+              <User className="w-12 h-12 mx-auto mb-4" aria-hidden="true" />
+              <p className="text-xs font-black uppercase tracking-widest">{tr('No chats yet', 'Нет активных чатов', 'Hozircha chat yo‘q')}</p>
             </div>
           )}
         </div>
@@ -279,92 +327,141 @@ export const Messages: React.FC = () => {
 
       {/* Chat Area */}
       <div className={`
-        flex-1 bg-[var(--card)] border border-[var(--border)] rounded-[2.5rem] overflow-hidden flex flex-col relative
+        flex-1 min-w-0 bg-[var(--card)] border border-[var(--border)] rounded-[2rem] md:rounded-[2.5rem] flex flex-col relative
         ${!selectedThread ? 'hidden md:flex' : 'flex'}
       `}>
         {selectedThread ? (
           <>
             {/* Header */}
-            <div className="p-6 border-b border-[var(--border)] flex items-center gap-4">
-              <button 
+            <div className="p-4 md:p-6 border-b border-[var(--border)] flex items-center gap-3 md:gap-4">
+              <button
+                type="button"
                 onClick={() => setSelectedThread(null)}
-                className="md:hidden text-gray-500"
+                aria-label={tr('Back to chats', 'К чатам', 'Chatlarga')}
+                className="md:hidden w-11 h-11 flex items-center justify-center text-gray-500"
               >
-                <ArrowLeft className="w-6 h-6" />
+                <ArrowLeft className="w-6 h-6" aria-hidden="true" />
               </button>
-              <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black overflow-hidden shadow-lg shadow-indigo-500/10">
-                {getOtherParticipantPhoto(selectedThread) ? (
-                  <img src={getOtherParticipantPhoto(selectedThread)!} alt={getOtherParticipantName(selectedThread)} className="w-full h-full object-cover" />
-                ) : (
-                  getOtherParticipantName(selectedThread)[0]
-                )}
+              <Avatar name={peerName} photo={getOtherParticipantPhoto(selectedThread)} size="w-10 h-10 rounded-xl" />
+              <div className="flex-1 min-w-0">
+                <h3 className="font-black text-[var(--text)] truncate">{peerName}</h3>
               </div>
-              <div className="flex-1">
-                <h3 className="font-black text-[var(--text)]">{getOtherParticipantName(selectedThread)}</h3>
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">В сети</span>
-                </div>
-              </div>
-              <button className="text-gray-400 hover:text-indigo-500 transition-colors">
-                <MoreHorizontal className="w-6 h-6" />
-              </button>
+              <ContentMenu
+                label={tr('Chat actions', 'Действия с чатом', 'Chat amallari')}
+                items={[
+                  { label: tr('Report', 'Пожаловаться', 'Shikoyat qilish'), onClick: () => setDialog('report') },
+                  peerBlocked
+                    ? { label: tr('Unblock', 'Разблокировать', 'Blokdan chiqarish'), onClick: () => setDialog('unblock') }
+                    : { label: tr('Block this person', 'Заблокировать', 'Bloklash'), danger: true, onClick: () => setDialog('block') },
+                ]}
+              />
             </div>
 
+            <p className="px-4 md:px-6 py-2 flex items-start gap-2 text-xs font-bold text-[var(--muted)] border-b border-[var(--border)] bg-[var(--input)]/40">
+              <ShieldCheck className="w-4 h-4 mt-0.5 shrink-0 text-emerald-500" aria-hidden="true" />
+              {tr('Never share passwords, your address, phone or photos of documents.', 'Не делись паролями, адресом, телефоном и фото документов.', 'Parollar, manzil, telefon va hujjat rasmlarini yubormang.')}
+            </p>
+
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
-              {messages.map((msg, i) => (
-                <div 
-                  key={msg.id} 
+            <div ref={logRef} role="log" aria-live="polite" className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6 custom-scrollbar">
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
                   className={`flex ${msg.senderId === user?.uid ? 'justify-end' : 'justify-start'}`}
                 >
                   <div className={`
-                    max-w-[80%] md:max-w-[70%] p-4 rounded-3xl text-sm leading-relaxed
-                    ${msg.senderId === user?.uid 
-                      ? 'bg-indigo-600 text-white rounded-tr-none shadow-lg shadow-indigo-500/20' 
+                    max-w-[85%] md:max-w-[70%] p-4 rounded-3xl text-sm leading-relaxed break-words
+                    ${msg.senderId === user?.uid
+                      ? 'bg-indigo-600 text-white rounded-tr-none shadow-lg shadow-indigo-500/20'
                       : 'bg-[var(--input)] text-[var(--text)] rounded-tl-none border border-[var(--border)]'}
                   `}>
-                    {msg.text}
-                    <div className={`text-[8px] mt-1 font-black uppercase tracking-widest ${msg.senderId === user?.uid ? 'text-white/50' : 'text-gray-500'}`}>
-                      {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    <p className="whitespace-pre-wrap">{msg.text}</p>
+                    <div className={`text-xs mt-1 font-bold tabular-nums ${msg.senderId === user?.uid ? 'text-white/70' : 'text-[var(--muted)]'}`}>
+                      {formatTime(msg.timestamp)}
                     </div>
                   </div>
                 </div>
               ))}
-              <div ref={messagesEndRef} />
             </div>
 
             {/* Input */}
-            <div className="p-6 border-t border-[var(--border)] bg-[var(--bg)]/50 backdrop-blur-md">
-              <div className="flex gap-4">
-                <input 
-                  type="text"
-                  placeholder="Введите сообщение..."
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  onKeyUp={(e) => e.key === 'Enter' && handleSendMessage()}
-                  className="flex-1 bg-[var(--input)] border border-[var(--border)] rounded-2xl px-6 py-4 text-sm font-bold text-[var(--text)] focus:outline-none focus:border-indigo-500/50 transition-all shadow-inner"
-                />
-                <Button 
-                  onClick={handleSendMessage}
-                  disabled={!newMessage.trim()}
-                  className="w-14 h-14 rounded-2xl bg-indigo-600 hover:bg-indigo-500 p-0 shadow-lg shadow-indigo-500/30 group"
-                >
-                  <Send className="w-6 h-6 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+            {peerBlocked ? (
+              <div className="p-4 md:p-6 border-t border-[var(--border)] flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <p className="text-sm font-bold text-[var(--muted)]">{tr('You blocked this person.', 'Ты заблокировал этого человека.', 'Siz bu odamni blokladingiz.')}</p>
+                <Button variant="outline" onClick={() => setDialog('unblock')} className="h-12 px-6 rounded-2xl">
+                  <span className="font-black uppercase text-xs tracking-widest">{tr('Unblock', 'Разблокировать', 'Blokdan chiqarish')}</span>
                 </Button>
               </div>
-            </div>
+            ) : (
+              <form
+                className="p-4 md:p-6 border-t border-[var(--border)] bg-[var(--bg)]/50 backdrop-blur-md space-y-3"
+                onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
+              >
+                {sendError && (
+                  <p role="alert" className="flex items-center gap-2 text-sm font-bold text-rose-500">
+                    <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
+                    {tr('Message not sent. The person may have blocked you.', 'Сообщение не отправлено. Возможно, тебя заблокировали.', 'Xabar yuborilmadi. Sizni bloklagan bo‘lishi mumkin.')}
+                  </p>
+                )}
+                <div className="flex gap-3 md:gap-4">
+                  <input
+                    type="text"
+                    aria-label={tr('Message', 'Сообщение', 'Xabar')}
+                    placeholder={tr('Write a message…', 'Введите сообщение…', 'Xabar yozing…')}
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    maxLength={2000}
+                    autoComplete="off"
+                    className="flex-1 min-w-0 bg-[var(--input)] border border-[var(--border)] rounded-2xl px-5 py-4 text-sm font-bold text-[var(--text)] focus:outline-none focus:border-indigo-500/50 transition-all shadow-inner"
+                  />
+                  <Button
+                    type="submit"
+                    disabled={!newMessage.trim()}
+                    aria-label={tr('Send', 'Отправить', 'Yuborish')}
+                    className="w-14 h-14 shrink-0 rounded-2xl bg-indigo-600 hover:bg-indigo-500 p-0 shadow-lg shadow-indigo-500/30 group"
+                  >
+                    <Send className="w-6 h-6 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+                  </Button>
+                </div>
+              </form>
+            )}
           </>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center p-10 opacity-30">
+          <div className="h-full flex flex-col items-center justify-center text-center p-10 opacity-60">
             <div className="w-24 h-24 bg-indigo-600/10 rounded-[3rem] flex items-center justify-center text-indigo-500 mb-8">
-              <MessageSquare className="w-10 h-10" />
+              <MessageSquare className="w-10 h-10" aria-hidden="true" />
             </div>
-            <h3 className="text-2xl font-black uppercase tracking-tight text-[var(--text)] mb-2">Ваши сообщения</h3>
-            <p className="max-w-xs text-sm font-medium">Выберите чат из списка или найдите пользователя по имени, чтобы начать общение.</p>
+            <h3 className="text-2xl font-black uppercase tracking-tight text-[var(--text)] mb-2">{tr('Your messages', 'Ваши сообщения', 'Xabarlaringiz')}</h3>
+            <p className="max-w-xs text-sm font-medium">{tr('Choose a chat from the list or find a person by name to start talking.', 'Выберите чат из списка или найдите пользователя по имени, чтобы начать общение.', 'Ro‘yxatdan chatni tanlang yoki ism bo‘yicha odam toping.')}</p>
           </div>
         )}
       </div>
+
+      {dialog === 'report' && selectedPeer && (
+        <ReportDialog
+          subject={peerName}
+          onClose={() => setDialog(null)}
+          onSubmit={(reason, details) => report({ targetType: 'user', targetId: selectedPeer, targetUserId: selectedPeer, reason, details, text: lastIncoming })}
+        />
+      )}
+      {dialog === 'block' && selectedPeer && (
+        <ConfirmDialog
+          title={tr('Block this person?', 'Заблокировать этого человека?', 'Bu odam bloklansinmi?')}
+          text={tr('They will not be able to message you. You can unblock them here or in Settings.', 'Он не сможет писать тебе. Разблокировать можно здесь или в настройках.', 'U sizga yoza olmaydi. Bu yerda yoki sozlamalarda blokdan chiqarish mumkin.')}
+          confirmLabel={tr('Block', 'Заблокировать', 'Bloklash')}
+          danger
+          onConfirm={() => block(selectedPeer, peerName)}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'unblock' && selectedPeer && (
+        <ConfirmDialog
+          title={tr('Unblock this person?', 'Разблокировать?', 'Blokdan chiqarilsinmi?')}
+          confirmLabel={tr('Unblock', 'Разблокировать', 'Blokdan chiqarish')}
+          onConfirm={() => unblock(selectedPeer)}
+          onClose={() => setDialog(null)}
+        />
+      )}
     </div>
   );
 };

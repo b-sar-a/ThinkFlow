@@ -286,6 +286,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .finally(() => { streakWriting.current = false; });
   }, [user, profile?.lastActiveDate]);
 
+  // Other students find you by name and see your photo. This public card is all they can read:
+  // the full profile (email, age, class) is private to you.
+  const publicSynced = useRef('');
+  useEffect(() => {
+    if (!user || !profile || user.uid === DEMO_UID) return;
+    const signature = `${profile.name}|${profile.photoURL ?? ''}`;
+    if (publicSynced.current === signature) return;
+    publicSynced.current = signature;
+    setDoc(
+      doc(db, 'publicProfiles', user.uid),
+      { uid: user.uid, name: profile.name, photoURL: profile.photoURL ?? null, updatedAt: Date.now() },
+      { merge: true }
+    ).catch((err) => {
+      publicSynced.current = '';
+      console.warn('Could not update the public profile:', err);
+    });
+  }, [user, profile?.name, profile?.photoURL]);
+
   // Invite links: remember ?ref= on arrival, credit it once the account exists.
   useEffect(() => { captureReferral(); }, []);
   const referralTried = useRef(false);

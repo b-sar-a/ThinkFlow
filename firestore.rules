@@ -152,6 +152,26 @@ service cloud.firestore {
              data.createdAt is number;
     }
 
+    function isValidComment(data) {
+      return data.userId is string &&
+             data.userName is string &&
+             data.content is string && data.content.size() > 0 && data.content.size() <= 1000 &&
+             data.createdAt is number;
+    }
+
+    // A like update may only add or remove my own uid.
+    function onlyOwnLikeChange() {
+      let added = request.resource.data.likes.toSet().difference(resource.data.likes.toSet());
+      let removed = resource.data.likes.toSet().difference(request.resource.data.likes.toSet());
+      return added.hasOnly([request.auth.uid]) && removed.hasOnly([request.auth.uid]);
+    }
+
+    // True when the other person in a two-person chat has blocked me.
+    function peerBlockedMe(participants) {
+      let other = participants[0] == request.auth.uid ? participants[1] : participants[0];
+      return exists(/databases/$(database)/documents/users/$(other)/blocks/$(request.auth.uid));
+    }
+
     function isValidChatThread(data) {
       return hasRequiredFields(['participants', 'lastMessage', 'lastTimestamp']) &&
              data.participants is list && data.participants.size() == 2 &&
@@ -185,7 +205,17 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if isOwner(userId) || isAdmin();
+
+      // Who I blocked: private to me.
+      match /blocks/{blockedId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) &&
+                              request.resource.data.keys().hasOnly(['name', 'blockedAt']) &&
+                              request.resource.data.name is string && request.resource.data.name.size() < 100 &&
+                              request.resource.data.blockedAt is number;
+      }
+
       allow create: if isOwner(userId) && isValidUser(request.resource.data) &&
                       (isAdmin() || (
                         request.resource.data.get('role', 'student') == 'student' &&
@@ -205,6 +235,31 @@ service cloud.firestore {
                        safeStreak() &&
                        safeProgress());
       allow delete: if isAdmin();
+    }
+
+    // What other students can see about a person: name and photo only.
+    match /publicProfiles/{profileId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(profileId) &&
+                            request.resource.data.keys().hasOnly(['uid', 'name', 'photoURL', 'updatedAt']) &&
+                            request.resource.data.name is string && request.resource.data.name.size() > 0 && request.resource.data.name.size() < 100 &&
+                            (!('photoURL' in request.resource.data) || request.resource.data.photoURL == null ||
+                              (request.resource.data.photoURL is string && request.resource.data.photoURL.size() < 500000));
+      allow delete: if isAdmin();
+    }
+
+    // "Report" from posts, comments and chats. Only moderators can read them.
+    match /reports/{reportId} {
+      allow create: if isAuthenticated() &&
+                    request.resource.data.reporterId == request.auth.uid &&
+                    request.resource.data.keys().hasOnly(['reporterId', 'targetType', 'targetId', 'targetUserId', 'reason', 'details', 'text', 'postId', 'status', 'createdAt']) &&
+                    request.resource.data.targetType in ['post', 'comment', 'message', 'user'] &&
+                    request.resource.data.reason in ['spam', 'bullying', 'personal_data', 'inappropriate', 'other'] &&
+                    request.resource.data.status == 'open' &&
+                    request.resource.data.details is string && request.resource.data.details.size() <= 500 &&
+                    request.resource.data.text is string && request.resource.data.text.size() <= 300 &&
+                    request.resource.data.createdAt is number;
+      allow read, update, delete: if isAdmin();
     }
 
     match /sessions/{sessionId} {
@@ -245,30 +300,40 @@ service cloud.firestore {
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidPost(request.resource.data);
       allow update: if isAuthenticated() && (
         (resource.data.userId == request.auth.uid && isValidPost(request.resource.data)) ||
-        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'commentsCount']))
+        (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'commentsCount']) &&
+         request.resource.data.likes is list && onlyOwnLikeChange() &&
+         request.resource.data.commentsCount is number &&
+         math.abs(request.resource.data.commentsCount - resource.data.commentsCount) <= 1)
       );
       allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
 
       match /comments/{commentId} {
         allow read: if isAuthenticated();
-        allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+        allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid && isValidComment(request.resource.data);
         allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
       }
     }
 
     match /chats/{chatId} {
       allow read: if isAuthenticated() && request.auth.uid in resource.data.participants;
-      allow create: if isAuthenticated() && request.auth.uid in request.resource.data.participants && isValidChatThread(request.resource.data);
-      allow update: if isAuthenticated() && request.auth.uid in resource.data.participants;
+      allow create: if isAuthenticated() && request.auth.uid in request.resource.data.participants && isValidChatThread(request.resource.data) &&
+                      !peerBlockedMe(request.resource.data.participants);
+      allow update: if isAuthenticated() && request.auth.uid in resource.data.participants &&
+                      request.resource.data.participants == resource.data.participants &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessage', 'lastTimestamp', 'participantPhotos', 'participantNames', 'unreadCount']);
       
       match /messages/{messageId} {
         allow read: if isAuthenticated() && request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants;
-        allow create: if isAuthenticated() && request.auth.uid == request.resource.data.senderId;
+        allow create: if isAuthenticated() && request.auth.uid == request.resource.data.senderId &&
+                        request.auth.uid in get(/databases/$(database)/documents/chats/$(chatId)).data.participants &&
+                        request.resource.data.chatId == chatId &&
+                        request.resource.data.text is string && request.resource.data.text.size() > 0 && request.resource.data.text.size() <= 2000 &&
+                        !peerBlockedMe(get(/databases/$(database)/documents/chats/$(chatId)).data.participants);
       }
     }
 
     match /genius_lab_activities/{activityId} {
-      allow read: if isAuthenticated();
+      allow read: if isAdmin();
       allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
       allow update, delete: if isAdmin();
     }

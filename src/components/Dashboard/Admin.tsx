@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { ShieldAlert, Users, MessageSquare, Trash2, CheckCircle, Loader2, TrendingUp, Flame, Award, Calendar, DollarSign, Zap } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../lib/firebase';
-import { collection, query, orderBy, onSnapshot, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, query, orderBy, limit, onSnapshot, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { UserProfile, Review } from '../../types';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
@@ -14,7 +14,8 @@ export const Admin: React.FC = () => {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'users' | 'reviews' | 'investor_analytics'>('users');
+  const [activeTab, setActiveTab] = useState<'users' | 'reviews' | 'reports' | 'investor_analytics'>('users');
+  const [reports, setReports] = useState<any[]>([]);
 
   useEffect(() => {
     if (profile?.role !== 'admin') return;
@@ -42,10 +43,17 @@ export const Admin: React.FC = () => {
       setActivities(activitiesData);
     });
 
+    const unsubscribeReports = onSnapshot(
+      query(collection(db, 'reports'), orderBy('createdAt', 'desc'), limit(100)),
+      (snapshot) => setReports(snapshot.docs.map((d) => ({ id: d.id, ...d.data() }))),
+      (error) => console.warn('Could not load reports:', error)
+    );
+
     return () => {
       unsubscribeUsers();
       unsubscribeReviews();
       unsubscribeActivities();
+      unsubscribeReports();
     };
   }, [profile]);
 
@@ -54,6 +62,25 @@ export const Admin: React.FC = () => {
       await deleteDoc(doc(db, 'reviews', id));
     } catch (error) {
       console.error("Delete review error:", error);
+    }
+  };
+
+  const resolveReport = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'reports', id), { status: 'resolved' });
+    } catch (error) {
+      console.error('Resolve report error:', error);
+    }
+  };
+
+  // Removes the reported post or comment, then closes the report.
+  const deleteReported = async (r: any) => {
+    try {
+      if (r.targetType === 'post') await deleteDoc(doc(db, 'posts', r.targetId));
+      else if (r.targetType === 'comment' && r.postId) await deleteDoc(doc(db, 'posts', r.postId, 'comments', r.targetId));
+      await resolveReport(r.id);
+    } catch (error) {
+      console.error('Delete reported content error:', error);
     }
   };
 
@@ -185,7 +212,13 @@ export const Admin: React.FC = () => {
           >
             Reviews ({reviews.length})
           </button>
-          <button 
+          <button
+            onClick={() => setActiveTab('reports')}
+            className={`px-8 h-14 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'reports' ? 'bg-rose-600 text-white shadow-lg shadow-rose-500/20' : 'bg-[var(--input)] text-[var(--muted)]'}`}
+          >
+            Reports ({reports.filter((r) => r.status === 'open').length})
+          </button>
+          <button
             onClick={() => setActiveTab('investor_analytics')}
             className={`px-8 h-14 rounded-2xl font-black uppercase text-xs tracking-widest transition-all ${activeTab === 'investor_analytics' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-505/20' : 'bg-[var(--input)] text-[var(--muted)]'}`}
           >
@@ -227,6 +260,41 @@ export const Admin: React.FC = () => {
               </div>
             </Card>
           ))}
+        </div>
+      ) : activeTab === 'reports' ? (
+        <div className="space-y-4">
+          {reports.length === 0 ? (
+            <div className="text-center py-12 bg-white/5 border border-white/10 rounded-[2.5rem] text-[var(--muted)]">
+              <ShieldAlert className="w-12 h-12 text-indigo-500/40 mx-auto mb-3" />
+              <p className="text-sm font-semibold">No reports yet.</p>
+            </div>
+          ) : (
+            reports.map((r) => (
+              <Card key={r.id} className={`p-6 rounded-3xl border border-[var(--border)] space-y-4 ${r.status === 'resolved' ? 'opacity-60' : ''}`}>
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="px-3 py-1 rounded-full bg-rose-500/10 text-rose-500 text-xs font-black uppercase tracking-widest">{r.reason}</span>
+                  <span className="text-xs font-bold text-[var(--muted)] uppercase tracking-widest">{r.targetType}</span>
+                  <span className="text-xs text-[var(--muted)]">{new Date(r.createdAt).toLocaleString()}</span>
+                  {r.status === 'resolved' && <span className="text-xs font-black text-emerald-500 uppercase">handled</span>}
+                </div>
+                {r.text && <p className="text-sm text-[var(--text)] whitespace-pre-wrap break-words p-4 rounded-2xl bg-[var(--input)]">{r.text}</p>}
+                {r.details && <p className="text-sm text-[var(--muted)] break-words">“{r.details}”</p>}
+                <p className="text-xs text-[var(--muted)] break-all">reporter: {r.reporterId} · reported user: {r.targetUserId}</p>
+                {r.status !== 'resolved' && (
+                  <div className="flex flex-wrap gap-3">
+                    {(r.targetType === 'post' || r.targetType === 'comment') && (
+                      <Button variant="outline" size="sm" onClick={() => deleteReported(r)} className="rounded-xl border-rose-500 text-rose-500 hover:bg-rose-500 hover:text-white">
+                        Delete content
+                      </Button>
+                    )}
+                    <Button variant="outline" size="sm" onClick={() => resolveReport(r.id)} className="rounded-xl">
+                      Mark handled
+                    </Button>
+                  </div>
+                )}
+              </Card>
+            ))
+          )}
         </div>
       ) : activeTab === 'reviews' ? (
         <div className="grid grid-cols-1 gap-4">
