@@ -8,6 +8,7 @@ import { UserProfile, Review } from '../../types';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
 import { ConfirmDialog } from '../Safety/Safety';
+import { authedPost } from '../../services/http';
 
 type Tab = 'users' | 'reports' | 'reviews' | 'analytics';
 type ReportFilter = 'open' | 'resolved';
@@ -451,10 +452,12 @@ export const Admin: React.FC = () => {
               </Card>
             </div>
 
+            <VisitorFunnel tr={tr} />
+
             <Card className="p-6 md:p-8 rounded-[2rem] border border-[var(--border)] space-y-5">
               <h2 className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-indigo-400">
                 <TrendingUp className="w-4 h-4" aria-hidden="true" />
-                {tr('Student funnel', 'Воронка учеников')}
+                {tr('Student funnel (from profiles)', 'Воронка учеников (по профилям)')}
               </h2>
               <ul className="space-y-4">
                 {funnel.map((s) => (
@@ -525,5 +528,115 @@ export const Admin: React.FC = () => {
         />
       )}
     </div>
+  );
+};
+
+interface FunnelData {
+  funnel: { key: string; count: number; fromPrevious: number | null; fromFirst: number | null }[];
+  extras: Record<string, number>;
+  daily: { day: string; visits: number; signups: number }[];
+  days: number;
+  truncated: boolean;
+}
+
+/** Visitor funnel from the milestone events the app sends (server/analytics.ts). */
+const VisitorFunnel: React.FC<{ tr: (en: string, ru: string) => string }> = ({ tr }) => {
+  const [data, setData] = useState<FunnelData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    authedPost<FunnelData>('/api/admin/funnel', {})
+      .then((d) => !cancelled && setData(d))
+      .catch((e) => {
+        if (cancelled) return;
+        const code = String(e?.message || '');
+        setError(
+          code === 'ANALYTICS_UNAVAILABLE'
+            ? tr('Event analytics needs FIREBASE_SERVICE_ACCOUNT on the server.', 'Для аналитики событий нужен FIREBASE_SERVICE_ACCOUNT на сервере.')
+            : tr('Could not load the visitor funnel.', 'Не удалось загрузить воронку посетителей.')
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const labels: Record<string, string> = {
+    landing_view: tr('Visited the site', 'Зашли на сайт'),
+    signup_started: tr('Opened sign-in', 'Открыли вход'),
+    signup_completed: tr('Signed up', 'Зарегистрировались'),
+    onboarding_completed: tr('Finished onboarding', 'Прошли онбординг'),
+    activated: tr('First learning action', 'Первое учебное действие'),
+  };
+  const extraLabels: Record<string, string> = {
+    first_lab_topic: tr('Lab topic', 'Тема в Лаборатории'),
+    first_task_completed: tr('First task', 'Первое задание'),
+    first_lesson_completed: tr('First lesson', 'Первый урок'),
+    referral_claimed: tr('Invite used', 'Приглашение применено'),
+    parent_linked: tr('Parent connected', 'Родитель подключён'),
+  };
+
+  const max = data ? Math.max(1, ...data.daily.map((d) => d.visits)) : 1;
+
+  return (
+    <Card className="p-6 md:p-8 rounded-[2rem] border border-[var(--border)] space-y-5">
+      <h2 className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-indigo-400">
+        <TrendingUp className="w-4 h-4" aria-hidden="true" />
+        {tr('Visitor funnel', 'Воронка посетителей')}{data ? ` · ${data.days} ${tr('days', 'дн.')}` : ''}
+      </h2>
+
+      {error ? (
+        <p role="alert" className="text-sm font-semibold text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">{error}</p>
+      ) : !data ? (
+        <Loader2 className="w-6 h-6 animate-spin text-indigo-500" aria-label={tr('Loading', 'Загрузка')} />
+      ) : (
+        <>
+          <ul className="space-y-4">
+            {data.funnel.map((s) => (
+              <li key={s.key} className="space-y-1.5">
+                <div className="flex justify-between gap-3 text-sm">
+                  <span className="font-bold text-[var(--text)]">{labels[s.key] ?? s.key}</span>
+                  <span className="text-[var(--muted)] text-right">
+                    {s.count}
+                    {s.fromPrevious !== null && <> · {s.fromPrevious}% {tr('of previous', 'от прошлого шага')}</>}
+                  </span>
+                </div>
+                <div className="h-2 rounded-full bg-[var(--input)] overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-emerald-500 to-indigo-500 rounded-full" style={{ width: `${s.fromFirst ?? 100}%` }} />
+                </div>
+              </li>
+            ))}
+          </ul>
+
+          <dl className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            {Object.entries(data.extras).map(([key, value]) => (
+              <div key={key} className="p-3 rounded-2xl bg-[var(--input)]">
+                <dt className="text-xs font-black uppercase tracking-wider text-[var(--muted)]">{extraLabels[key] ?? key}</dt>
+                <dd className="mt-1 text-lg font-black text-[var(--text)]">{value}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <div className="space-y-2">
+            <h3 className="text-xs font-black uppercase tracking-wider text-[var(--muted)]">{tr('Visits and sign-ups per day', 'Визиты и регистрации по дням')}</h3>
+            <div className="flex items-end gap-1 h-24" role="img" aria-label={tr('Daily visits and sign-ups', 'Визиты и регистрации по дням')}>
+              {data.daily.map((d) => (
+                <div key={d.day} className="flex-1 h-full flex flex-col justify-end" title={`${d.day}: ${d.visits} / ${d.signups}`}>
+                  <div className="w-full rounded-t bg-indigo-500/40 flex flex-col justify-end" style={{ height: `${(d.visits / max) * 100}%` }}>
+                    <div className="w-full rounded-t bg-emerald-500" style={{ height: d.visits ? `${Math.min(100, (d.signups / d.visits) * 100)}%` : 0 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-[var(--muted)]">
+              {tr('Counts are per device, not per person. Indigo: visits, green: sign-ups.', 'Считается по устройствам, а не по людям. Фиолетовый: визиты, зелёный: регистрации.')}
+              {data.truncated && ' ' + tr('Showing the latest 50,000 events only.', 'Показаны только последние 50 000 событий.')}
+            </p>
+          </div>
+        </>
+      )}
+    </Card>
   );
 };

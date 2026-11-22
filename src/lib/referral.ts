@@ -1,4 +1,5 @@
 import { authedPost } from "../services/http";
+import { track } from "./analytics";
 
 const KEY = "tf_ref";
 const CODE = /^[A-Za-z0-9]{6,12}$/;
@@ -35,6 +36,7 @@ export async function claimPendingReferral(ownUid: string): Promise<void> {
   }
   try {
     await authedPost("/api/referral/claim", { ref: code });
+    track("referral_claimed");
   } catch (err: any) {
     const reason = String(err?.message || "");
     if (reason === "REFERRAL_UNAVAILABLE" || /Server Error|Failed to fetch|AUTH_/.test(reason)) return;

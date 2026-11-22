@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { track } from '../../lib/analytics';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Mail, Lock, User, Loader2, ArrowRight, ShieldCheck, Sparkles, Zap } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
@@ -21,6 +22,9 @@ declare global {
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const { signIn, signUp, signInWithGoogle } = useAuth();
+  useEffect(() => {
+    if (isOpen) track('signup_started');
+  }, [isOpen]);
   const { t, language } = useLanguage();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);

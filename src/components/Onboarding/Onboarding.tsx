@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ArrowRight, ArrowLeft, Check, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { track } from '../../lib/analytics';
 import { INTERESTS } from '../../constants';
 import type { Language } from '../../types';
 
@@ -128,6 +129,7 @@ export const Onboarding: React.FC<OnboardingProps> = ({ onDone }) => {
           ? { studentClass, age, interests, goal, language, onboarded: true }
           : { language, onboarded: true }
       );
+      track('onboarding_completed');
       onDone();
     } catch {
       setError(c.error);

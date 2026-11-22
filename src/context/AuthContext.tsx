@@ -19,6 +19,7 @@ import {
 import { auth, db, googleProvider } from '../lib/firebase';
 import { UserProfile, Language } from '../types';
 import { captureReferral, claimPendingReferral } from '../lib/referral';
+import { track } from '../lib/analytics';
 
 const DEMO_UID = 'demo-uid-123';
 
@@ -154,6 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       };
       
       await setDoc(doc(db, 'users', newUser.uid), profileData);
+      track('signup_completed', { method: 'email' });
     } catch (error) {
       console.error("Sign-Up Error:", error);
       throw error;
@@ -252,7 +254,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             explanationStyle: 'Metaphorical'
           };
           
-          setDoc(userDocRef, newUser).catch(err => {
+          setDoc(userDocRef, newUser).then(() => track('signup_completed', { method: 'google' })).catch(err => {
             console.warn("Could not create initial profile in Firestore:", err);
           });
           

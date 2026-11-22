@@ -2,6 +2,7 @@ import express, { Router, type Request, type Response, type NextFunction } from 
 import { GoogleGenAI, Type } from "@google/genai";
 import { FieldPath, FieldValue } from "firebase-admin/firestore";
 import { accountCreatedAt, adminDb, hasAdminDb, verifyIdToken } from "./firebaseAdmin.js";
+import { cleanEvent, computeFunnel, recordEvent, type StoredEvent } from "./analytics.js";
 import { FamilyError, createCode, linkWithCode, listChildren, listParents, unlink, type Db } from "./family.js";
 
 /**
@@ -481,6 +482,54 @@ Write "feedback" in one short sentence.`;
   router.post("/api/family/unlink", requireAuth, rateLimit, async (req, res) => {
     await unlink(familyDb(), (req as any).uid, req.body?.childUid, req.body?.parentUid);
     res.json({ ok: true });
+  });
+
+  // ---------- funnel analytics (see server/analytics.ts) ----------
+
+  // Open to visitors who are not signed in yet, so it is limited per IP and never reports errors.
+  const trackHits = new Map<string, number[]>();
+  const TRACK_MAX_PER_MINUTE = 60;
+  router.post("/api/track", async (req, res) => {
+    try {
+      const ip = String(req.headers["x-forwarded-for"] || req.ip || "unknown").split(",")[0].trim();
+      const now = Date.now();
+      const recent = (trackHits.get(ip) || []).filter((t) => now - t < RATE_WINDOW_MS);
+      if (recent.length >= TRACK_MAX_PER_MINUTE) return res.status(204).end();
+      recent.push(now);
+      trackHits.set(ip, recent);
+      if (trackHits.size > 5000) {
+        for (const [key, times] of trackHits) if (!times.some((t) => now - t < RATE_WINDOW_MS)) trackHits.delete(key);
+      }
+
+      const event = cleanEvent(req.body);
+      const db = adminDb();
+      if (event && db) {
+        let uid: string | null = null;
+        const token = /^Bearer (.+)$/.exec(req.headers.authorization || "");
+        if (token) uid = await verifyIdToken(token[1]).then((d) => d.uid).catch(() => null);
+        await recordEvent(db as unknown as Db, event, uid);
+      }
+    } catch (error) {
+      console.warn("[ANALYTICS] event dropped:", error);
+    }
+    res.status(204).end();
+  });
+
+  router.post("/api/admin/funnel", requireAuth, rateLimit, async (req, res) => {
+    const db = adminDb();
+    if (!db) throw new HttpError(503, "ANALYTICS_UNAVAILABLE");
+    const me = await db.doc(`users/${(req as any).uid}`).get();
+    if (me.data()?.role !== "admin") throw new HttpError(403, "FORBIDDEN");
+
+    const days = 14;
+    const now = Date.now();
+    const snapshot = await db
+      .collection("analytics_events")
+      .where("ts", ">=", now - days * 86_400_000)
+      .limit(50_000)
+      .get();
+    const events = snapshot.docs.map((d) => d.data() as StoredEvent);
+    res.json({ ...computeFunnel(events, now, days), days, truncated: snapshot.size >= 50_000 });
   });
 
   // Errors from async handlers: Express 5 forwards rejected promises here.

@@ -11,6 +11,7 @@ import { Button } from '../UI/Button';
 import { Chat } from './Chat';
 import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
+import { track } from '../../lib/analytics';
 
 const presetTemplates = [
   {
@@ -298,6 +299,7 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
       if (generatedTree && Array.isArray(generatedTree.nodes) && generatedTree.nodes.length > 0) {
         setTree(generatedTree);
         setSelectedNode(generatedTree.nodes[0]);
+        track('first_lab_topic');
         addXPAction(25);
         await logActivity();
       } else {
