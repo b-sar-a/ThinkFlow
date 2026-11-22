@@ -103,7 +103,7 @@ const App: React.FC = () => {
       case 'messages': return <Messages />;
       case 'tasks': return <Tasks />;
       case 'leaderboard': return <PromoHub />;
-      case 'articles': return <Articles />;
+      case 'articles': return <Articles onNavigate={setCurrentView} />;
       case 'tips': return <Tips />;
       case 'reviews': return <Reviews />;
       case 'profile': return <ProfileEditor />;

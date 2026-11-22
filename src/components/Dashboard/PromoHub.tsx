@@ -1,300 +1,308 @@
 import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Gift, Copy, Check, Sparkles, Award, Star, Share2, Zap } from 'lucide-react';
+import { Gift, Copy, Check, Share2, Zap, Users, Loader2 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Button } from '../UI/Button';
 import { Card } from '../UI/Card';
 import { authedPost } from '../../services/http';
 
+const LAUNCH_CODES = ['STARTAI', 'LEARNFLOW'];
+const MAX_REWARDED_INVITES = 20;
+const BONUS = 1000;
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // Clipboard API can be blocked (insecure context, iframe): let the user copy by hand.
+    window.prompt('Ctrl+C', text);
+    return false;
+  }
+}
+
 export const PromoHub: React.FC = () => {
   const { profile } = useAuth();
-  const { t } = useLanguage();
+  const { language } = useLanguage();
+  const tr = (en: string, ru: string, uz: string) => (language === 'ru' ? ru : language === 'uz' ? uz : en);
+
   const [promoCode, setPromoCode] = useState('');
   const [promoError, setPromoError] = useState<string | null>(null);
   const [promoSuccess, setPromoSuccess] = useState<string | null>(null);
-  const [isCopyingLink, setIsCopyingLink] = useState(false);
-  const [isCopyingText, setIsCopyingText] = useState(false);
-  
+  const [isApplying, setIsApplying] = useState(false);
+  const [copied, setCopied] = useState<'link' | 'text' | null>(null);
+
   const handleApplyPromo = async (e: React.FormEvent) => {
     e.preventDefault();
     setPromoError(null);
     setPromoSuccess(null);
 
     const code = promoCode.trim().toUpperCase();
-    if (!code || !profile) return;
+    if (!code || !profile || isApplying) return;
 
-    const lang = profile.language;
-    const pick = (ru: string, uz: string, en: string) => (lang === 'ru' ? ru : lang === 'uz' ? uz : en);
-
+    setIsApplying(true);
     try {
       const { added } = await authedPost<{ added: number }>('/api/promo/redeem', { code });
       const amount = added.toLocaleString();
-      setPromoSuccess(pick(
-        `Промокод активирован! +${amount} токенов ИИ добавлены к квоте!`,
-        `Promo kod faollashtirildi! Kvotangizga +${amount} AI token qo'shildi!`,
-        `Code applied! +${amount} AI tokens added to your quota!`
+      setPromoSuccess(tr(
+        `Code applied! +${amount} AI tokens added to your quota.`,
+        `Промокод активирован! +${amount} токенов ИИ добавлено к квоте.`,
+        `Promo kod faollashtirildi! Kvotangizga +${amount} AI token qo'shildi.`
       ));
       setPromoCode('');
     } catch (err: any) {
       const reason = String(err?.message || '');
       if (reason === 'ALREADY_CLAIMED') {
-        setPromoError(pick('Вы уже активировали этот промокод!', 'Bu promo kod allaqachon ishlatilgan!', 'You have already claimed this promo code!'));
+        setPromoError(tr('You have already used this code.', 'Вы уже активировали этот промокод.', 'Bu promo kod allaqachon ishlatilgan.'));
       } else if (reason === 'INVALID_CODE') {
-        setPromoError(pick('Неверный промокод или срок действия истек', "Promo kod noto'g'ri yoki muddati tugagan", 'Invalid promo code or expired'));
+        setPromoError(tr('Invalid code, or it has expired.', 'Неверный промокод или срок действия истёк.', "Promo kod noto'g'ri yoki muddati tugagan."));
       } else if (reason === 'PROMO_UNAVAILABLE') {
-        setPromoError(pick('Промокоды временно недоступны.', 'Promo kodlar vaqtincha mavjud emas.', 'Promo codes are temporarily unavailable.'));
+        setPromoError(tr('Promo codes are temporarily unavailable.', 'Промокоды временно недоступны.', 'Promo kodlar vaqtincha mavjud emas.'));
       } else {
-        setPromoError(pick('Не удалось активировать код. Попробуйте еще раз.', "Kodni faollashtirib bo'lmadi. Qayta urinib ko'ring.", 'Failed to apply code. Try again.'));
+        setPromoError(tr('Could not apply the code. Try again.', 'Не удалось активировать код. Попробуйте ещё раз.', "Kodni faollashtirib bo'lmadi. Qayta urinib ko'ring."));
       }
+    } finally {
+      setIsApplying(false);
     }
   };
 
   // Invite code = first 8 characters of the user id; the server credits both sides once.
   const referralUrl = `${window.location.origin}/?ref=${profile?.uid?.slice(0, 8) ?? ''}`;
   const invited = profile?.referralCount ?? 0;
-  
-  const referralShareTextEn = `Unlock your academic genius with ThinkFlow AI! Use my invite link to get +1,000 AI tokens when you join: ${referralUrl}`;
-  const referralShareTextRu = `Активируй свой учебный интеллект с ИИ-помощником ThinkFlow! Переходи по моей ссылке и получи +1 000 токенов ИИ при регистрации: ${referralUrl}`;
+  const shareText = tr(
+    `Learn with ThinkFlow AI! Join with my link and get +${BONUS.toLocaleString()} AI tokens: ${referralUrl}`,
+    `Учусь с ИИ-помощником ThinkFlow! Зарегистрируйся по моей ссылке и получи +${BONUS.toLocaleString()} токенов ИИ: ${referralUrl}`,
+    `ThinkFlow AI bilan o'rganaman! Mening havolam orqali qo'shil va +${BONUS.toLocaleString()} AI token ol: ${referralUrl}`
+  );
+  const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
 
-  const copyReferralLink = () => {
-    setIsCopyingLink(true);
-    navigator.clipboard.writeText(referralUrl);
-    setTimeout(() => setIsCopyingLink(false), 2000);
+  const flash = (what: 'link' | 'text') => {
+    setCopied(what);
+    setTimeout(() => setCopied(null), 2000);
   };
 
-  const copyReferralText = () => {
-    setIsCopyingText(true);
-    const text = profile?.language === 'ru' ? referralShareTextRu : referralShareTextEn;
-    navigator.clipboard.writeText(text);
-    setTimeout(() => setIsCopyingText(false), 2000);
+  const copyLink = async () => {
+    if (await copyText(referralUrl)) flash('link');
+  };
+  const copyMessage = async () => {
+    if (await copyText(shareText)) flash('text');
+  };
+  const share = async () => {
+    try {
+      await navigator.share({ title: 'ThinkFlow', text: shareText });
+    } catch {
+      /* the person closed the share sheet */
+    }
   };
 
-  const currentThemeText = (uk: string, ru: string) => {
-    return profile?.language === 'ru' ? ru : uk;
-  };
+  const progressPct = Math.min(100, (invited / MAX_REWARDED_INVITES) * 100);
 
   return (
-    <div className="space-y-8 py-4 animate-in fade-in duration-500">
-      {/* Header Container */}
-      <div className="p-8 md:p-12 rounded-[2.5rem] bg-gradient-to-r from-indigo-950/40 via-purple-950/20 to-[var(--card)] border border-indigo-500/10 relative overflow-hidden shadow-2xl">
+    <div className="max-w-5xl mx-auto space-y-8 py-4 animate-in fade-in duration-500">
+      <div className="p-6 md:p-12 rounded-[2.5rem] bg-gradient-to-r from-indigo-950/40 via-purple-950/20 to-[var(--card)] border border-indigo-500/10 relative overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-500/10 blur-[150px] rounded-full pointer-events-none" />
-        
+
         <div className="max-w-3xl space-y-4 relative z-10">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-wider">
-            <Gift className="w-3.5 h-3.5 text-indigo-400" />
-            {currentThemeText("Rewards & Referral Hub", "Центр наград и рефералов")}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-black uppercase tracking-wider">
+            <Gift className="w-3.5 h-3.5" aria-hidden="true" />
+            {tr('Bonuses', 'Бонусы', 'Bonuslar')}
           </div>
-          
-          <h1 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-white italic leading-tight">
-            {currentThemeText("Spread the Flow, Get ", "Делись знаниями, получай ")}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-amber-400 drop-shadow-sm font-black">
-              {currentThemeText("More AI Tokens", "ИИ Токены")}
+
+          <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)] italic leading-tight">
+            {tr('Invite friends, get ', 'Зови друзей, получай ', "Do'stlarni taklif qil, ")}
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-amber-400 font-black">
+              {tr('more AI tokens', 'больше токенов ИИ', 'ko‘proq AI token ol')}
             </span>
           </h1>
-          
-          <p className="text-sm md:text-base text-gray-400 font-medium max-w-2xl leading-relaxed">
-            {currentThemeText(
-              "Help us improve educational accessibility for everyone! Invite friends to ThinkFlow and claim token quota bonuses. Discover hidden launch promo codes across our channels to unlock extra intelligence limits.",
-              "Помогите нам сделать качественное образование доступным каждому! Приглашайте друзей в ThinkFlow и расширяйте квоты использования ИИ. Находите купоны в наших сообществах, чтобы получить дополнительный объём умной памяти."
+
+          <p className="text-sm md:text-base text-[var(--muted)] font-medium max-w-2xl leading-relaxed">
+            {tr(
+              'Tokens are your daily AI quota. Invite a friend or enter a launch code to get more.',
+              'Токены — это ваша квота ИИ. Пригласите друга или введите стартовый код, чтобы получить больше.',
+              "Tokenlar — sizning AI kvotangiz. Do'stingizni taklif qiling yoki start kodini kiriting."
             )}
           </p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Referral Box */}
-        <Card className="p-6 md:p-8 rounded-[2rem] border-white/5 bg-white/[0.02] flex flex-col justify-between space-y-6 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/5 blur-[50px] rounded-full" />
-          
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
-                <Share2 className="w-5 h-5" />
-              </div>
-              <div>
-                <h3 className="font-black text-white uppercase tracking-tighter text-base leading-none">
-                  {currentThemeText("Invite your Friends", "Пригласить друзей")}
-                </h3>
-                <span className="text-[10px] text-indigo-400 font-black uppercase tracking-widest block mt-1">{currentThemeText("Get +1,000 tokens for each friend", "+1 000 токенов за каждого друга")}</span>
-              </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+        <Card className="p-6 md:p-8 rounded-[2rem] flex flex-col gap-6 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-40 h-40 bg-indigo-500/5 blur-[50px] rounded-full pointer-events-none" />
+
+          <div className="flex items-center gap-3 relative">
+            <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 shrink-0">
+              <Share2 className="w-5 h-5" aria-hidden="true" />
             </div>
-
-            <p className="text-xs text-gray-400 leading-relaxed">
-              {currentThemeText(
-                "When a friend signs up with your link, you both get +1,000 AI tokens. Friends must be new accounts, and up to 20 invites pay out.",
-                "Когда друг регистрируется по твоей ссылке, вы оба получаете +1 000 токенов ИИ. Друг должен быть новым пользователем; награда выплачивается за первые 20 приглашений."
-              )}
-            </p>
-            {invited > 0 && (
-              <p className="text-xs font-black uppercase tracking-widest text-emerald-400">
-                {currentThemeText(`Friends joined: ${invited}`, `Присоединилось друзей: ${invited}`)}
-              </p>
-            )}
-
-            <div className="space-y-2 pt-2">
-              <label className="text-[9px] font-black uppercase text-gray-500 tracking-wider block">Your Invite URL</label>
-              <div className="flex gap-2">
-                <input 
-                  type="text" 
-                  readOnly 
-                  value={referralUrl}
-                  className="flex-1 min-w-0 px-4 h-12 bg-white/5 border border-white/5 rounded-2xl text-xs text-indigo-300 focus:outline-none"
-                />
-                <Button 
-                  onClick={copyReferralLink}
-                  className="h-12 w-12 bg-indigo-600 hover:bg-indigo-500 shrink-0 border-none rounded-2xl p-0 flex items-center justify-center"
-                >
-                  {isCopyingLink ? <Check className="w-4 h-4 text-white" /> : <Copy className="w-4 h-4 text-white" />}
-                </Button>
-              </div>
+            <div>
+              <h2 className="font-black text-[var(--text)] uppercase tracking-tight text-base leading-tight">
+                {tr('Invite friends', 'Пригласить друзей', "Do'stlarni taklif qilish")}
+              </h2>
+              <span className="text-xs text-indigo-400 font-black uppercase tracking-wider block mt-1">
+                {tr(`+${BONUS.toLocaleString()} tokens for you and your friend`, `+${BONUS.toLocaleString()} токенов вам и другу`, `+${BONUS.toLocaleString()} token sizga va do'stingizga`)}
+              </span>
             </div>
           </div>
 
-          <Button 
-            onClick={copyReferralText}
-            variant="ghost" 
-            className="w-full h-11 border border-white/5 hover:border-indigo-500/20 hover:bg-indigo-500/10 text-xs text-gray-300 font-bold rounded-2xl uppercase tracking-wider"
-          >
-            {isCopyingText ? (
-              <span className="flex items-center gap-2 justify-center text-emerald-400">
-                <Check className="w-3.5 h-3.5" />
-                {currentThemeText("Copied! Share with friends", "Готово! Отправь друзьям")}
-              </span>
-            ) : (
-              currentThemeText("Copy Ready-to-Send Post", "Скопировать текст приглашения")
+          <p className="text-sm text-[var(--muted)] leading-relaxed relative">
+            {tr(
+              `When a friend signs up with your link, you both get +${BONUS.toLocaleString()} tokens. The friend must be a new user. The first ${MAX_REWARDED_INVITES} invites pay out.`,
+              `Когда друг регистрируется по вашей ссылке, вы оба получаете +${BONUS.toLocaleString()} токенов. Друг должен быть новым пользователем. Награда выплачивается за первые ${MAX_REWARDED_INVITES} приглашений.`,
+              `Do'stingiz havolangiz orqali ro'yxatdan o'tsa, ikkalangiz +${BONUS.toLocaleString()} token olasiz. Do'st yangi foydalanuvchi bo'lishi kerak. Birinchi ${MAX_REWARDED_INVITES} ta taklif uchun mukofot beriladi.`
             )}
-          </Button>
+          </p>
+
+          <div className="space-y-2 relative">
+            <div className="flex items-center justify-between text-xs font-black uppercase tracking-wider">
+              <span className="flex items-center gap-1.5 text-[var(--muted)]">
+                <Users className="w-3.5 h-3.5" aria-hidden="true" />
+                {tr('Friends joined', 'Присоединилось друзей', "Qo'shilgan do'stlar")}
+              </span>
+              <span className="text-[var(--text)]">{invited} / {MAX_REWARDED_INVITES}</span>
+            </div>
+            <div
+              className="h-2 rounded-full bg-[var(--input)] overflow-hidden"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={MAX_REWARDED_INVITES}
+              aria-valuenow={Math.min(invited, MAX_REWARDED_INVITES)}
+              aria-label={tr('Friends joined', 'Присоединилось друзей', "Qo'shilgan do'stlar")}
+            >
+              <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all" style={{ width: `${progressPct}%` }} />
+            </div>
+          </div>
+
+          <div className="space-y-2 relative">
+            <label htmlFor="invite-url" className="text-xs font-black uppercase text-[var(--muted)] tracking-wider block">
+              {tr('Your invite link', 'Ваша ссылка-приглашение', 'Sizning taklif havolangiz')}
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="invite-url"
+                type="text"
+                readOnly
+                value={referralUrl}
+                onFocus={(e) => e.currentTarget.select()}
+                className="flex-1 min-w-0 px-4 h-12 bg-[var(--input)] border border-[var(--border)] rounded-2xl text-sm text-indigo-400 focus:outline-none focus:border-indigo-500"
+              />
+              <Button
+                onClick={copyLink}
+                aria-label={tr('Copy link', 'Скопировать ссылку', 'Havolani nusxalash')}
+                className="h-12 w-12 bg-indigo-600 hover:bg-indigo-500 shrink-0 border-none rounded-2xl p-0 flex items-center justify-center"
+              >
+                {copied === 'link' ? <Check className="w-4 h-4 text-white" /> : <Copy className="w-4 h-4 text-white" />}
+              </Button>
+            </div>
+            <span role="status" className="block h-4 text-xs font-bold text-emerald-500">
+              {copied === 'link' ? tr('Link copied', 'Ссылка скопирована', 'Havola nusxalandi') : ''}
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 relative">
+            <Button
+              onClick={copyMessage}
+              variant="outline"
+              className="flex-1 h-12 rounded-2xl text-xs font-black uppercase tracking-wider"
+            >
+              {copied === 'text'
+                ? (
+                  <span className="flex items-center gap-2 justify-center text-emerald-500">
+                    <Check className="w-4 h-4" /> {tr('Copied', 'Скопировано', 'Nusxalandi')}
+                  </span>
+                )
+                : tr('Copy invite message', 'Скопировать приглашение', 'Taklifni nusxalash')}
+            </Button>
+            {canShare && (
+              <Button onClick={share} className="flex-1 h-12 rounded-2xl text-xs font-black uppercase tracking-wider bg-indigo-600 hover:bg-indigo-500 border-none">
+                <Share2 className="w-4 h-4 mr-2" aria-hidden="true" />
+                {tr('Share', 'Поделиться', 'Ulashish')}
+              </Button>
+            )}
+          </div>
         </Card>
 
-        {/* Promo Codes claim */}
-        <Card className="p-6 md:p-8 rounded-[2rem] border-white/5 bg-white/[0.02] flex flex-col justify-between space-y-6 relative overflow-hidden">
-          <div className="absolute bottom-0 left-0 w-40 h-40 bg-purple-500/5 blur-[50px] rounded-full" />
-          
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400">
-                <Zap className="w-5 h-5 fill-current" />
-              </div>
-              <div>
-                <h3 className="font-black text-white uppercase tracking-tighter text-base leading-none">
-                  {currentThemeText("Activate Promo Codes", "Активация промокодов")}
-                </h3>
-                <span className="text-[10px] text-purple-400 font-black uppercase tracking-widest block mt-1">Discover hidden community benefits</span>
-              </div>
+        <Card className="p-6 md:p-8 rounded-[2rem] flex flex-col gap-6 relative overflow-hidden">
+          <div className="absolute bottom-0 left-0 w-40 h-40 bg-purple-500/5 blur-[50px] rounded-full pointer-events-none" />
+
+          <div className="flex items-center gap-3 relative">
+            <div className="w-11 h-11 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 shrink-0">
+              <Zap className="w-5 h-5 fill-current" aria-hidden="true" />
+            </div>
+            <div>
+              <h2 className="font-black text-[var(--text)] uppercase tracking-tight text-base leading-tight">
+                {tr('Promo code', 'Промокод', 'Promo kod')}
+              </h2>
+              <span className="text-xs text-purple-400 font-black uppercase tracking-wider block mt-1">
+                {tr('One use per account', 'Один раз на аккаунт', 'Har bir akkauntga bir marta')}
+              </span>
+            </div>
+          </div>
+
+          <p className="text-sm text-[var(--muted)] leading-relaxed relative">
+            {tr(
+              'Got a code from a teacher, a class chat or our channels? Enter it to add tokens to your quota right away.',
+              'Получили код от учителя, из чата класса или наших каналов? Введите его, и токены сразу добавятся к квоте.',
+              "O'qituvchi, sinf chati yoki kanallarimizdan kod oldingizmi? Kiriting, tokenlar kvotangizga darhol qo'shiladi."
+            )}
+          </p>
+
+          <form onSubmit={handleApplyPromo} className="space-y-3 relative">
+            <label htmlFor="promo-code" className="text-xs font-black uppercase text-[var(--muted)] tracking-wider block">
+              {tr('Enter code', 'Введите код', 'Kodni kiriting')}
+            </label>
+            <div className="flex gap-2">
+              <input
+                id="promo-code"
+                type="text"
+                autoComplete="off"
+                autoCapitalize="characters"
+                spellCheck={false}
+                placeholder="STARTAI"
+                value={promoCode}
+                onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                className="flex-1 min-w-0 px-4 h-12 bg-[var(--input)] border border-[var(--border)] rounded-2xl text-sm text-[var(--text)] placeholder:text-[var(--muted)] placeholder:opacity-60 focus:border-purple-500 focus:outline-none font-mono tracking-wider"
+              />
+              <Button
+                type="submit"
+                disabled={!promoCode.trim() || isApplying}
+                className="h-12 px-6 bg-purple-600 hover:bg-purple-500 shrink-0 border-none rounded-2xl font-black uppercase text-xs tracking-wider disabled:opacity-50"
+              >
+                {isApplying ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : tr('Apply', 'Применить', 'Qo‘llash')}
+              </Button>
             </div>
 
-            <p className="text-xs text-gray-400 leading-relaxed">
-              {currentThemeText(
-                "Keep an eye out on physical posters, class bulletins, and social forums. Enter keys here to boost your threshold instantly.",
-                "Следите за объявлениями, чатами групп и конкурсами! Вводите секретные слова и коды в форму ниже, чтобы мгновенно подпитать квоту вашего ИИ."
-              )}
-            </p>
-
-            <form onSubmit={handleApplyPromo} className="space-y-3 pt-2">
-              <div>
-                <label className="text-[9px] font-black uppercase text-gray-500 tracking-wider block mb-1.5">Enter Coupon / Code</label>
-                <div className="flex gap-2">
-                  <input 
-                    type="text" 
-                    placeholder="e.g. STARTAI"
-                    value={promoCode}
-                    onChange={(e) => setPromoCode(e.target.value)}
-                    className="flex-1 min-w-0 px-4 h-12 bg-white/5 border border-white/5 rounded-2xl text-xs text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none uppercase"
-                  />
-                  <Button 
-                    type="submit"
-                    className="h-12 px-6 bg-purple-600 hover:bg-purple-500 shrink-0 border-none rounded-2xl font-black uppercase text-[10px] tracking-widest"
-                  >
-                    {currentThemeText("CLAIM", "ВВОД")}
-                  </Button>
-                </div>
-              </div>
-
+            <div role="status" aria-live="polite">
               {promoError && (
-                <div className="text-[10px] font-bold text-rose-500 uppercase tracking-wide bg-rose-500/10 p-2.5 rounded-xl border border-rose-500/10">
+                <div role="alert" className="text-sm font-semibold text-rose-500 bg-rose-500/10 p-3 rounded-xl border border-rose-500/20">
                   {promoError}
                 </div>
               )}
-
               {promoSuccess && (
-                <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wide bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/10">
+                <div className="text-sm font-semibold text-emerald-500 bg-emerald-500/10 p-3 rounded-xl border border-emerald-500/20">
                   {promoSuccess}
                 </div>
               )}
-            </form>
-          </div>
+            </div>
+          </form>
 
-          <div className="p-3.5 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 text-[10px] text-gray-400 space-y-1">
-            <span className="font-black text-white uppercase block">{currentThemeText("⭐ Try these launch coupon codes:", "⭐ Попробуйте эти стартовые промокоды:")}</span>
-            <div className="flex flex-wrap gap-2 pt-1.5">
-              <span className="font-mono bg-white/5 border border-white/5 text-indigo-400 px-2 py-0.5 rounded text-[10px]">STARTAI</span>
-              <span className="font-mono bg-white/5 border border-white/5 text-indigo-400 px-2 py-0.5 rounded text-[10px]">LEARNFLOW</span>
+          <div className="mt-auto p-4 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 space-y-2 relative">
+            <span className="text-xs font-black text-[var(--text)] uppercase tracking-wider block">
+              {tr('Launch codes', 'Стартовые коды', 'Start kodlari')}
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {LAUNCH_CODES.map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setPromoCode(code)}
+                  className="font-mono bg-[var(--input)] border border-[var(--border)] hover:border-indigo-500/50 text-indigo-400 px-3 h-9 rounded-xl text-xs font-bold tracking-wider transition-colors"
+                >
+                  {code}
+                </button>
+              ))}
             </div>
           </div>
         </Card>
       </div>
-
-      {/* Brand Ambassador Quests */}
-      <Card className="p-6 md:p-8 rounded-[2.5rem] border-white/5 bg-white/[0.01] space-y-6">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500">
-              <Award className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-black text-white uppercase tracking-tighter text-base leading-none">
-                {currentThemeText("Ambassador Missions", "Миссии Амбассадора")}
-              </h3>
-              <span className="text-[10px] text-amber-500 font-black uppercase tracking-widest block mt-1">Unlock high performance thresholds</span>
-            </div>
-          </div>
-          <span className="bg-amber-500 text-black text-[9px] font-black px-2 py-0.5 rounded-full uppercase scale-95">{currentThemeText("NEW", "НОВОЕ")}</span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {[
-            {
-              titleEn: "Vocal Supporter",
-              titleRu: "Голос Проекта",
-              descEn: "Write a high-quality review in your group or blog explaining your learning experience.",
-              descRu: "Напишите честный отзыв в вашей группе, блоге или соцсетях, рассказав, как вы учитесь с ИИ.",
-              reward: "+3,000 Tokens",
-              actionEn: "Check Quest",
-              actionRu: "Начать квест",
-            },
-            {
-              titleEn: "Knowledge Mapper",
-              titleRu: "Исследователь тем",
-              descEn: "Spawn more than 10 master knowledge map clusters in Genius Lab.",
-              descRu: "Создайте более 10 разветвленных карт знаний по сложным наукам в Genius Lab.",
-              reward: "+5,000 Tokens",
-              actionEn: "Achieve Lab Level",
-              actionRu: "Перейти в Лабораторию",
-            },
-            {
-              titleEn: "Super Educator",
-              titleRu: "Супер Наставник",
-              descEn: "Assist other users by answering their queries in the public messages.",
-              descRu: "Помогите другим пользователям, отвечая на вопросы и делясь метафорами в сообщениях.",
-              reward: "+4,000 Tokens",
-              actionEn: "Help Community",
-              actionRu: "Помочь сообществу",
-            }
-          ].map((m, idx) => (
-            <div key={idx} className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3 hover:translate-y-[-2px] transition-transform">
-              <div className="flex justify-between items-start gap-2">
-                <span className="font-black text-xs text-white uppercase tracking-wider">{currentThemeText(m.titleEn, m.titleRu)}</span>
-                <span className="text-[9px] font-black text-amber-400 shrink-0">{m.reward}</span>
-              </div>
-              <p className="text-[10px] text-gray-400 leading-normal">{currentThemeText(m.descEn, m.descRu)}</p>
-              <button className="text-[9px] font-black uppercase text-indigo-400 hover:text-indigo-300 tracking-wider">
-                {currentThemeText(m.actionEn, m.actionRu)} &rarr;
-              </button>
-            </div>
-          ))}
-        </div>
-      </Card>
     </div>
   );
 };

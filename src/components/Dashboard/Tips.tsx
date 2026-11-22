@@ -1,16 +1,42 @@
-
-import React from 'react';
-import { Lightbulb, Clock, BookOpen, CheckCircle2, ArrowRight, Star, Target, Zap, FileText, BarChart3, Quote, Sparkles, Users, Brain } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Lightbulb, Clock, BookOpen, CheckCircle2, Star, Target, Zap, FileText, BarChart3, Quote, Sparkles, Users, Brain, Check } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../UI/Card';
 
+type TabId = 'sat' | 'ielts' | 'gen';
+const TRIED_KEY = 'tf_tips_tried';
+
+const readTried = (): string[] => {
+  try {
+    const raw = localStorage.getItem(TRIED_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string') : [];
+  } catch {
+    return [];
+  }
+};
+
 export const Tips: React.FC = () => {
   const { t, language } = useLanguage();
+  const tr = (en: string, ru: string, uz: string) => (language === 'ru' ? ru : language === 'uz' ? uz : en);
+  const [tab, setTab] = useState<TabId>('sat');
+  const [tried, setTried] = useState<string[]>(readTried);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(TRIED_KEY, JSON.stringify(tried));
+    } catch {
+      /* storage blocked: progress just is not remembered */
+    }
+  }, [tried]);
+
+  const toggleTried = (id: string) =>
+    setTried((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
 
   const satTips = language === 'ru' ? [
     { title: "Техника Фейнмана", desc: "Объясните сложную задачу SAT 10-летнему ребенку. Если вы не можете — вы не понимаете ее до конца.", icon: Brain },
     { title: "Интервальные повторения", desc: "Не зубрите всё сразу. Повторяйте сложные правила через 1, 3 и 7 дней для вечного запоминания.", icon: Zap },
-    { title: "Активное вспоминание", desc: "Вместо чтения конспектов, закройте книгу и запишите всё, что помните. Это в 3 раза эффективнее.", icon: BookOpen },
+    { title: "Активное вспоминание", desc: "Вместо чтения конспектов, закройте книгу и запишите всё, что помните. Исследования показывают, что вспоминание работает лучше, чем перечитывание.", icon: BookOpen },
     { title: "Эффект Зейгарник", desc: "Делайте перерыв на самом интересном месте задачи. Мозг продолжит решать ее в фоновом режиме.", icon: Target },
     { title: "Метод исключения", desc: "В SAT всегда 3 ответа абсолютно неверны. Ищите ошибки, а не правильный ответ.", icon: CheckCircle2 },
     { title: "Темп в математике", desc: "Первые 10 вопросов — это разминка. Решайте их за 5 минут, чтобы оставить время на финал.", icon: Clock },
@@ -19,7 +45,7 @@ export const Tips: React.FC = () => {
   ] : language === 'uz' ? [
     { title: "Feynman texnikasi", desc: "Murakkab SAT muammosini 10 yoshli bolaga tushuntiring. Agar tushuntirolmasangiz, demak o'zingiz ham hali to'liq tushunmagansiz.", icon: Brain },
     { title: "Interval takrorlash", desc: "Hammasini birdan yodlamang. Doimiy xotira uchun qiyin qoidalarni 1, 3 va 7 kunlik intervallarda takrorlang.", icon: Zap },
-    { title: "Faol eslash", desc: "Konspektlarni qayta o'qish o'rniga, kitobni yoping va eslagan hamma narsangizni yozing. Bu 3 baravar samaraliroq.", icon: BookOpen },
+    { title: "Faol eslash", desc: "Konspektlarni qayta o'qish o'rniga, kitobni yoping va eslagan hamma narsangizni yozing. Tadqiqotlar eslashning qayta o'qishdan yaxshiroq ekanini ko'rsatadi.", icon: BookOpen },
     { title: "Zeygarnik effekti", desc: "Muammoning eng qiziqarli joyida tanaffus qiling. Miyangiz uni fonda hal qilishda davom etadi.", icon: Target },
     { title: "Istisno qilish usuli", desc: "SATda 3 ta javob har doim xato bo'ladi. To'g'ri javobni emas, xatolarni qidiring.", icon: CheckCircle2 },
     { title: "Matematika sur'ati", desc: "Dastlabki 10 ta savol - bu isinish. Final uchun vaqtni tejash uchun ularni 5 daqiqada hal qiling.", icon: Clock },
@@ -28,7 +54,7 @@ export const Tips: React.FC = () => {
   ] : [
     { title: "Feynman Technique", desc: "Explain a complex SAT problem to a 10-year-old. If you can't, you don't fully understand it yet.", icon: Brain },
     { title: "Spaced Repetition", desc: "Don't cram. Review hard rules at 1, 3, and 7-day intervals for permanent memory.", icon: Zap },
-    { title: "Active Recall", desc: "Instead of re-reading notes, close the book and write down everything you remember. It's 3x more effective.", icon: BookOpen },
+    { title: "Active Recall", desc: "Instead of re-reading notes, close the book and write down everything you remember. Research shows that retrieval practice beats re-reading.", icon: BookOpen },
     { title: "Zeigarnik Effect", desc: "Take a break at the most interesting part of a problem. Your brain will keep solving it in the background.", icon: Target },
     { title: "Process of Elimination", desc: "In SAT, 3 answers are always objectively wrong. Look for errors, not the right answer.", icon: CheckCircle2 },
     { title: "Math Pacing", desc: "The first 10 questions are a warm-up. Solve them in 5 mins to save time for the finale.", icon: Clock },
@@ -42,7 +68,7 @@ export const Tips: React.FC = () => {
     { title: "Предсказание ответов", desc: "В аудировании читайте вопросы заранее и угадывайте часть речи (существительное, число и т.д.).", icon: Target },
     { title: "Сканирование по ключевым словам", desc: "Ищите не слова из вопроса, а их синонимы. IELTS всегда парафразирует.", icon: BookOpen },
     { title: "Парафразирование", desc: "Никогда не копируйте слова из вопроса. Используйте синонимы, чтобы показать свой уровень.", icon: Quote },
-    { title: "Обзор Task 1", desc: "Без четкого Overview (обзора тенденций) вы никогда не получите выше 6.0 за Task 1.", icon: BarChart3 },
+    { title: "Обзор Task 1", desc: "Без чёткого Overview (обзора тенденций) высокий балл за Task 1 получить трудно.", icon: BarChart3 },
     { title: "Точность написания", desc: "В аудировании 'accommodation' с одной 'm' — это 0 баллов. Проверяйте двойные буквы.", icon: CheckCircle2 },
     { title: "Сложные структуры", desc: "Используйте Conditionals (If...) и Inversion (Not only...), чтобы удивить экзаменатора.", icon: Zap },
     { title: "Использование синонимов", desc: "Замените 'very good' на 'exceptional' или 'outstanding'. Это сразу поднимет балл.", icon: Sparkles },
@@ -55,7 +81,7 @@ export const Tips: React.FC = () => {
     { title: "Javobni bashorat qilish", desc: "Listening bo'limida savollarni oldindan o'qing va so'z turkumini (ot, son va h.k.) taxmin qiling.", icon: Target },
     { title: "Kalit so'zlarni skanerlash", desc: "Savoldagi so'zlarni qidirmang; ularning sinonimlarini qidiring. IELTS har doim parafraz qiladi.", icon: BookOpen },
     { title: "Parafraz qilish", desc: "Hech qachon savoldagi so'zlarni nusxalamang. O'z darajangizni ko'rsatish uchun sinonimlardan foydalaning.", icon: Quote },
-    { title: "Task 1 sharhi", desc: "Aniq Overview (trend xulosasi) bo'lmasa, Task 1 uchun hech qachon 6.0 dan yuqori ball ololmaysiz.", icon: BarChart3 },
+    { title: "Task 1 sharhi", desc: "Aniq Overview (trend xulosasi) bo'lmasa, Task 1 uchun yuqori ball olish qiyin.", icon: BarChart3 },
     { title: "Imlo aniqligi", desc: "Listeningda bitta 'm' bilan yozilgan 'accommodation' 0 ball hisoblanadi. Ikki baravar harflarni diqqat bilan tekshiring.", icon: CheckCircle2 },
     { title: "Murakkab tuzilmalar", desc: "Imtihon oluvchini hayratda qoldirish uchun Conditionals (If...) va Inversion (Not only...) dan foydalaning.", icon: Zap },
     { title: "Sinonimlardan foydalanish", desc: "'Very good' so'zini 'exceptional' yoki 'outstanding' bilan almashtiring. Bu balingizni darhol oshiradi.", icon: Sparkles },
@@ -68,7 +94,7 @@ export const Tips: React.FC = () => {
     { title: "Answer Prediction", desc: "In Listening, read questions ahead and guess the part of speech (noun, number, etc.).", icon: Target },
     { title: "Keyword Scanning", desc: "Don't look for words from the question; look for their synonyms. IELTS always paraphrases.", icon: BookOpen },
     { title: "Paraphrasing", desc: "Never copy words from the question. Use synonyms to demonstrate your range.", icon: Quote },
-    { title: "Task 1 Overview", desc: "Without a clear Overview (trend summary), you'll never get above 6.0 for Task 1.", icon: BarChart3 },
+    { title: "Task 1 Overview", desc: "Without a clear Overview (trend summary), it is hard to score high on Task 1.", icon: BarChart3 },
     { title: "Spelling Accuracy", desc: "In Listening, 'accommodation' with one 'm' is 0 points. Check double letters carefully.", icon: CheckCircle2 },
     { title: "Complex Structures", desc: "Use Conditionals (If...) and Inversion (Not only...) to impress the examiner.", icon: Zap },
     { title: "Synonym Usage", desc: "Replace 'very good' with 'exceptional' or 'outstanding'. It boosts your score instantly.", icon: Sparkles },
@@ -94,124 +120,88 @@ export const Tips: React.FC = () => {
     { title: "Ultradian Rhythms", desc: "Work for 90 mins, then rest for 20. This matches the brain's natural energy cycles.", icon: Users },
   ];
 
+
+  const tabs: { id: TabId; label: string; hint: string; tips: typeof satTips; accent: string; activeBg: string }[] = [
+    { id: 'sat', label: 'SAT', hint: t.satTips, tips: satTips, accent: 'text-indigo-500', activeBg: 'bg-indigo-600' },
+    { id: 'ielts', label: 'IELTS', hint: t.ieltsTips, tips: ieltsTips, accent: 'text-emerald-500', activeBg: 'bg-emerald-600' },
+    { id: 'gen', label: tr('General', 'Общие', 'Umumiy'), hint: t.generalTipsSub, tips: generalTips, accent: 'text-purple-500', activeBg: 'bg-purple-600' },
+  ];
+  const current = tabs.find((x) => x.id === tab)!;
+  const triedCount = (id: TabId, n: number) => Array.from({ length: n }).filter((_, i) => tried.includes(id + ':' + i)).length;
+
   return (
-    <div className="max-w-6xl mx-auto space-y-16 animate-in fade-in duration-700">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
-        <div className="space-y-4">
-          <h2 className="text-6xl font-black uppercase tracking-tighter text-[var(--text)]">
-            {t.tips}
-          </h2>
-          <p className="text-[var(--muted)] font-medium max-w-2xl text-lg">
-            {t.tipsSub}
-          </p>
+    <div className="max-w-6xl mx-auto space-y-8 md:space-y-10 animate-in fade-in duration-700">
+      <div className="flex items-center justify-between gap-6">
+        <div className="min-w-0 space-y-2">
+          <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)]">{t.tips}</h1>
+          <p className="text-[var(--muted)] font-medium max-w-2xl">{t.tipsSub}</p>
         </div>
-        <div className="w-24 h-24 bg-indigo-600/10 rounded-[2.5rem] flex items-center justify-center text-indigo-500 shadow-inner">
-          <Lightbulb className="w-12 h-12" />
+        <div className="hidden sm:flex w-16 h-16 bg-indigo-600/10 rounded-[1.5rem] items-center justify-center text-indigo-500 shrink-0">
+          <Lightbulb className="w-8 h-8" aria-hidden="true" />
         </div>
       </div>
 
-      <section className="space-y-10">
-        <div className="flex items-center gap-6">
-          <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
-            <span className="font-black text-2xl">SAT</span>
-          </div>
-          <div>
-            <h3 className="text-3xl font-black uppercase tracking-tight text-[var(--text)]">{t.sat}</h3>
-            <p className="text-[var(--muted)] text-sm font-medium">{t.satTips}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {satTips.map((tip, i) => (
-            <Card key={i} hover className="p-8 rounded-[2.5rem] group cursor-pointer flex flex-col">
-              <div className="w-14 h-14 bg-[var(--input)] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <tip.icon className="w-6 h-6 text-indigo-500" />
-              </div>
-              <h4 className="text-xl font-black mb-3 text-[var(--text)] group-hover:text-indigo-500 transition-colors">{tip.title}</h4>
-              <p className="text-[var(--muted)] text-xs leading-relaxed mb-6 flex-1">{tip.desc}</p>
-              <ArrowRight className="w-4 h-4 text-indigo-500 group-hover:translate-x-2 transition-transform" />
-            </Card>
+      <div className="space-y-4">
+        <div role="tablist" aria-label={t.tips} className="flex flex-wrap gap-2">
+          {tabs.map((x) => (
+            <button
+              key={x.id}
+              type="button"
+              role="tab"
+              id={'tips-tab-' + x.id}
+              aria-selected={tab === x.id}
+              aria-controls="tips-panel"
+              onClick={() => setTab(x.id)}
+              className={`h-11 px-5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors ${
+                tab === x.id ? x.activeBg + ' text-white shadow-lg' : 'bg-[var(--input)] text-[var(--muted)] hover:text-[var(--text)]'
+              }`}
+            >
+              {x.label}
+              <span className="ml-2 opacity-70">{triedCount(x.id, x.tips.length)}/{x.tips.length}</span>
+            </button>
           ))}
         </div>
-      </section>
+        <p className="text-sm text-[var(--muted)]">
+          {current.hint} {tr('Tap "I tried it" on tips you have used.', 'Нажимайте «Попробовал» на советах, которые уже применили.', "Qo'llagan maslahatlaringizda «Sinadim» tugmasini bosing.")}
+        </p>
+      </div>
 
-      <section className="space-y-10">
-        <div className="flex items-center gap-6">
-          <div className="w-16 h-16 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
-            <span className="font-black text-2xl">IELTS</span>
-          </div>
-          <div>
-            <h3 className="text-3xl font-black uppercase tracking-tight text-[var(--text)]">{t.ielts}</h3>
-            <p className="text-[var(--muted)] text-sm font-medium">{t.ieltsTips}</p>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {ieltsTips.map((tip, i) => (
-            <Card key={i} hover className="p-8 rounded-[2.5rem] group cursor-pointer flex flex-col">
-              <div className="w-14 h-14 bg-[var(--input)] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <tip.icon className="w-6 h-6 text-emerald-500" />
+      <div id="tips-panel" role="tabpanel" aria-labelledby={'tips-tab-' + tab} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
+        {current.tips.map((tip, i) => {
+          const id = tab + ':' + i;
+          const done = tried.includes(id);
+          return (
+            <Card key={id} className={`p-6 rounded-[2rem] flex flex-col ${done ? 'border-emerald-500/30' : ''}`}>
+              <div className="w-12 h-12 bg-[var(--input)] rounded-2xl flex items-center justify-center mb-5">
+                <tip.icon className={`w-6 h-6 ${current.accent}`} aria-hidden="true" />
               </div>
-              <h4 className="text-xl font-black mb-3 text-[var(--text)] group-hover:text-emerald-500 transition-colors">{tip.title}</h4>
-              <p className="text-[var(--muted)] text-xs leading-relaxed mb-6 flex-1">{tip.desc}</p>
-              <ArrowRight className="w-4 h-4 text-emerald-500 group-hover:translate-x-2 transition-transform" />
+              <h2 className="text-lg font-black mb-2 text-[var(--text)] leading-snug">{tip.title}</h2>
+              <p className="text-[var(--muted)] text-sm leading-relaxed mb-5 flex-1">{tip.desc}</p>
+              <button
+                type="button"
+                aria-pressed={done}
+                onClick={() => toggleTried(id)}
+                className={`inline-flex items-center justify-center gap-2 h-11 rounded-xl text-xs font-black uppercase tracking-wider border transition-colors ${
+                  done
+                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500'
+                    : 'border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:border-indigo-500/40'
+                }`}
+              >
+                {done && <Check className="w-4 h-4" aria-hidden="true" />}
+                {done ? tr('Tried', 'Попробовал', 'Sinadim') : tr('I tried it', 'Попробовал', 'Sinadim')}
+              </button>
             </Card>
-          ))}
-        </div>
-      </section>
+          );
+        })}
+      </div>
 
-      <section className="space-y-10">
-        <div className="flex items-center gap-6">
-          <div className="w-16 h-16 bg-purple-600 rounded-2xl flex items-center justify-center text-white shadow-xl">
-            <span className="font-black text-2xl">GEN</span>
-          </div>
-          <div>
-            <h3 className="text-3xl font-black uppercase tracking-tight text-[var(--text)]">
-              {t.generalTips}
-            </h3>
-            <p className="text-[var(--muted)] text-sm font-medium">
-              {t.generalTipsSub}
-            </p>
-          </div>
+      <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-8 md:p-12 rounded-[2.5rem] flex flex-col md:flex-row items-start md:items-center gap-6 md:gap-10 text-white shadow-2xl shadow-indigo-500/20">
+        <div className="w-20 h-20 md:w-28 md:h-28 bg-white/10 rounded-[2rem] shrink-0 flex items-center justify-center">
+          <Lightbulb className="w-10 h-10 md:w-14 md:h-14" aria-hidden="true" />
         </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {generalTips.map((tip, i) => (
-            <Card key={i} hover className="p-8 rounded-[2.5rem] group cursor-pointer flex flex-col">
-              <div className="w-14 h-14 bg-[var(--input)] rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                <tip.icon className="w-6 h-6 text-purple-500" />
-              </div>
-              <h4 className="text-xl font-black mb-3 text-[var(--text)] group-hover:text-purple-500 transition-colors">{tip.title}</h4>
-              <p className="text-[var(--muted)] text-xs leading-relaxed mb-6 flex-1">{tip.desc}</p>
-              <ArrowRight className="w-4 h-4 text-purple-500 group-hover:translate-x-2 transition-transform" />
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-12 rounded-[4rem] flex flex-col md:flex-row items-center gap-12 text-white shadow-2xl shadow-indigo-500/20 relative overflow-hidden group">
-        <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity" />
-        <div className="w-40 h-40 bg-white/10 rounded-[3rem] shrink-0 flex items-center justify-center text-6xl shadow-2xl relative z-10">
-          💡
-        </div>
-        <div className="space-y-6 relative z-10">
-          <h3 className="text-3xl font-black uppercase tracking-tighter">
-            {t.proTipTitle}
-          </h3>
-          <p className="text-white/80 leading-relaxed text-lg font-medium">
-            {t.proTipDesc}
-          </p>
-          <div className="flex gap-4">
-            <span className="px-4 py-2 bg-white/10 text-white rounded-full text-[10px] font-black uppercase tracking-widest">
-              {t.reasoning}
-            </span>
-            <span className="px-4 py-2 bg-white/10 text-white rounded-full text-[10px] font-black uppercase tracking-widest">
-              {t.logic}
-            </span>
-            <span className="px-4 py-2 bg-white/10 text-white rounded-full text-[10px] font-black uppercase tracking-widest">
-              {t.mastery}
-            </span>
-          </div>
+        <div className="space-y-4">
+          <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">{t.proTipTitle}</h2>
+          <p className="text-white/85 leading-relaxed text-base md:text-lg font-medium">{t.proTipDesc}</p>
         </div>
       </div>
     </div>

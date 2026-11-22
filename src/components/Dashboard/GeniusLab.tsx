@@ -178,7 +178,21 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
   const reduceMotion = useReducedMotion();
   const interestName = (value: string) => INTEREST_LABEL[language]?.[value] ?? value;
   const interests = profile?.interests ?? [];
-  const [topic, setTopic] = useState('');
+  // A topic sent from an article ("Explore in the Lab"). Read in the initializer, cleared on mount.
+  const [topic, setTopic] = useState(() => {
+    try {
+      return sessionStorage.getItem('tf_lab_topic') ?? '';
+    } catch {
+      return '';
+    }
+  });
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem('tf_lab_topic');
+    } catch {
+      /* ignore */
+    }
+  }, []);
   const [tree, setTree] = useState<KnowledgeTree | null>(null);
   const [selectedNode, setSelectedNode] = useState<KnowledgeNode | null>(null);
   const [isLoading, setIsLoading] = useState(false);
