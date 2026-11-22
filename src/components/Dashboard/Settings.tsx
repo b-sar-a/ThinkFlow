@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
 import { useSafety } from '../../lib/safety';
+import { ParentAccess } from '../Family/ParentAccess';
 
 const TELEGRAM = 'https://t.me/b_sar_a';
 
@@ -38,7 +39,7 @@ const Row: React.FC<{ icon: React.ReactNode; tint: string; title: string; hint: 
   </div>
 );
 
-export const Settings: React.FC = () => {
+export const Settings: React.FC<{ onNavigate?: (view: string) => void }> = ({ onNavigate }) => {
   const { theme, toggleTheme } = useTheme();
   const { language, setLanguage, t } = useLanguage();
   const { signOut, deleteAccount, geniusMode, setGeniusMode, profile, updateProfileData } = useAuth();
@@ -173,6 +174,8 @@ export const Settings: React.FC = () => {
             </div>
           </Row>
         </Card>
+
+        <ParentAccess onNavigate={onNavigate} />
 
         {Object.keys(blocked).length > 0 && (
           <Card className="p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] border border-[var(--border)] space-y-6">

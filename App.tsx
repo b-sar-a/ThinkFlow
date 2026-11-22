@@ -9,6 +9,7 @@ const Chat = lazy(() => import('./src/components/Dashboard/Chat').then(m => ({ d
 const Tasks = lazy(() => import('./src/components/Dashboard/Tasks').then(m => ({ default: m.Tasks })));
 const PromoHub = lazy(() => import('./src/components/Dashboard/PromoHub').then(m => ({ default: m.PromoHub })));
 const Programs = lazy(() => import('./src/components/Dashboard/Programs').then(m => ({ default: m.Programs })));
+const Family = lazy(() => import('./src/components/Dashboard/Family').then(m => ({ default: m.Family })));
 const Articles = lazy(() => import('./src/components/Dashboard/Articles').then(m => ({ default: m.Articles })));
 const Tips = lazy(() => import('./src/components/Dashboard/Tips').then(m => ({ default: m.Tips })));
 const Reviews = lazy(() => import('./src/components/Dashboard/Reviews').then(m => ({ default: m.Reviews })));
@@ -110,7 +111,8 @@ const App: React.FC = () => {
       case 'reviews': return <Reviews />;
       case 'profile': return <ProfileEditor />;
       case 'progress': return <Progress onNavigate={setCurrentView} />;
-      case 'settings': return <Settings />;
+      case 'settings': return <Settings onNavigate={setCurrentView} />;
+      case 'family': return <Family />;
       case 'admin': return <Admin />;
       default: return <GeniusLab onNavigate={setCurrentView} />;
     }
