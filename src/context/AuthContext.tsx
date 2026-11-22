@@ -23,6 +23,7 @@ import { track } from '../lib/analytics';
 import { authedPost } from '../services/http';
 
 const DEMO_UID = 'demo-uid-123';
+const OWNER_EMAILS = ['skwinskwinskwin@gmail.com', 'sarvarkhotamov10@gmail.com'];
 
 /** The language the visitor already chose on the landing page (defaults to Russian). */
 const savedLanguage = (): Language => {
@@ -213,7 +214,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (docSnap.exists()) {
           const data = docSnap.data();
           // Ensure critical fields exist for leaderboard and genius mode
-          const isOwner = data.email === "skwinskwinskwin@gmail.com";
+          // Owner accounts: made admin automatically (the same list is in firestore.rules).
+          const isOwner = OWNER_EMAILS.includes(String(data.email || "").toLowerCase());
           if (
             data.xp === undefined || 
             data.level === undefined || 
@@ -247,7 +249,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         } else {
           // Profile doesn't exist, create a fallback
-          const isOwner = user.email === "skwinskwinskwin@gmail.com";
+          const isOwner = OWNER_EMAILS.includes(String(user.email || "").toLowerCase());
           const newUser: UserProfile = {
             uid: user.uid,
             email: user.email || '',
