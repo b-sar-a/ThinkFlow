@@ -10,6 +10,7 @@ import { Button } from '../UI/Button';
 import { Card } from '../UI/Card';
 import { verifyTask } from '../../services/gemini';
 import { levelInfo } from '../../lib/progress';
+import { track } from '../../lib/analytics';
 
 type Template = { title: string; desc: string; diff: 'Easy' | 'Medium' | 'Challenge'; xp: number };
 
@@ -162,6 +163,7 @@ export const Tasks: React.FC = () => {
         await updateDoc(doc(db, 'tasks', task.id), { status: 'completed' });
         // Through the profile so the level follows the same formula as everywhere else.
         await updateProfileData({ xp: newXP, level: Math.max(levelInfo(newXP).level, profile.level) });
+        track('first_task_completed');
       }
     } catch (error: any) {
       console.error("Task completion error:", error);

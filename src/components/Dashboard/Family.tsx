@@ -6,6 +6,7 @@ import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
 import { ConfirmDialog } from '../Safety/Safety';
 import { fetchChildren, linkChild, unlinkFamily, familyErrorText, type ChildSummary } from '../../services/family';
+import { track } from '../../lib/analytics';
 import { GRADE_LABEL, GOAL_LABEL, type Grade, type Goal } from '../../lib/profileOptions';
 
 export const PARENT_MODE_KEY = 'tf_parent_mode';
@@ -58,6 +59,7 @@ export const Family: React.FC = () => {
     setLinked(false);
     try {
       await linkChild(code);
+      track('parent_linked');
       setCode('');
       setLinked(true);
       await load();

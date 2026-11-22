@@ -5,6 +5,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
 import { levelInfo } from '../../lib/progress';
+import { track } from '../../lib/analytics';
 import { PROGRAMS, LESSON_XP, checkAnswer, Bi, Lesson, Program, PracticeItem } from '../../data/programs';
 
 const ICONS = { calculator: Calculator, target: Target, pen: PenTool, atom: Atom } as const;
@@ -71,6 +72,7 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
     if (done.includes(key)) return;
     saveDone([...done, key]);
     setJustEarned(key);
+    track('first_lesson_completed');
     if (!profile) return;
     try {
       const newXP = (profile.xp || 0) + LESSON_XP;

@@ -5,6 +5,7 @@ import { useTheme } from './src/context/ThemeContext';
 import { useLanguage } from './src/context/LanguageContext';
 import { Sidebar } from './src/components/Layout/Sidebar';
 import { Navbar } from './src/components/Layout/Navbar';
+import { track } from './src/lib/analytics';
 const Chat = lazy(() => import('./src/components/Dashboard/Chat').then(m => ({ default: m.Chat })));
 const Tasks = lazy(() => import('./src/components/Dashboard/Tasks').then(m => ({ default: m.Tasks })));
 const PromoHub = lazy(() => import('./src/components/Dashboard/PromoHub').then(m => ({ default: m.PromoHub })));
@@ -49,6 +50,11 @@ const App: React.FC = () => {
       updateProfileData({ language }).catch(() => {});
     }
   }, [language]);
+
+  // Funnel: a visitor who is not signed in sees the landing page.
+  useEffect(() => {
+    if (isAuthReady && !user) track('landing_view');
+  }, [isAuthReady, user]);
 
   // Close modal when user logs in
   useEffect(() => {
