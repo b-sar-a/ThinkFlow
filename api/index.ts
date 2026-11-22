@@ -35,6 +35,6 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
     console.error("[API] could not start:", error);
     res.statusCode = 500;
     res.setHeader("Content-Type", "application/json");
-    res.end(JSON.stringify({ error: "API_START_FAILED", detail: String((error as Error)?.message ?? error).slice(0, 300) }));
+    res.end(JSON.stringify({ error: "API_START_FAILED", node: process.version, detail: String((error as Error)?.message ?? error).slice(0, 400) }));
   }
 }
