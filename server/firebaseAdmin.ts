@@ -49,3 +49,12 @@ export async function accountCreatedAt(uid: string): Promise<number> {
   const record = await getAuth(adminApp()).getUser(uid);
   return new Date(record.metadata.creationTime).getTime();
 }
+
+/** Removes the Firebase Auth account. A missing account counts as done, so retries are safe. */
+export async function deleteAuthUser(uid: string): Promise<void> {
+  try {
+    await getAuth(adminApp()).deleteUser(uid);
+  } catch (error: any) {
+    if (error?.code !== "auth/user-not-found") throw error;
+  }
+}

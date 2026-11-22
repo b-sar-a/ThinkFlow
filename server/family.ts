@@ -37,7 +37,7 @@ export interface Tx {
 }
 export interface Db {
   doc(path: string): DocRef;
-  collection(name: string): { where(field: string, op: "==", value: any): QueryLike };
+  collection(name: string): { where(field: string, op: "==" | "array-contains", value: any): QueryLike };
   runTransaction<T>(fn: (tx: Tx) => Promise<T>): Promise<T>;
 }
 

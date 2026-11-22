@@ -20,6 +20,7 @@ import { auth, db, googleProvider } from '../lib/firebase';
 import { UserProfile, Language } from '../types';
 import { captureReferral, claimPendingReferral } from '../lib/referral';
 import { track } from '../lib/analytics';
+import { authedPost } from '../services/http';
 
 const DEMO_UID = 'demo-uid-123';
 
@@ -163,19 +164,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const signOut = async () => {
+    // The demo user is set by hand (it is not a Firebase session), so it has to be cleared by hand too.
+    if (user?.uid === DEMO_UID) {
+      setUser(null);
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
     await firebaseSignOut(auth);
   };
 
+  // Real deletion: the server removes the data and the login (see server/accountDeletion.ts).
+  // Throws Error('REAUTH_REQUIRED' | 'DELETE_UNAVAILABLE' | ...) so the screen can explain what to do.
   const deleteAccount = async () => {
     if (!user) return;
-    try {
-      // For this demo, we'll just mark it as deleted in the profile
-      await setDoc(doc(db, 'users', user.uid), { bio: (profile?.bio || '') + ' [DELETED]' }, { merge: true });
-      await signOut();
-    } catch (error) {
-      console.error("Delete account error:", error);
-      throw error;
+    if (user.uid !== DEMO_UID) {
+      await authedPost('/api/account/delete', { confirm: 'DELETE' });
+      // Forget this device too (language and theme are harmless and stay).
+      try {
+        Object.keys(localStorage)
+          .filter((k) => (k.startsWith('tf_') && k !== 'tf_lang' && k !== 'tf_theme') || k.startsWith('tf_programs_'))
+          .forEach((k) => localStorage.removeItem(k));
+      } catch {
+        /* storage blocked */
+      }
     }
+    await signOut();
   };
 
   useEffect(() => {

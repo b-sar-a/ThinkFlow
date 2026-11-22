@@ -62,7 +62,11 @@ const RU: Copy = {
         },
         {
           title: 'Твои права',
-          body: ['Ты можешь запросить копию своих данных или полное удаление аккаунта. Удаление аккаунта удаляет профиль и историю обучения.'],
+          body: [
+            'Ты можешь запросить копию своих данных.',
+            'Удалить аккаунт можно самому: Настройки → Аккаунт → Удалить аккаунт. Это навсегда удаляет профиль, прогресс, задания, чаты с ИИ, отзывы, посты, комментарии, твои сообщения (в чатах с другими твоё имя скрывается), доступ родителей и вход в аккаунт.',
+            'Жалобы на нарушения сохраняются, чтобы защищать других учеников.',
+          ],
         },
       ],
     },
@@ -155,7 +159,11 @@ const EN: Copy = {
         },
         {
           title: 'Your rights',
-          body: ['You can ask for a copy of your data or full deletion of your account. Deleting the account removes your profile and learning history.'],
+          body: [
+            'You can ask for a copy of your data.',
+            'You can delete your account yourself: Settings → Account → Delete account. This permanently removes your profile, progress, tasks, AI chats, reviews, posts, comments, your messages (your name is hidden in chats with others), parent access and your sign-in.',
+            'Abuse reports are kept to protect other students.',
+          ],
         },
       ],
     },
