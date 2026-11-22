@@ -107,7 +107,7 @@ const App: React.FC = () => {
       case 'tips': return <Tips />;
       case 'reviews': return <Reviews />;
       case 'profile': return <ProfileEditor />;
-      case 'progress': return <Progress />;
+      case 'progress': return <Progress onNavigate={setCurrentView} />;
       case 'settings': return <Settings />;
       case 'admin': return <Admin />;
       default: return <GeniusLab onNavigate={setCurrentView} />;
