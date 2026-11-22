@@ -17,7 +17,8 @@ import {
   X,
   ShieldAlert,
   Sparkles,
-  Users
+  Users,
+  GraduationCap
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
@@ -50,6 +51,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
   // Profile and Settings live next to the avatar below, so the list has room for the learning sections.
   const menuItems = [
     { id: 'genius_lab', label: t.geniusLab, icon: Brain },
+    { id: 'programs', label: tr('Programs', 'Программы', 'Dasturlar'), icon: GraduationCap },
     { id: 'community', label: t.community, icon: Users },
     { id: 'messages', label: t.messages, icon: MessageSquare },
     { id: 'tasks', label: t.tasks, icon: LayoutGrid },

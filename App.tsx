@@ -8,6 +8,7 @@ import { Navbar } from './src/components/Layout/Navbar';
 const Chat = lazy(() => import('./src/components/Dashboard/Chat').then(m => ({ default: m.Chat })));
 const Tasks = lazy(() => import('./src/components/Dashboard/Tasks').then(m => ({ default: m.Tasks })));
 const PromoHub = lazy(() => import('./src/components/Dashboard/PromoHub').then(m => ({ default: m.PromoHub })));
+const Programs = lazy(() => import('./src/components/Dashboard/Programs').then(m => ({ default: m.Programs })));
 const Articles = lazy(() => import('./src/components/Dashboard/Articles').then(m => ({ default: m.Articles })));
 const Tips = lazy(() => import('./src/components/Dashboard/Tips').then(m => ({ default: m.Tips })));
 const Reviews = lazy(() => import('./src/components/Dashboard/Reviews').then(m => ({ default: m.Reviews })));
@@ -103,6 +104,7 @@ const App: React.FC = () => {
       case 'messages': return <Messages />;
       case 'tasks': return <Tasks />;
       case 'leaderboard': return <PromoHub />;
+      case 'programs': return <Programs onNavigate={setCurrentView} />;
       case 'articles': return <Articles onNavigate={setCurrentView} />;
       case 'tips': return <Tips />;
       case 'reviews': return <Reviews />;
