@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { GraduationCap, Calculator, Target, PenTool, Atom, ArrowLeft, ArrowRight, Check, CheckCircle2, Circle, Sparkles, Eye } from 'lucide-react';
+import { GraduationCap, Calculator, Target, PenTool, Atom, FlaskConical, Code2, ArrowLeft, ArrowRight, Check, CheckCircle2, Circle, Sparkles, Eye } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../UI/Card';
@@ -8,13 +8,15 @@ import { levelInfo } from '../../lib/progress';
 import { track } from '../../lib/analytics';
 import { PROGRAMS, LESSON_XP, checkAnswer, Bi, Lesson, Program, PracticeItem } from '../../data/programs';
 
-const ICONS = { calculator: Calculator, target: Target, pen: PenTool, atom: Atom } as const;
+const ICONS = { calculator: Calculator, target: Target, pen: PenTool, atom: Atom, flask: FlaskConical, code: Code2 } as const;
 
 const ACCENT = {
   indigo: { text: 'text-indigo-500', soft: 'bg-indigo-500/10', border: 'border-indigo-500/30' },
   emerald: { text: 'text-emerald-500', soft: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
   amber: { text: 'text-amber-500', soft: 'bg-amber-500/10', border: 'border-amber-500/30' },
   rose: { text: 'text-rose-500', soft: 'bg-rose-500/10', border: 'border-rose-500/30' },
+  cyan: { text: 'text-cyan-500', soft: 'bg-cyan-500/10', border: 'border-cyan-500/30' },
+  purple: { text: 'text-purple-500', soft: 'bg-purple-500/10', border: 'border-purple-500/30' },
 } as const;
 
 type ItemStatus = 'idle' | 'correct' | 'wrong' | 'shown' | 'selfdone';
@@ -163,7 +165,7 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
 
         <div className={`p-5 md:p-6 rounded-[1.5rem] border ${accent.border} ${accent.soft}`}>
           <h2 className={`text-xs font-black uppercase tracking-[0.2em] mb-2 ${accent.text}`}>{tr('Worked example', 'Разобранный пример', 'Yechilgan misol')}</h2>
-          <p className="text-[var(--text)] leading-relaxed">{language === 'uz' && lesson.uz ? lesson.uz.example : text(lesson.example)}</p>
+          <p className="text-[var(--text)] leading-relaxed whitespace-pre-line">{language === 'uz' && lesson.uz ? lesson.uz.example : text(lesson.example)}</p>
         </div>
 
         <section className="space-y-4" aria-labelledby="practice-title">
@@ -390,7 +392,7 @@ const Practice: React.FC<PracticeProps> = ({ items, text, uz, tr, alreadyDone, o
         return (
           <li key={i}>
             <Card className={`p-5 md:p-6 rounded-[1.5rem] border ${solved ? 'border-emerald-500/30' : 'border-[var(--border)]'} space-y-4`}>
-              <p className="font-semibold text-[var(--text)] leading-relaxed">
+              <p className="font-semibold text-[var(--text)] leading-relaxed whitespace-pre-line">
                 <span className="text-[var(--muted)] mr-2">{i + 1}.</span>
                 {qOf(item)}
               </p>
