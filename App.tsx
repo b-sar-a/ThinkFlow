@@ -30,7 +30,7 @@ const App: React.FC = () => {
   const { t, language, setLanguage } = useLanguage();
   const [currentView, setCurrentView] = useState('genius_lab');
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => typeof window !== 'undefined' && window.innerWidth >= 1024);
 
   // One source of truth for language: the saved profile wins at login, and later changes
   // made in the UI are written back (the AI answers in profile.language).
@@ -128,7 +128,7 @@ const App: React.FC = () => {
       />
       
       <main className={`flex-1 flex flex-col min-w-0 transition-all duration-500 ${isSidebarOpen ? 'md:ml-0' : 'ml-0'} h-full relative z-10`}>
-        <Navbar onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} />
+        <Navbar onMenuClick={() => setIsSidebarOpen(!isSidebarOpen)} onViewChange={setCurrentView} />
         
         <div className="flex-1 overflow-y-auto custom-scrollbar p-4 md:p-10 scroll-smooth">
           <div className="max-w-7xl mx-auto flex flex-col pb-24">
