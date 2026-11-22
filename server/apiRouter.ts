@@ -4,6 +4,7 @@ import { FieldPath, FieldValue } from "firebase-admin/firestore";
 import { accountCreatedAt, adminDb, deleteAuthUser, hasAdminDb, verifyIdToken } from "./firebaseAdmin.js";
 import { deleteAccountData, type DeletionDb } from "./accountDeletion.js";
 import { cleanEvent, computeFunnel, recordEvent, type StoredEvent } from "./analytics.js";
+import * as classes from "./classes.js";
 import { FamilyError, createCode, linkWithCode, listChildren, listParents, unlink, type Db } from "./family.js";
 
 /**
@@ -483,6 +484,78 @@ Write "feedback" in one short sentence.`;
 
   router.post("/api/family/unlink", requireAuth, rateLimit, async (req, res) => {
     await unlink(familyDb(), (req as any).uid, req.body?.childUid, req.body?.parentUid);
+    res.json({ ok: true });
+  });
+
+  // ---------- teacher cabinet (see server/classes.ts) ----------
+
+  const requireAdmin = async (uid: string) => {
+    const db = familyDb();
+    if ((await db.doc(`users/${uid}`).get()).data()?.role !== "admin") throw new HttpError(403, "FORBIDDEN");
+    return db;
+  };
+  const uidOf = (req: Request): string => (req as any).uid;
+  const guardedClass = [requireAuth, rateLimit] as const;
+
+  // A person asks to be a teacher; an admin approves in the Admin panel.
+  router.post("/api/teacher/status", ...guardedClass, async (req, res) => {
+    res.json({ status: await classes.teacherStatus(familyDb(), uidOf(req)) });
+  });
+  router.post("/api/teacher/request", ...guardedClass, async (req, res) => {
+    await classes.requestTeacher(familyDb(), uidOf(req), { school: req.body?.school, note: req.body?.note });
+    res.json({ status: "pending" });
+  });
+
+  router.post("/api/class/create", ...guardedClass, async (req, res) => {
+    res.json(await classes.createClass(familyDb(), uidOf(req), req.body?.name));
+  });
+  router.post("/api/class/list", ...guardedClass, async (req, res) => {
+    res.json({ classes: await classes.listClasses(familyDb(), uidOf(req)) });
+  });
+  router.post("/api/class/rotate", ...guardedClass, async (req, res) => {
+    res.json(await classes.rotateCode(familyDb(), uidOf(req), String(req.body?.classId ?? "")));
+  });
+  router.post("/api/class/delete", ...guardedClass, async (req, res) => {
+    await classes.deleteClass(familyDb(), uidOf(req), String(req.body?.classId ?? ""));
+    res.json({ ok: true });
+  });
+  router.post("/api/class/roster", ...guardedClass, async (req, res) => {
+    res.json(await classes.roster(familyDb(), uidOf(req), String(req.body?.classId ?? "")));
+  });
+  router.post("/api/class/student", ...guardedClass, async (req, res) => {
+    res.json(await classes.studentDetail(familyDb(), uidOf(req), String(req.body?.classId ?? ""), String(req.body?.studentUid ?? "")));
+  });
+
+  // Student side: joining a class is the student's own consent.
+  router.post("/api/class/join", requireAuth, rateLimit, limitLinkAttempts, async (req, res) => {
+    res.json(await classes.joinClass(familyDb(), uidOf(req), req.body?.code));
+  });
+  router.post("/api/class/mine", ...guardedClass, async (req, res) => {
+    res.json({ classes: await classes.listMyClasses(familyDb(), uidOf(req)) });
+  });
+  router.post("/api/class/leave", ...guardedClass, async (req, res) => {
+    await classes.leaveClass(familyDb(), uidOf(req), String(req.body?.classId ?? ""), String(req.body?.studentUid ?? ""));
+    res.json({ ok: true });
+  });
+
+  // Admin: the approval list.
+  router.post("/api/admin/teachers", ...guardedClass, async (req, res) => {
+    const db = await requireAdmin(uidOf(req));
+    res.json(await classes.listTeacherAdmin(db));
+  });
+  router.post("/api/admin/teacher/approve", ...guardedClass, async (req, res) => {
+    const db = await requireAdmin(uidOf(req));
+    await classes.approveTeacher(db, uidOf(req), String(req.body?.uid ?? ""));
+    res.json({ ok: true });
+  });
+  router.post("/api/admin/teacher/decline", ...guardedClass, async (req, res) => {
+    const db = await requireAdmin(uidOf(req));
+    await classes.declineTeacher(db, String(req.body?.uid ?? ""));
+    res.json({ ok: true });
+  });
+  router.post("/api/admin/teacher/revoke", ...guardedClass, async (req, res) => {
+    const db = await requireAdmin(uidOf(req));
+    await classes.revokeTeacher(db, String(req.body?.uid ?? ""));
     res.json({ ok: true });
   });
 
