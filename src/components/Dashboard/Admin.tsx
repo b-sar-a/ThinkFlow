@@ -11,7 +11,7 @@ import { ConfirmDialog } from '../Safety/Safety';
 import { authedPost } from '../../services/http';
 import { fetchTeacherAdmin, teacherAction, type TeacherAdminData } from '../../services/classes';
 
-type Tab = 'users' | 'reports' | 'reviews' | 'teachers' | 'analytics';
+type Tab = 'users' | 'reports' | 'reviews' | 'teachers' | 'analytics' | 'status';
 type ReportFilter = 'open' | 'resolved';
 
 const USERS_LIMIT = 500;
@@ -193,6 +193,7 @@ export const Admin: React.FC = () => {
     { id: 'reviews', label: tr('Reviews', 'Отзывы'), count: reviews.length, active: 'bg-indigo-600' },
     { id: 'teachers', label: tr('Teachers', 'Учителя'), active: 'bg-indigo-600' },
     { id: 'analytics', label: tr('Analytics', 'Аналитика'), active: 'bg-emerald-600' },
+    { id: 'status', label: tr('Status', 'Состояние'), active: 'bg-emerald-600' },
   ];
 
   return (
@@ -366,6 +367,8 @@ export const Admin: React.FC = () => {
               ))
             )}
           </div>
+        ) : activeTab === 'status' ? (
+          <StatusPanel tr={tr} />
         ) : activeTab === 'teachers' ? (
           <TeacherApprovals tr={tr} />
         ) : activeTab === 'reviews' ? (
@@ -747,6 +750,94 @@ const TeacherApprovals: React.FC<{ tr: (en: string, ru: string) => string }> = (
 
       {confirm && (
         <ConfirmDialog title={confirm.title} text={confirm.text} confirmLabel={confirm.confirmLabel} danger={confirm.danger} onConfirm={confirm.run} onClose={() => setConfirm(null)} />
+      )}
+    </div>
+  );
+};
+
+interface Health {
+  status: string;
+  node?: string;
+  aiKeyLoaded: boolean;
+  quotaEnforced: boolean;
+}
+
+/** What the server can do right now, read from /api/health, with the exact next step for anything that is off. */
+const StatusPanel: React.FC<{ tr: (en: string, ru: string) => string }> = ({ tr }) => {
+  const [health, setHealth] = useState<Health | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  const load = () => {
+    setHealth(null);
+    setFailed(false);
+    fetch('/api/health', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then(setHealth)
+      .catch(() => setFailed(true));
+  };
+  useEffect(load, []);
+
+  const Row: React.FC<{ ok: boolean; title: string; ok_text: string; off_text: string }> = ({ ok, title, ok_text, off_text }) => (
+    <li className="flex items-start gap-3 p-4 rounded-2xl bg-[var(--input)]">
+      <span className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${ok ? 'bg-emerald-500' : 'bg-rose-500'}`} aria-hidden="true" />
+      <div className="min-w-0">
+        <p className="font-black text-[var(--text)]">
+          {title} <span className={`text-xs uppercase tracking-wider ${ok ? 'text-emerald-500' : 'text-rose-500'}`}>{ok ? tr('works', 'работает') : tr('off', 'выключено')}</span>
+        </p>
+        <p className="text-sm text-[var(--muted)] leading-relaxed">{ok ? ok_text : off_text}</p>
+      </div>
+    </li>
+  );
+
+  const needKey = tr('Add FIREBASE_SERVICE_ACCOUNT in Vercel (Settings → Environment Variables), then redeploy.', 'Добавьте FIREBASE_SERVICE_ACCOUNT в Vercel (Settings → Environment Variables) и перевыкатите сайт.');
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-4">
+        <p className="text-sm text-[var(--muted)]">{tr('Read live from the server (/api/health).', 'Читается с сервера в реальном времени (/api/health).')}</p>
+        <Button variant="outline" size="sm" onClick={load} className="rounded-xl h-11 px-4 shrink-0">
+          <span className="font-black uppercase text-xs tracking-wider">{tr('Refresh', 'Обновить')}</span>
+        </Button>
+      </div>
+
+      {failed ? (
+        <p role="alert" className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-sm font-semibold">
+          {tr('The server does not answer. Check the latest deployment in Vercel and its function logs.', 'Сервер не отвечает. Проверьте последний деплой в Vercel и логи функции.')}
+        </p>
+      ) : !health ? (
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-500" aria-label={tr('Loading', 'Загрузка')} />
+      ) : (
+        <>
+          <ul className="space-y-3">
+            <Row ok title={tr('Server', 'Сервер')} ok_text={`${tr('Answers requests', 'Отвечает на запросы')}${health.node ? `, Node ${health.node}` : ''}.`} off_text="" />
+            <Row
+              ok={health.aiKeyLoaded}
+              title={tr('AI (Gemini)', 'ИИ (Gemini)')}
+              ok_text={tr('The key is loaded. If it was ever in the old public code, replace it with a new one (aistudio.google.com) and update GEMINI_API_KEY in Vercel.', 'Ключ загружен. Если он когда-то был в старом публичном коде, замените его новым (aistudio.google.com) и обновите GEMINI_API_KEY в Vercel.')}
+              off_text={tr('Add GEMINI_API_KEY in Vercel (Settings → Environment Variables), then redeploy.', 'Добавьте GEMINI_API_KEY в Vercel (Settings → Environment Variables) и перевыкатите сайт.')}
+            />
+            <Row
+              ok={health.quotaEnforced}
+              title={tr('Token quota', 'Квота токенов')}
+              ok_text={tr('Each student has a real, shared daily limit in Firestore.', 'У каждого ученика настоящий общий лимит в Firestore.')}
+              off_text={tr('Only a rough in-memory limit protects the AI. ', 'Сейчас ИИ защищает только приблизительный лимит в памяти. ') + needKey}
+            />
+            <Row ok={health.quotaEnforced} title={tr('Promo codes and invites', 'Промокоды и приглашения')} ok_text={tr('Credited on the server, once per student.', 'Начисляются на сервере, один раз на ученика.')} off_text={needKey} />
+            <Row ok={health.quotaEnforced} title={tr('Parent access', 'Доступ родителей')} ok_text={tr('Codes and the parent cabinet work.', 'Коды и кабинет родителя работают.')} off_text={needKey} />
+            <Row ok={health.quotaEnforced} title={tr('Teacher cabinet', 'Кабинет учителя')} ok_text={tr('Requests, approval and classes work.', 'Заявки, одобрение и классы работают.')} off_text={needKey} />
+            <Row ok={health.quotaEnforced} title={tr('Funnel analytics', 'Аналитика воронки')} ok_text={tr('Events are stored; see Analytics.', 'События сохраняются; смотрите «Аналитика».')} off_text={needKey} />
+            <Row ok={health.quotaEnforced} title={tr('Account deletion', 'Удаление аккаунта')} ok_text={tr('Students can delete their account and data.', 'Ученики могут удалить аккаунт и данные.')} off_text={needKey} />
+          </ul>
+
+          <div className="p-5 rounded-2xl border border-[var(--border)] space-y-2">
+            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-[var(--muted)]">{tr('Cannot be detected from here', 'Отсюда не определить')}</h2>
+            <ul className="list-disc pl-5 text-sm text-[var(--muted)] leading-relaxed space-y-1">
+              <li>{tr('firestore.rules published in the Firebase console (after the keys above are set).', 'Правила firestore.rules опубликованы в консоли Firebase (после того как заданы ключи выше).')}</li>
+              <li>{tr('Firestore index: Indexes → Single field → collection group "comments", field "userId" (needed to delete a student’s comments under other posts).', 'Индекс Firestore: Indexes → Single field → collection group «comments», поле «userId» (нужен, чтобы удалять комментарии ученика под чужими постами).')}</li>
+              <li>{tr('One manual test on test accounts: parent link, teacher approval and class join, account deletion. Steps are in docs/LAUNCH.md.', 'Один ручной прогон на тестовых аккаунтах: подключение родителя, одобрение учителя и вступление в класс, удаление аккаунта. Шаги в docs/LAUNCH.md.')}</li>
+            </ul>
+          </div>
+        </>
       )}
     </div>
   );
