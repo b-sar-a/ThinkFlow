@@ -12,6 +12,7 @@ const ERRORS: Record<string, string> = {
   AUTH_INVALID: "Сессия истекла. Войдите заново.",
   RATE_LIMITED: "Слишком много запросов. Подождите минуту.",
   AI_BUSY: "ИИ сейчас перегружен. Попробуйте через 10 секунд.",
+  AI_BUSY_TODAY: "На сегодня запросы к ИИ закончились. Попробуйте завтра.",
 };
 
 async function callServerAI(endpoint: string, payload: any): Promise<any> {

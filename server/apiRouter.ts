@@ -5,6 +5,7 @@ import { accountCreatedAt, adminDb, deleteAuthUser, hasAdminDb, verifyIdToken } 
 import { deleteAccountData, type DeletionDb } from "./accountDeletion.js";
 import { cleanEvent, computeFunnel, recordEvent, type StoredEvent } from "./analytics.js";
 import * as classes from "./classes.js";
+import { QuotaError, createMemoryQuota } from "./quota.js";
 import { FamilyError, createCode, linkWithCode, listChildren, listParents, unlink, type Db } from "./family.js";
 
 /**
@@ -125,9 +126,23 @@ function rateLimit(req: Request, res: Response, next: NextFunction) {
  * reservation is replaced by the real token count; if the call fails it is released.
  * If the process dies mid-call the reservation stays, which errs on the side of charging.
  */
+// Safety net for when Firestore is not configured: a per-student and a per-instance daily budget.
+const memoryQuota = createMemoryQuota({
+  perUserDaily: DEFAULT_TOKEN_LIMIT,
+  globalDaily: Math.max(0, Math.floor(Number(process.env.AI_FALLBACK_DAILY_TOKENS) || 400_000)),
+});
+
 async function reserveQuota(uid: string, estimate: number) {
   const db = adminDb();
-  if (!db) return;
+  if (!db) {
+    try {
+      memoryQuota.reserve(uid, estimate);
+    } catch (error) {
+      if (error instanceof QuotaError) throw new HttpError(429, error.message === "GLOBAL_DAILY_LIMIT" ? "AI_BUSY_TODAY" : "PRO_LIMIT_REACHED");
+      throw error;
+    }
+    return;
+  }
   const ref = db.doc(`users/${uid}`);
   await db.runTransaction(async (tx) => {
     const data = (await tx.get(ref)).data() || {};
@@ -139,7 +154,11 @@ async function reserveQuota(uid: string, estimate: number) {
 
 async function adjustQuota(uid: string, delta: number) {
   const db = adminDb();
-  if (!db || delta === 0) return;
+  if (delta === 0) return;
+  if (!db) {
+    memoryQuota.adjust(uid, delta);
+    return;
+  }
   await db.doc(`users/${uid}`).set({ aiTokensUsed: FieldValue.increment(delta) }, { merge: true });
 }
 
