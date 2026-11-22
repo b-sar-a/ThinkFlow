@@ -21,6 +21,12 @@ type ItemStatus = 'idle' | 'correct' | 'wrong' | 'shown' | 'selfdone';
 
 const storageKey = (uid: string) => `tf_programs_${uid}`;
 
+const MAX_LESSONS_SAVED = 200;
+const KNOWN_LESSONS = new Set(PROGRAMS.flatMap((p) => p.lessons.map((l) => `${p.id}/${l.id}`)));
+/** Only lessons that exist, each once, at most what the rules allow. */
+const cleanDone = (list: unknown): string[] =>
+  Array.from(new Set(Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string' && KNOWN_LESSONS.has(x)) : [])).slice(0, MAX_LESSONS_SAVED);
+
 const readDone = (uid: string | undefined): string[] => {
   if (!uid) return [];
   try {
@@ -43,7 +49,8 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
   const text = (b: Bi<string>) => (language === 'en' ? b.en : b.ru);
   const texts = (b: Bi<string[]>) => (language === 'en' ? b.en : b.ru);
 
-  const [done, setDone] = useState<string[]>(() => readDone(user?.uid));
+  const [done, setDone] = useState<string[]>(() => cleanDone(readDone(user?.uid)));
+  const uploaded = useRef(false);
   const [programId, setProgramId] = useState<string | null>(null);
   const [lessonId, setLessonId] = useState<string | null>(null);
   const [justEarned, setJustEarned] = useState<string | null>(null);
@@ -56,6 +63,28 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
   useEffect(() => {
     topRef.current?.scrollIntoView({ block: 'start' });
   }, [programId, lessonId]);
+
+  useEffect(() => {
+    if (!profile) return;
+    const cloud = cleanDone(profile.lessonsDone);
+    const merged = cleanDone([...cloud, ...done]);
+    if (merged.length !== done.length) {
+      setDone(merged);
+      if (user?.uid) {
+        try {
+          localStorage.setItem(storageKey(user.uid), JSON.stringify(merged));
+        } catch {
+          /* storage blocked */
+        }
+      }
+    }
+    // Progress made before the cloud copy existed (or offline) goes up once.
+    if (!uploaded.current && merged.length > cloud.length) {
+      uploaded.current = true;
+      updateProfileData({ lessonsDone: merged }).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.lessonsDone]);
 
   const saveDone = (next: string[]) => {
     setDone(next);
@@ -70,15 +99,17 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
   const completeLesson = async (p: Program, l: Lesson) => {
     const key = doneKey(p, l);
     if (done.includes(key)) return;
-    saveDone([...done, key]);
+    const next = cleanDone([...done, key]);
+    saveDone(next);
     setJustEarned(key);
     track('first_lesson_completed');
     if (!profile) return;
     try {
       const newXP = (profile.xp || 0) + LESSON_XP;
-      await updateProfileData({ xp: newXP, level: Math.max(levelInfo(newXP).level, profile.level) });
+      // XP, level and the finished-lessons list go up in one write.
+      await updateProfileData({ xp: newXP, level: Math.max(levelInfo(newXP).level, profile.level), lessonsDone: next });
     } catch (e) {
-      console.warn('Could not save lesson XP:', e);
+      console.warn('Could not save lesson progress:', e);
     }
   };
 

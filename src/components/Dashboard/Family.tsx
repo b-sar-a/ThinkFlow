@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Users, Flame, Trophy, CheckCircle2, Loader2, UserPlus, ShieldCheck, TrendingUp } from 'lucide-react';
+import { Users, Flame, Trophy, CheckCircle2, Loader2, UserPlus, ShieldCheck, TrendingUp, GraduationCap } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../UI/Card';
@@ -159,6 +159,7 @@ export const Family: React.FC = () => {
               { icon: Trophy, label: 'XP', value: c.xp },
               { icon: Flame, label: tr('Streak, days', 'Серия, дней', 'Seriya, kun'), value: `${c.streakDays} (${tr('best', 'рекорд', 'rekord')} ${c.longestStreak})` },
               { icon: CheckCircle2, label: tr('Tasks done', 'Заданий выполнено', 'Bajarilgan vazifalar'), value: c.tasksCompleted },
+              { icon: GraduationCap, label: tr('Lessons done', 'Уроков пройдено', 'Tugagan darslar'), value: c.lessonsCompleted },
             ];
             return (
               <li key={c.childUid}>
@@ -178,7 +179,7 @@ export const Family: React.FC = () => {
                     </Button>
                   </div>
 
-                  <dl className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <dl className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     {stats.map((s) => (
                       <div key={s.label} className="p-4 rounded-2xl bg-[var(--input)]">
                         <dt className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-[var(--muted)]">
@@ -219,8 +220,8 @@ export const Family: React.FC = () => {
       <p className="flex items-start gap-2 text-xs text-[var(--muted)] leading-relaxed">
         <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
         {tr(
-          'You see name, grade, goal, XP, level, streaks, finished tasks and study days. You never see messages, posts, AI chats or email. Your child can remove your access at any time.',
-          'Вы видите имя, класс, цель, XP, уровень, серии, выполненные задания и дни занятий. Сообщения, посты, чаты с ИИ и почта вам недоступны. Ребёнок может отозвать доступ в любой момент.',
+          'You see name, grade, goal, XP, level, streaks, finished tasks, finished lessons and study days. You never see messages, posts, AI chats or email. Your child can remove your access at any time.',
+          'Вы видите имя, класс, цель, XP, уровень, серии, выполненные задания, пройденные уроки и дни занятий. Сообщения, посты, чаты с ИИ и почта вам недоступны. Ребёнок может отозвать доступ в любой момент.',
           "Siz ism, sinf, maqsad, XP, daraja, seriyalar, bajarilgan vazifalar va o'qish kunlarini ko'rasiz. Xabarlar, postlar, AI suhbatlari va pochta ko'rinmaydi. Farzandingiz kirishni istalgan vaqtda bekor qila oladi."
         )}
       </p>

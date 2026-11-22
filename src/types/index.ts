@@ -35,6 +35,8 @@ export interface UserProfile {
   onboarded?: boolean;
   goal?: string;
   streakDays?: number;
+  /** Finished lessons, "programId/lessonId", kept in the cloud so progress follows the student. */
+  lessonsDone?: string[];
   longestStreak?: number;
   lastActiveDate?: string;
   referralCount?: number;

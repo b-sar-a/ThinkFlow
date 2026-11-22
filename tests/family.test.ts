@@ -16,7 +16,7 @@ describe('parent access', () => {
     fake = createFakeDb();
     db = fake.db;
     const { store } = fake;
-    store.set('users/kid', { name: 'Aziza', email: 'secret@kid.com', studentClass: 'Grade 8', goal: 'exams', xp: 300, level: 4, streakDays: 3, longestStreak: 5, lastActiveDate: '2026-11-22', aiTokensUsed: 999 });
+    store.set('users/kid', { name: 'Aziza', email: 'secret@kid.com', studentClass: 'Grade 8', goal: 'exams', xp: 300, level: 4, streakDays: 3, longestStreak: 5, lastActiveDate: '2026-11-22', aiTokensUsed: 999, lessonsDone: ['algebra-7-9/linear-equations', 'sat-math/percent-ratio'] });
     store.set('users/mom', { name: 'Mom' });
     store.set('users/dad', { name: 'Dad' });
     store.set('tasks/t1', { userId: 'kid', status: 'completed' });
@@ -91,7 +91,7 @@ describe('parent access', () => {
     it('is a fixed list of fields and never the email or token usage', async () => {
       const [kid] = await listChildren(db, 'mom', NOW);
       expect(Object.keys(kid).sort()).toEqual(
-        ['childUid', 'goal', 'grade', 'lastActiveDate', 'level', 'linkedAt', 'longestStreak', 'name', 'streakDays', 'tasksCompleted', 'week', 'xp'].sort()
+        ['childUid', 'goal', 'grade', 'lastActiveDate', 'lessonsCompleted', 'level', 'linkedAt', 'longestStreak', 'name', 'streakDays', 'tasksCompleted', 'week', 'xp'].sort()
       );
       expect(JSON.stringify(kid)).not.toContain('secret@kid.com');
     });
@@ -99,6 +99,7 @@ describe('parent access', () => {
     it('counts only this student: finished tasks and the active days of the last week', async () => {
       const [kid] = await listChildren(db, 'mom', NOW);
       expect(kid.tasksCompleted).toBe(1);
+      expect(kid.lessonsCompleted).toBe(2);
       expect(kid.xp).toBe(300);
       expect(kid.week).toHaveLength(7);
       expect(kid.week.filter((d) => d.active).map((d) => d.date)).toEqual(['2026-11-20', '2026-11-22']);

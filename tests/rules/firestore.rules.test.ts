@@ -101,6 +101,14 @@ describe('users', () => {
       await assertFails(updateDoc(ref, { aiTokensUsed: 5 }));
     });
 
+    it('keep finished lessons as a list of at most 200 entries', async () => {
+      const ref = doc(as('alice'), 'users/alice');
+      await assertSucceeds(updateDoc(ref, { lessonsDone: ['algebra-7-9/linear-equations'] }));
+      await assertSucceeds(updateDoc(ref, { lessonsDone: Array.from({ length: 200 }, (_, i) => `p/${i}`) }));
+      await assertFails(updateDoc(ref, { lessonsDone: Array.from({ length: 201 }, (_, i) => `p/${i}`) }));
+      await assertFails(updateDoc(ref, { lessonsDone: 'all of them' }));
+    });
+
     it('refuse a bio that is too long', async () => {
       await assertFails(updateDoc(doc(as('alice'), 'users/alice'), { bio: 'x'.repeat(1001) }));
     });

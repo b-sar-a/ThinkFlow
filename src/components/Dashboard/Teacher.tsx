@@ -454,7 +454,7 @@ const ClassRoster: React.FC<{ cls: ClassRow; tr: Tr; locale: string; language: '
                           )}
                           <div className="text-right shrink-0">
                             <p className="font-black text-[var(--text)]">{s.xp} XP</p>
-                            <p className="text-xs text-[var(--muted)]">{tr('Lvl', 'Ур.', 'Dar.')} {s.level}{s.streakDays ? ` · ${tr("streak", "серия", "seriya")} ${s.streakDays}` : ''}</p>
+                            <p className="text-xs text-[var(--muted)]">{tr('Lessons', 'Уроков', 'Darslar')} {s.lessonsCompleted} · {tr('Lvl', 'Ур.', 'Dar.')} {s.level}{s.streakDays ? ` · ${tr("streak", "серия", "seriya")} ${s.streakDays}` : ''}</p>
                           </div>
                           <ChevronDown className={`w-4 h-4 text-[var(--muted)] shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} aria-hidden="true" />
                         </button>
@@ -468,7 +468,7 @@ const ClassRoster: React.FC<{ cls: ClassRow; tr: Tr; locale: string; language: '
                             ) : (
                               <>
                                 <p className="text-sm text-[var(--text)]">
-                                  {tr(`Finished tasks: ${detail.tasksCompleted}. Best streak: ${detail.longestStreak} days.`, `Выполнено заданий: ${detail.tasksCompleted}. Лучшая серия: ${detail.longestStreak} дн.`, `Bajarilgan vazifalar: ${detail.tasksCompleted}. Eng yaxshi seriya: ${detail.longestStreak} kun.`)}
+                                  {tr(`Finished tasks: ${detail.tasksCompleted}. Finished lessons: ${detail.lessonsCompleted}. Best streak: ${detail.longestStreak} days.`, `Выполнено заданий: ${detail.tasksCompleted}. Пройдено уроков: ${detail.lessonsCompleted}. Лучшая серия: ${detail.longestStreak} дн.`, `Bajarilgan vazifalar: ${detail.tasksCompleted}. Tugagan darslar: ${detail.lessonsCompleted}. Eng yaxshi seriya: ${detail.longestStreak} kun.`)}
                                 </p>
                                 <div className="grid grid-cols-7 gap-2" role="img" aria-label={tr('Study days in the last week', 'Дни занятий за неделю', "So'nggi hafta o'qish kunlari")}>
                                   {detail.week.map((d) => (

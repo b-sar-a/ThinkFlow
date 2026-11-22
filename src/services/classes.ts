@@ -20,6 +20,7 @@ export interface RosterStudent {
   streakDays: number;
   longestStreak: number;
   lastActiveDate: string;
+  lessonsCompleted: number;
   joinedAt: number;
 }
 
