@@ -19,6 +19,8 @@ export interface PracticeItem {
   answer?: number | string[];
   /** Shown after answering: the worked solution or the model answer. */
   explain: Bi<string>;
+  /** Uzbek text of the question and of the solution (Russian is shown where this is missing). */
+  uz?: { q: string; explain: string };
 }
 
 export interface Lesson {
@@ -29,6 +31,8 @@ export interface Lesson {
   practice: PracticeItem[];
   /** Pre-fills the Genius Lab when the student wants a deeper dive. */
   labTopic: Bi<string>;
+  /** Uzbek explanation and example (Russian is shown where this is missing). */
+  uz?: { teach: string[]; example: string };
 }
 
 export type ProgramKind = 'school' | 'exam';
@@ -73,3 +77,26 @@ export const checkAnswer = (item: PracticeItem, input: string): CheckResult => {
   const got = normalize(input);
   return got && item.answer.some((a) => normalize(a) === got) ? 'correct' : 'wrong';
 };
+
+/** What an Uzbek overlay file provides for one lesson. */
+export interface UzOverlay {
+  teach: string[];
+  example: string;
+  practice: { q: string; explain: string }[];
+}
+
+/** Returns the program with the Uzbek texts attached to its lessons (matched by lesson id). */
+export function withUzbek(program: Program, overlay: Record<string, UzOverlay>): Program {
+  return {
+    ...program,
+    lessons: program.lessons.map((lesson) => {
+      const uz = overlay[lesson.id];
+      if (!uz) return lesson;
+      return {
+        ...lesson,
+        uz: { teach: uz.teach, example: uz.example },
+        practice: lesson.practice.map((item, i) => (uz.practice[i] ? { ...item, uz: uz.practice[i] } : item)),
+      };
+    }),
+  };
+}

@@ -118,21 +118,21 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
           </h1>
         </header>
 
-        {language === 'uz' && (
+        {language === 'uz' && !lesson.uz && (
           <p className="text-sm text-[var(--muted)] p-4 rounded-2xl bg-[var(--input)]">
             O‘zbekcha to‘liq matn tayyorlanmoqda, hozircha dars rus tilida.
           </p>
         )}
 
         <div className="space-y-4">
-          {texts(lesson.teach).map((p, i) => (
+          {(language === 'uz' && lesson.uz ? lesson.uz.teach : texts(lesson.teach)).map((p, i) => (
             <p key={i} className="text-base md:text-lg leading-relaxed text-[var(--text)]">{p}</p>
           ))}
         </div>
 
         <div className={`p-5 md:p-6 rounded-[1.5rem] border ${accent.border} ${accent.soft}`}>
           <h2 className={`text-xs font-black uppercase tracking-[0.2em] mb-2 ${accent.text}`}>{tr('Worked example', 'Разобранный пример', 'Yechilgan misol')}</h2>
-          <p className="text-[var(--text)] leading-relaxed">{text(lesson.example)}</p>
+          <p className="text-[var(--text)] leading-relaxed">{language === 'uz' && lesson.uz ? lesson.uz.example : text(lesson.example)}</p>
         </div>
 
         <section className="space-y-4" aria-labelledby="practice-title">
@@ -144,6 +144,7 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
             key={`${program.id}/${lesson.id}`}
             items={lesson.practice}
             text={text}
+            uz={language === 'uz'}
             tr={tr}
             alreadyDone={done.includes(doneKey(program, lesson))}
             onAllDone={() => completeLesson(program, lesson)}
@@ -319,12 +320,15 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
 interface PracticeProps {
   items: PracticeItem[];
   text: (b: Bi<string>) => string;
+  uz: boolean;
   tr: (en: string, ru: string, uz: string) => string;
   alreadyDone: boolean;
   onAllDone: () => void;
 }
 
-const Practice: React.FC<PracticeProps> = ({ items, text, tr, alreadyDone, onAllDone }) => {
+const Practice: React.FC<PracticeProps> = ({ items, text, uz, tr, alreadyDone, onAllDone }) => {
+  const qOf = (it: PracticeItem) => (uz && it.uz ? it.uz.q : text(it.q));
+  const explainOf = (it: PracticeItem) => (uz && it.uz ? it.uz.explain : text(it.explain));
   const [status, setStatus] = useState<ItemStatus[]>(() => items.map(() => 'idle'));
   const [values, setValues] = useState<string[]>(() => items.map(() => ''));
   const fired = useRef(false);
@@ -357,7 +361,7 @@ const Practice: React.FC<PracticeProps> = ({ items, text, tr, alreadyDone, onAll
             <Card className={`p-5 md:p-6 rounded-[1.5rem] border ${solved ? 'border-emerald-500/30' : 'border-[var(--border)]'} space-y-4`}>
               <p className="font-semibold text-[var(--text)] leading-relaxed">
                 <span className="text-[var(--muted)] mr-2">{i + 1}.</span>
-                {text(item.q)}
+                {qOf(item)}
               </p>
 
               {self ? (
@@ -379,7 +383,7 @@ const Practice: React.FC<PracticeProps> = ({ items, text, tr, alreadyDone, onAll
                   )}
                   {(s === 'shown' || s === 'selfdone') && (
                     <>
-                      <p className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-[var(--text)] leading-relaxed">{text(item.explain)}</p>
+                      <p className="p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-[var(--text)] leading-relaxed">{explainOf(item)}</p>
                       {s === 'shown' && (
                         <Button onClick={() => setStatus((st) => set(st, i, 'selfdone'))} className="h-11 px-5 rounded-xl">
                           <Check className="w-4 h-4 mr-2" aria-hidden="true" />
@@ -418,14 +422,14 @@ const Practice: React.FC<PracticeProps> = ({ items, text, tr, alreadyDone, onAll
                           <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
                           {tr('Correct!', 'Верно!', "To'g'ri!")}
                         </p>
-                        <p className="text-sm text-[var(--muted)]">{text(item.explain)}</p>
+                        <p className="text-sm text-[var(--muted)]">{explainOf(item)}</p>
                       </div>
                     )}
                     {(s === 'wrong' || s === 'shown') && (
                       <div className="space-y-2">
                         <p className="text-sm font-bold text-rose-500">{tr('Not quite. Check your calculation and try again.', 'Пока неверно. Проверьте вычисления и попробуйте ещё раз.', "Hali noto'g'ri. Hisoblashni tekshirib, qayta urinib ko'ring.")}</p>
                         {s === 'shown' ? (
-                          <p className="text-sm text-[var(--text)] p-3 rounded-xl bg-[var(--input)]">{text(item.explain)}</p>
+                          <p className="text-sm text-[var(--text)] p-3 rounded-xl bg-[var(--input)]">{explainOf(item)}</p>
                         ) : (
                           <button
                             type="button"
