@@ -148,6 +148,7 @@ export async function summarize(db: Db, childUid: string, now = Date.now()) {
     longestStreak: Number(u.longestStreak) || 0,
     lastActiveDate: typeof u.lastActiveDate === "string" ? u.lastActiveDate : "",
     tasksCompleted: tasks.docs.filter((t) => t.data().status === "completed").length,
+    lessonsCompleted: Array.isArray(u.lessonsDone) ? Math.min(200, u.lessonsDone.length) : 0,
     week,
   };
 }

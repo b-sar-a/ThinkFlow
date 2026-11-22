@@ -155,6 +155,7 @@ export interface RosterStudent {
   streakDays: number;
   longestStreak: number;
   lastActiveDate: string;
+  lessonsCompleted: number;
   joinedAt: number;
 }
 
@@ -179,6 +180,7 @@ export async function roster(db: Db, teacherUid: string, classId: string) {
           streakDays: Number(u.streakDays) || 0,
           longestStreak: Number(u.longestStreak) || 0,
           lastActiveDate: typeof u.lastActiveDate === "string" ? u.lastActiveDate : "",
+          lessonsCompleted: Array.isArray(u.lessonsDone) ? Math.min(200, u.lessonsDone.length) : 0,
           joinedAt: m.data().joinedAt ?? 0,
         } satisfies RosterStudent;
       })

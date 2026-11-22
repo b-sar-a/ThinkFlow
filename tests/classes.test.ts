@@ -16,7 +16,7 @@ describe('teacher cabinet', () => {
     for (const [uid, name] of [['teach', 'Ms. Karimova'], ['teach2', 'Mr. Other'], ['admin', 'Admin'], ['s2', 'Timur'], ['s3', 'Dilnoza']]) {
       fake.store.set(`users/${uid}`, { name, email: `${uid}@x.com` });
     }
-    fake.store.set('users/s1', { name: 'Aziza', email: 's1@x.com', studentClass: 'Grade 8', xp: 300, level: 4, streakDays: 3, longestStreak: 5, lastActiveDate: '2026-11-22', aiTokensUsed: 5 });
+    fake.store.set('users/s1', { name: 'Aziza', email: 's1@x.com', studentClass: 'Grade 8', xp: 300, level: 4, streakDays: 3, longestStreak: 5, lastActiveDate: '2026-11-22', aiTokensUsed: 5, lessonsDone: ['algebra-7-9/linear-equations'] });
   });
 
   const approve = async (uid: string) => {
@@ -88,7 +88,8 @@ describe('teacher cabinet', () => {
       const cls = await C.createClass(db, 'teach', 'Class 8B', NOW);
       await C.joinClass(db, 's1', cls.code, NOW);
       const { students } = await C.roster(db, 'teach', cls.classId);
-      expect(Object.keys(students[0]).sort()).toEqual(['grade', 'joinedAt', 'lastActiveDate', 'level', 'longestStreak', 'name', 'streakDays', 'studentUid', 'xp']);
+      expect(Object.keys(students[0]).sort()).toEqual(['grade', 'joinedAt', 'lastActiveDate', 'lessonsCompleted', 'level', 'longestStreak', 'name', 'streakDays', 'studentUid', 'xp']);
+      expect(students[0].lessonsCompleted).toBe(1);
       expect(JSON.stringify(students)).not.toContain('s1@x.com');
       expect(JSON.stringify(students)).not.toContain('aiTokensUsed');
     });

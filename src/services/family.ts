@@ -18,6 +18,7 @@ export interface ChildSummary {
   longestStreak: number;
   lastActiveDate: string;
   tasksCompleted: number;
+  lessonsCompleted: number;
   week: WeekDay[];
 }
 

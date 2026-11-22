@@ -98,6 +98,7 @@ service cloud.firestore {
              (!('longestStreak' in data) || (data.longestStreak is number && data.longestStreak >= 0 && data.longestStreak <= 3650)) &&
              (!('lastActiveDate' in data) || (data.lastActiveDate is string && data.lastActiveDate.size() == 10)) &&
              (!('referralCount' in data) || data.referralCount is number) &&
+             (!('lessonsDone' in data) || (data.lessonsDone is list && data.lessonsDone.size() <= 200)) &&
              (!('studentClass' in data) || data.studentClass is string) &&
              (!('interests' in data) || data.interests is list) &&
              (!('xp' in data) || data.xp is number) &&
