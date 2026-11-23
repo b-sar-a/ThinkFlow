@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Trophy, Zap, Target, Star, FlaskConical, ListChecks, MessageSquare } from 'lucide-react';
+import { BarChart3, Trophy, Zap, Target, Star, FlaskConical, ListChecks, MessageSquare, GraduationCap, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../UI/Card';
@@ -8,6 +8,7 @@ import { Button } from '../UI/Button';
 import { db } from '../../lib/firebase';
 import { collection, query, where, getCountFromServer } from 'firebase/firestore';
 import { levelInfo } from '../../lib/progress';
+import { PROGRAMS, LESSON_XP } from '../../data/programs';
 
 interface ProgressProps {
   /** Lets the page send the student on to the Lab or the tasks. */
@@ -58,7 +59,19 @@ export const Progress: React.FC<ProgressProps> = ({ onNavigate }) => {
     },
   ];
 
+  // Finished lessons come from the profile, so they follow the student to every device.
+  const lessonsDone = new Set(Array.isArray(profile.lessonsDone) ? profile.lessonsDone : []);
+  const programRows = PROGRAMS.map((p) => ({
+    id: p.id,
+    title: p.title[language],
+    done: p.lessons.filter((l) => lessonsDone.has(`${p.id}/${l.id}`)).length,
+    total: p.lessons.length,
+  }));
+  const lessonsTotal = programRows.reduce((n, r) => n + r.done, 0);
+  const lessonsAll = programRows.reduce((n, r) => n + r.total, 0);
+
   const ways = [
+    { icon: GraduationCap, text: tr('Finish a lesson in Programs', 'Пройти урок в Программах', 'Dasturlarda darsni tugatish'), xp: `+${LESSON_XP} XP` },
     { icon: FlaskConical, text: tr('Open a course or build a map in the Lab', 'Открыть курс или построить карту в Лаборатории', 'Laboratoriyada kurs ochish yoki xarita qurish'), xp: '+25 XP' },
     { icon: ListChecks, text: tr('Solve a task correctly', 'Верно решить задание', 'Vazifani to‘g‘ri yechish'), xp: '30–125 XP' },
     { icon: MessageSquare, text: tr('Ask the AI assistant a question', 'Задать вопрос ИИ-ассистенту', 'AI yordamchiga savol berish'), xp: '+15 XP' },
@@ -93,6 +106,53 @@ export const Progress: React.FC<ProgressProps> = ({ onNavigate }) => {
         ))}
       </div>
 
+      <Card className="p-6 md:p-10 rounded-[2.5rem] border border-[var(--border)] space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <h3 className="text-xl md:text-2xl font-black uppercase tracking-tighter text-[var(--text)]">{tr('Programs', 'Программы', 'Dasturlar')}</h3>
+          <p className="text-sm font-bold text-[var(--muted)] tabular-nums">{lessonsTotal}/{lessonsAll} {tr('lessons', 'уроков', 'dars')}</p>
+        </div>
+        <ul className="grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4">
+          {programRows.map((r) => {
+            const pct = r.total ? (r.done / r.total) * 100 : 0;
+            const row = (
+              <>
+                <span className="flex justify-between gap-3 text-sm font-bold text-[var(--text)]">
+                  <span className="truncate">{r.title}</span>
+                  <span className="text-[var(--muted)] tabular-nums shrink-0">{r.done}/{r.total}</span>
+                </span>
+                <span
+                  role="progressbar"
+                  aria-label={r.title}
+                  aria-valuemin={0}
+                  aria-valuemax={r.total}
+                  aria-valuenow={r.done}
+                  className="mt-2 block h-2 rounded-full bg-[var(--input)] overflow-hidden"
+                >
+                  <span className="block h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-700" style={{ width: `${pct}%` }} />
+                </span>
+              </>
+            );
+            return (
+              <li key={r.id}>
+                {onNavigate ? (
+                  <button type="button" onClick={() => onNavigate('programs')} className="block w-full text-left rounded-xl focus-visible:outline-2 focus-visible:outline-indigo-500">
+                    {row}
+                  </button>
+                ) : (
+                  <div>{row}</div>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+        {onNavigate && (
+          <Button variant="outline" onClick={() => onNavigate('programs')} className="h-12 px-6 rounded-2xl gap-2">
+            <span className="font-black uppercase text-xs tracking-widest">{tr('Open Programs', 'Открыть Программы', 'Dasturlarni ochish')}</span>
+            <ArrowRight className="w-4 h-4" aria-hidden="true" />
+          </Button>
+        )}
+      </Card>
+
       <Card className="p-8 md:p-14 rounded-[3rem] md:rounded-[4rem] border border-[var(--border)] overflow-hidden relative">
         <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-600/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl" />
 
@@ -126,7 +186,7 @@ export const Progress: React.FC<ProgressProps> = ({ onNavigate }) => {
             {tr('Next level in', 'До следующего уровня', 'Keyingi darajagacha')} <span className="text-indigo-500 tabular-nums">{remaining.toLocaleString()} XP</span>
           </p>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-[var(--border)]">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-[var(--border)]">
             {ways.map((way) => (
               <div key={way.text} className="flex items-start gap-3 p-4 rounded-2xl bg-[var(--input)] border border-[var(--border)]">
                 <way.icon className="w-5 h-5 mt-0.5 shrink-0 text-indigo-500" aria-hidden="true" />
