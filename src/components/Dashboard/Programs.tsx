@@ -64,6 +64,33 @@ const readMistakes = (uid: string | undefined): string[] => {
   }
 };
 
+/** Lessons finished per day (local date), for the daily goal. Kept on this device. */
+const DAILY_GOAL = 1;
+const dailyKey = (uid: string) => `tf_daily_${uid}`;
+const dayKey = (offset = 0) => {
+  const d = new Date();
+  d.setDate(d.getDate() - offset);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const cleanDaily = (raw: unknown): Record<string, number> => {
+  const recent = new Set(Array.from({ length: 30 }, (_, i) => dayKey(i)));
+  const out: Record<string, number> = {};
+  if (raw && typeof raw === 'object') {
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (recent.has(k) && typeof v === 'number' && Number.isFinite(v) && v > 0) out[k] = Math.min(Math.floor(v), 99);
+    }
+  }
+  return out;
+};
+const readDaily = (uid: string | undefined): Record<string, number> => {
+  if (!uid) return {};
+  try {
+    return cleanDaily(JSON.parse(localStorage.getItem(dailyKey(uid)) || '{}'));
+  } catch {
+    return {};
+  }
+};
+
 /** Progress ring used on the "continue" card. */
 const Ring: React.FC<{ percent: number; label: string }> = ({ percent, label }) => {
   const r = 26;
@@ -99,6 +126,7 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
   const [mistakes, setMistakes] = useState<string[]>(() => readMistakes(user?.uid));
   const [reviewKeys, setReviewKeys] = useState<string[] | null>(null);
   const [reviewFinished, setReviewFinished] = useState(false);
+  const [daily, setDaily] = useState<Record<string, number>>(() => readDaily(user?.uid));
   const topRef = useRef<HTMLDivElement>(null);
 
   const program = PROGRAMS.find((p) => p.id === programId) ?? null;
@@ -117,6 +145,15 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
       /* storage blocked: the list lasts for this visit only */
     }
   }, [mistakes, user?.uid]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    try {
+      localStorage.setItem(dailyKey(user.uid), JSON.stringify(daily));
+    } catch {
+      /* storage blocked: the streak of days lasts for this visit only */
+    }
+  }, [daily, user?.uid]);
 
   const noteMistake = (key: string) => setMistakes((m) => cleanMistakes([...m.filter((k) => k !== key), key]));
   const clearMistake = (key: string) => setMistakes((m) => m.filter((k) => k !== key));
@@ -158,6 +195,7 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
     if (done.includes(key)) return;
     const next = cleanDone([...done, key]);
     saveDone(next);
+    setDaily((d) => cleanDaily({ ...d, [dayKey()]: (d[dayKey()] ?? 0) + 1 }));
     setJustEarned(key);
     track('first_lesson_completed');
     if (!profile) return;
@@ -383,6 +421,9 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
     return p && l ? { p, l, n: p.lessons.indexOf(l) + 1 } : null;
   })();
   const missed = mistakes.filter((k) => itemOf(k) !== null);
+  const todayCount = daily[dayKey()] ?? 0;
+  const week = Array.from({ length: 7 }, (_, i) => 6 - i).map((offset) => ({ key: dayKey(offset), n: daily[dayKey(offset)] ?? 0 }));
+  const weekDays = week.filter((d) => d.n > 0).length;
   return (
     <div ref={topRef} className="max-w-5xl mx-auto space-y-10 animate-in fade-in duration-700 scroll-mt-4">
       <div className="flex items-center justify-between gap-6">
@@ -417,6 +458,22 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
                 <span className="block text-xs font-black uppercase tracking-[0.2em] text-indigo-500">{totalDone === 0 ? tr('Start here', 'Начните отсюда', 'Shu yerdan boshlang') : tr('Continue where you stopped', 'Продолжить с того места', "To'xtagan joyingizdan davom eting")}</span>
                 <span className="block text-lg md:text-xl font-black text-[var(--text)] leading-snug">{language === 'uz' && nextUp.l.title.uz ? nextUp.l.title.uz : text(nextUp.l.title)}</span>
                 <span className="block text-sm text-[var(--muted)]">{nextUp.p.title[language]} · {tr('Lesson', 'Урок', 'Dars')} {nextUp.n} · {totalDone}/{totalLessons} {tr('lessons done', 'уроков пройдено', 'dars tugagan')}</span>
+                <span className="flex items-center gap-3 pt-2">
+                  <span
+                    className="flex items-center gap-1.5"
+                    role="img"
+                    aria-label={tr(`Lessons on ${weekDays} of the last 7 days`, `Уроки в ${weekDays} из последних 7 дней`, `So'nggi 7 kunning ${weekDays} tasida darslar`)}
+                  >
+                    {week.map((d) => (
+                      <span key={d.key} className={`w-2.5 h-2.5 rounded-full ${d.n > 0 ? 'bg-emerald-500' : 'bg-[var(--input)]'}`} />
+                    ))}
+                  </span>
+                  <span className={`text-xs font-bold ${todayCount >= DAILY_GOAL ? 'text-emerald-500' : 'text-[var(--muted)]'}`}>
+                    {todayCount >= DAILY_GOAL
+                      ? tr("Today's goal is done", 'Цель на сегодня выполнена', "Bugungi maqsad bajarildi")
+                      : tr("Today's goal: finish 1 lesson", 'Цель на сегодня: пройти 1 урок', "Bugungi maqsad: 1 ta dars tugatish")}
+                  </span>
+                </span>
               </span>
               <span className="hidden sm:flex w-12 h-12 rounded-2xl bg-indigo-500 text-white items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
                 <Play className="w-5 h-5" aria-hidden="true" />
