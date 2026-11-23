@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
 import { Brain, Sparkles, Target, Zap, ArrowRight, Loader2, CheckCircle2, ChevronRight, MessageSquare, Star, AlertCircle, Play, Atom, Code2, Landmark } from 'lucide-react';
 import { generateKnowledgeTree, verifyTask } from '../../services/gemini';
@@ -13,6 +13,32 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import { track } from '../../lib/analytics';
 import { LAB_PRESETS, presetTree } from '../../data/labPresets';
+
+// XP from ready-made courses is paid once: the first opening of a course and each challenge once.
+// (It is remembered on this device; the AI-made trees cost tokens, which is their own limit.)
+interface LabSeen {
+  opened: string[];
+  nodes: string[];
+}
+const labSeenKey = (uid: string) => `tf_lab_seen_${uid}`;
+const readLabSeen = (uid: string | undefined): LabSeen => {
+  if (!uid) return { opened: [], nodes: [] };
+  try {
+    const raw = JSON.parse(localStorage.getItem(labSeenKey(uid)) || '{}');
+    const strings = (x: unknown) => (Array.isArray(x) ? x.filter((v): v is string => typeof v === 'string').slice(0, 200) : []);
+    return { opened: strings(raw.opened), nodes: strings(raw.nodes) };
+  } catch {
+    return { opened: [], nodes: [] };
+  }
+};
+const writeLabSeen = (uid: string | undefined, seen: LabSeen) => {
+  if (!uid) return;
+  try {
+    localStorage.setItem(labSeenKey(uid), JSON.stringify(seen));
+  } catch {
+    /* storage blocked: the rule then applies for this visit only */
+  }
+};
 
 // Icons for the ready-made courses (instead of emoji).
 const PRESET_ICON: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -55,6 +81,8 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
     }
   }, []);
   const [tree, setTree] = useState<KnowledgeTree | null>(null);
+  // The ready-made course that is open now (null for an AI-made tree).
+  const presetRef = useRef<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<KnowledgeNode | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [showChat, setShowChat] = useState(false);
@@ -105,10 +133,17 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
       setTopic(currentLabel);
       
       // Inject preset tree
+      const seen = readLabSeen(user?.uid);
       const copyTree = presetTree(template, language);
+      // Challenges solved before stay solved.
+      copyTree.nodes = copyTree.nodes.map((n) => ({ ...n, completed: seen.nodes.includes(`${template.id}/${n.id}`) }));
+      presetRef.current = template.id;
       setTree(copyTree);
       setSelectedNode(copyTree.nodes[0]);
-      await addXPAction(25);
+      if (!seen.opened.includes(template.id)) {
+        writeLabSeen(user?.uid, { ...seen, opened: [...seen.opened, template.id] });
+        await addXPAction(25);
+      }
       await logActivity();
     } catch (err) {
       setError(tr('Could not open the course. Try again.', 'Не удалось открыть курс. Попробуй ещё раз.', 'Kursni ochib bo‘lmadi. Qayta urinib ko‘ring.'));
@@ -155,6 +190,7 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
     setVerifyFeedback(null);
     setChallengeAnswer('');
     try {
+      presetRef.current = null;
       const generatedTree = await generateKnowledgeTree(topic, profile);
       if (generatedTree && Array.isArray(generatedTree.nodes) && generatedTree.nodes.length > 0) {
         setTree(generatedTree);
@@ -199,11 +235,19 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
     try {
       const result = await verifyTask(selectedNode, challengeAnswer, profile);
       
-      setVerifyFeedback({ isCorrect: result.isCorrect, text: result.feedback });
-      
+      const nodeKey = presetRef.current ? `${presetRef.current}/${selectedNode.id}` : null;
+      const seen = readLabSeen(user?.uid);
+      // A challenge pays XP once, however many times it is solved again.
+      const alreadyPaid = Boolean(selectedNode.completed) || (nodeKey !== null && seen.nodes.includes(nodeKey));
+      const noExtra = tr('(You already completed this challenge, so there is no extra XP.)', '(Это задание уже пройдено, поэтому дополнительных XP нет.)', "(Bu topshiriq avval bajarilgan, shuning uchun qo'shimcha XP yo'q.)");
+      setVerifyFeedback({ isCorrect: result.isCorrect, text: result.isCorrect && alreadyPaid ? result.feedback + ' ' + noExtra : result.feedback });
+
       if (result.isCorrect) {
         const totalAward = (selectedNode.points || 0) + (result.bonusXP || 0);
-        await addXPAction(totalAward);
+        if (!alreadyPaid) {
+          if (nodeKey) writeLabSeen(user?.uid, { ...seen, nodes: [...seen.nodes, nodeKey] });
+          await addXPAction(totalAward);
+        }
         
         if (tree) {
           setTree({
