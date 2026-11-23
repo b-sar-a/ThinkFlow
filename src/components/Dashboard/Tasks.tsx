@@ -14,8 +14,8 @@ import { track } from '../../lib/analytics';
 
 type Template = { title: string; desc: string; diff: 'Easy' | 'Medium' | 'Challenge'; xp: number };
 
-// The same seven problems in both languages (Uzbek speakers get English for now).
-const TEMPLATES: Record<'ru' | 'en', Template[]> = {
+// The same seven problems in all three languages.
+const TEMPLATES: Record<'ru' | 'en' | 'uz', Template[]> = {
   en: [
     { title: "Kinetics: Velocity", desc: "Calculate the velocity (v) if an object travels 150m (d) in 30s (t). Formula: v=d/t. Result in m/s.", diff: "Easy", xp: 30 },
     { title: "Algebra: Simplify", desc: "Solve for x: 3x + 15 = 45. Give the numeric value.", diff: "Easy", xp: 35 },
@@ -24,6 +24,15 @@ const TEMPLATES: Record<'ru' | 'en', Template[]> = {
     { title: "Chemistry: Molar Mass", desc: "Calculate the molar mass of H₂O. (H=1, O=16). Give the total g/mol.", diff: "Medium", xp: 70 },
     { title: "Logic: Sequence", desc: "Find the missing number: 1, 1, 2, 3, 5, 8, ?. (Fibonacci sequence)", diff: "Medium", xp: 50 },
     { title: "Physics: Power", desc: "Calculate Power (P) if Work (W) is 500J and time (t) is 10s. Formula: P=W/t. Result in Watts.", diff: "Challenge", xp: 125 },
+  ],
+  uz: [
+    { title: "Kinematika: tezlik", desc: "Jism 30 s (t) da 150 m (d) yo'l o'tsa, uning tezligi (v) nimaga teng? Formula: v = d / t. Javob m/s da.", diff: "Easy", xp: 30 },
+    { title: "Algebra: x ni toping", desc: "Tenglamani yeching: 3x + 15 = 45. Javob son bo'lsin.", diff: "Easy", xp: 35 },
+    { title: "Om qonuni", desc: "Zanjirda kuchlanish 10 V (V), qarshilik 2 Om (R). Tok kuchi (I) ni toping. Formula: I = V / R. Javob amperda.", diff: "Medium", xp: 60 },
+    { title: "Geometriya: yuza", desc: "Radiusi r = 5 m bo'lgan doiraning yuzini toping. π = 3,14 deb oling. Formula: A = πr². Javob m² da.", diff: "Medium", xp: 65 },
+    { title: "Kimyo: molyar massa", desc: "H₂O ning molyar massasini toping (H = 1, O = 16). Javob g/mol da.", diff: "Medium", xp: 70 },
+    { title: "Mantiq: ketma-ketlik", desc: "Yetishmayotgan sonni toping: 1, 1, 2, 3, 5, 8, ? (Fibonachchi sonlari).", diff: "Medium", xp: 50 },
+    { title: "Fizika: quvvat", desc: "Ish (W) 500 J, vaqt (t) 10 s bo'lsa, quvvat (P) ni toping. Formula: P = W / t. Javob vattda.", diff: "Challenge", xp: 125 },
   ],
   ru: [
     { title: "Кинематика: скорость", desc: "Найди скорость (v), если тело проходит 150 м (d) за 30 с (t). Формула: v = d / t. Ответ в м/с.", diff: "Easy", xp: 30 },
@@ -120,7 +129,7 @@ export const Tasks: React.FC = () => {
     if (!user || !profile) return;
     setIsGenerating(true);
 
-    const pool = TEMPLATES[language === 'ru' ? 'ru' : 'en'];
+    const pool = TEMPLATES[language];
     // Prefer a problem the student does not already have in the list.
     const fresh = pool.filter((tpl) => !tasks.some((task) => task.title === tpl.title));
     const choices = fresh.length > 0 ? fresh : pool;
