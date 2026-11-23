@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { GraduationCap, Calculator, Target, PenTool, Atom, FlaskConical, Code2, Dna, Landmark, Cpu, ArrowLeft, ArrowRight, Check, CheckCircle2, Circle, Sparkles, Eye } from 'lucide-react';
+import { GraduationCap, Calculator, Target, PenTool, Atom, FlaskConical, Code2, Dna, Landmark, Cpu, RotateCcw, Play, ArrowLeft, ArrowRight, Check, CheckCircle2, Circle, Sparkles, Eye } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../UI/Card';
@@ -42,6 +42,43 @@ const readDone = (uid: string | undefined): string[] => {
   }
 };
 
+/** Tasks answered wrong, as "program/lesson/number". Kept on this device, oldest first. */
+const mistakesKey = (uid: string) => `tf_mistakes_${uid}`;
+const MAX_MISTAKES = 60;
+const REVIEW_BATCH = 5;
+const itemOf = (key: string): { item: PracticeItem; program: Program; lesson: Lesson } | null => {
+  const [pid, lid, n] = key.split('/');
+  const program = PROGRAMS.find((p) => p.id === pid);
+  const lesson = program?.lessons.find((l) => l.id === lid);
+  const item = lesson?.practice[Number(n)];
+  return program && lesson && item && item.answer !== undefined ? { item, program, lesson } : null;
+};
+const cleanMistakes = (list: unknown): string[] =>
+  Array.from(new Set(Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string' && itemOf(x) !== null) : [])).slice(-MAX_MISTAKES);
+const readMistakes = (uid: string | undefined): string[] => {
+  if (!uid) return [];
+  try {
+    return cleanMistakes(JSON.parse(localStorage.getItem(mistakesKey(uid)) || '[]'));
+  } catch {
+    return [];
+  }
+};
+
+/** Progress ring used on the "continue" card. */
+const Ring: React.FC<{ percent: number; label: string }> = ({ percent, label }) => {
+  const r = 26;
+  const c = 2 * Math.PI * r;
+  return (
+    <div className="relative w-16 h-16 shrink-0" role="img" aria-label={label}>
+      <svg viewBox="0 0 64 64" className="w-16 h-16 -rotate-90" aria-hidden="true">
+        <circle cx="32" cy="32" r={r} fill="none" strokeWidth="6" className="stroke-[var(--input)]" />
+        <circle cx="32" cy="32" r={r} fill="none" strokeWidth="6" strokeLinecap="round" className="stroke-indigo-500 transition-all duration-700" strokeDasharray={c} strokeDashoffset={c * (1 - Math.min(100, percent) / 100)} />
+      </svg>
+      <span className="absolute inset-0 flex items-center justify-center text-sm font-black text-[var(--text)]">{Math.round(percent)}%</span>
+    </div>
+  );
+};
+
 interface ProgramsProps {
   onNavigate?: (view: string) => void;
 }
@@ -59,6 +96,9 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
   const [programId, setProgramId] = useState<string | null>(null);
   const [lessonId, setLessonId] = useState<string | null>(null);
   const [justEarned, setJustEarned] = useState<string | null>(null);
+  const [mistakes, setMistakes] = useState<string[]>(() => readMistakes(user?.uid));
+  const [reviewKeys, setReviewKeys] = useState<string[] | null>(null);
+  const [reviewFinished, setReviewFinished] = useState(false);
   const topRef = useRef<HTMLDivElement>(null);
 
   const program = PROGRAMS.find((p) => p.id === programId) ?? null;
@@ -67,7 +107,19 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
 
   useEffect(() => {
     topRef.current?.scrollIntoView({ block: 'start' });
-  }, [programId, lessonId]);
+  }, [programId, lessonId, reviewKeys]);
+
+  useEffect(() => {
+    if (!user?.uid) return;
+    try {
+      localStorage.setItem(mistakesKey(user.uid), JSON.stringify(mistakes));
+    } catch {
+      /* storage blocked: the list lasts for this visit only */
+    }
+  }, [mistakes, user?.uid]);
+
+  const noteMistake = (key: string) => setMistakes((m) => cleanMistakes([...m.filter((k) => k !== key), key]));
+  const clearMistake = (key: string) => setMistakes((m) => m.filter((k) => k !== key));
 
   useEffect(() => {
     if (!profile) return;
@@ -129,6 +181,54 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
 
   const progressOf = (p: Program) => p.lessons.filter((l) => done.includes(doneKey(p, l))).length;
 
+  // -------- review of missed tasks --------
+  if (reviewKeys) {
+    const batch = reviewKeys.map((key) => ({ key, found: itemOf(key) })).filter((x): x is { key: string; found: NonNullable<ReturnType<typeof itemOf>> } => x.found !== null);
+    const leave = () => {
+      setReviewKeys(null);
+      setReviewFinished(false);
+    };
+    return (
+      <div ref={topRef} className="max-w-3xl mx-auto space-y-8 animate-in fade-in duration-500 scroll-mt-4">
+        <button type="button" onClick={leave} className="inline-flex items-center gap-2 h-11 px-1 text-sm font-bold text-[var(--muted)] hover:text-[var(--text)] transition-colors">
+          <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+          {tr('All programs', 'Все программы', 'Barcha dasturlar')}
+        </button>
+        <header className="space-y-3">
+          <p className="text-xs font-black uppercase tracking-wider text-rose-500">{tr('Review', 'Повторение', 'Takrorlash')}</p>
+          <h1 className="text-3xl md:text-4xl font-black tracking-tight text-[var(--text)] leading-tight">{tr('Tasks you missed before', 'Задания, в которых были ошибки', "Avval xato qilingan topshiriqlar")}</h1>
+          <p className="text-[var(--muted)]">
+            {tr(
+              'Solve them again. A task leaves the list when you answer it correctly. No XP here, this is just for you to remember.',
+              'Решите их ещё раз. Задание уходит из списка, когда вы ответили верно. XP здесь нет, это нужно, чтобы запомнить.',
+              "Ularni qayta yeching. To'g'ri javob bergach topshiriq ro'yxatdan chiqadi. Bu yerda XP yo'q, bu eslab qolish uchun."
+            )}
+          </p>
+        </header>
+        <Practice
+          key={reviewKeys.join('|')}
+          items={batch.map((b) => b.found.item)}
+          text={text}
+          uz={language === 'uz'}
+          tr={tr}
+          alreadyDone={false}
+          onAllDone={() => setReviewFinished(true)}
+          onSolved={(i) => clearMistake(batch[i].key)}
+          source={(i) => `${batch[i].found.program.title[language]}: ${language === 'uz' && batch[i].found.lesson.title.uz ? batch[i].found.lesson.title.uz : text(batch[i].found.lesson.title)}`}
+        />
+        {reviewFinished && (
+          <div role="status" className="p-5 rounded-[1.5rem] bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 font-bold flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 shrink-0" aria-hidden="true" />
+            {tr('All reviewed. Well done!', 'Всё повторено. Отлично!', "Hammasi takrorlandi. Barakalla!")}
+          </div>
+        )}
+        <Button onClick={leave} className="h-12 px-6 rounded-2xl w-full sm:w-auto">
+          <span className="font-black uppercase text-xs tracking-wider">{tr('Back to programs', 'К программам', 'Dasturlarga qaytish')}</span>
+        </Button>
+      </div>
+    );
+  }
+
   // -------- lesson --------
   if (program && lesson) {
     const idx = program.lessons.findIndex((l) => l.id === lesson.id);
@@ -184,6 +284,7 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
             tr={tr}
             alreadyDone={done.includes(doneKey(program, lesson))}
             onAllDone={() => completeLesson(program, lesson)}
+            onWrong={(i) => noteMistake(`${program.id}/${lesson.id}/${i}`)}
           />
         </section>
 
@@ -274,6 +375,14 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
     { kind: 'school', label: tr('School subjects', 'Школьные предметы', 'Maktab fanlari') },
     { kind: 'exam', label: tr('Exam preparation', 'Подготовка к экзаменам', 'Imtihonga tayyorgarlik') },
   ];
+  const totalLessons = PROGRAMS.reduce((n, p) => n + p.lessons.length, 0);
+  const totalDone = PROGRAMS.reduce((n, p) => n + progressOf(p), 0);
+  const nextUp = (() => {
+    const p = PROGRAMS.find((x) => progressOf(x) > 0 && progressOf(x) < x.lessons.length) ?? PROGRAMS.find((x) => progressOf(x) < x.lessons.length);
+    const l = p?.lessons.find((x) => !done.includes(doneKey(p, x)));
+    return p && l ? { p, l, n: p.lessons.indexOf(l) + 1 } : null;
+  })();
+  const missed = mistakes.filter((k) => itemOf(k) !== null);
   return (
     <div ref={topRef} className="max-w-5xl mx-auto space-y-10 animate-in fade-in duration-700 scroll-mt-4">
       <div className="flex items-center justify-between gap-6">
@@ -291,6 +400,50 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
           <GraduationCap className="w-8 h-8" aria-hidden="true" />
         </div>
       </div>
+
+      {(nextUp || missed.length > 0) && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          {nextUp && (
+            <button
+              type="button"
+              onClick={() => {
+                setProgramId(nextUp.p.id);
+                setLessonId(nextUp.l.id);
+              }}
+              className={`group text-left flex items-center gap-5 p-6 rounded-[2rem] bg-gradient-to-br from-indigo-500/10 via-[var(--card)] to-purple-500/10 border border-indigo-500/30 hover:border-indigo-500/60 hover:shadow-xl hover:shadow-indigo-500/10 transition-all focus-visible:outline-2 focus-visible:outline-indigo-500 ${missed.length > 0 ? 'lg:col-span-2' : 'lg:col-span-3'}`}
+            >
+              <Ring percent={(totalDone / totalLessons) * 100} label={tr(`${totalDone} of ${totalLessons} lessons done`, `Пройдено ${totalDone} из ${totalLessons} уроков`, `${totalLessons} darsdan ${totalDone} tasi tugagan`)} />
+              <span className="flex-1 min-w-0 space-y-1">
+                <span className="block text-xs font-black uppercase tracking-[0.2em] text-indigo-500">{totalDone === 0 ? tr('Start here', 'Начните отсюда', 'Shu yerdan boshlang') : tr('Continue where you stopped', 'Продолжить с того места', "To'xtagan joyingizdan davom eting")}</span>
+                <span className="block text-lg md:text-xl font-black text-[var(--text)] leading-snug">{language === 'uz' && nextUp.l.title.uz ? nextUp.l.title.uz : text(nextUp.l.title)}</span>
+                <span className="block text-sm text-[var(--muted)]">{nextUp.p.title[language]} · {tr('Lesson', 'Урок', 'Dars')} {nextUp.n} · {totalDone}/{totalLessons} {tr('lessons done', 'уроков пройдено', 'dars tugagan')}</span>
+              </span>
+              <span className="hidden sm:flex w-12 h-12 rounded-2xl bg-indigo-500 text-white items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
+                <Play className="w-5 h-5" aria-hidden="true" />
+              </span>
+            </button>
+          )}
+          {missed.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setReviewFinished(false);
+                setReviewKeys(missed.slice(0, REVIEW_BATCH));
+              }}
+              className={`group text-left flex items-center gap-4 p-6 rounded-[2rem] bg-[var(--card)] border border-rose-500/30 hover:border-rose-500/60 hover:shadow-xl hover:shadow-rose-500/10 transition-all focus-visible:outline-2 focus-visible:outline-rose-500 ${nextUp ? '' : 'lg:col-span-3'}`}
+            >
+              <span className="w-12 h-12 rounded-2xl bg-rose-500/10 text-rose-500 flex items-center justify-center shrink-0">
+                <RotateCcw className="w-6 h-6" aria-hidden="true" />
+              </span>
+              <span className="flex-1 min-w-0 space-y-1">
+                <span className="block text-xs font-black uppercase tracking-[0.2em] text-rose-500">{tr('Review', 'Повторение', 'Takrorlash')}</span>
+                <span className="block font-black text-[var(--text)]">{tr(`${missed.length} ${missed.length === 1 ? 'task' : 'tasks'} to review`, `Заданий для повторения: ${missed.length}`, `Takrorlash uchun topshiriqlar: ${missed.length}`)}</span>
+                <span className="block text-sm text-[var(--muted)]">{tr('Tasks you got wrong. Solve them again to remember.', 'Задания с ошибками. Решите их снова, чтобы запомнить.', "Xato qilingan topshiriqlar. Eslab qolish uchun qayta yeching.")}</span>
+              </span>
+            </button>
+          )}
+        </div>
+      )}
 
       {groups.map((g) => {
         const list = PROGRAMS.filter((p) => p.kind === g.kind);
@@ -344,9 +497,9 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
 
       <p className="text-xs text-[var(--muted)]">
         {tr(
-          'Your progress is saved on this device. Lessons are written by the ThinkFlow team; more programs are coming.',
-          'Прогресс сохраняется на этом устройстве. Уроки написаны командой ThinkFlow, новые программы появятся позже.',
-          "Progress shu qurilmada saqlanadi. Darslarni ThinkFlow jamoasi yozgan, yangi dasturlar keyin qo'shiladi."
+          'Finished lessons are saved to your account and follow you to any device; the list of tasks to review stays on this device. Lessons are written by the ThinkFlow team; more programs are coming.',
+          'Пройденные уроки сохраняются в аккаунте и доступны на любом устройстве; список заданий для повторения хранится на этом устройстве. Уроки написаны командой ThinkFlow, новые программы появятся позже.',
+          "Tugagan darslar akkauntingizda saqlanadi va istalgan qurilmada ko'rinadi; takrorlash ro'yxati shu qurilmada qoladi. Darslarni ThinkFlow jamoasi yozgan, yangi dasturlar keyin qo'shiladi."
         )}
       </p>
     </div>
@@ -360,9 +513,15 @@ interface PracticeProps {
   tr: (en: string, ru: string, uz: string) => string;
   alreadyDone: boolean;
   onAllDone: () => void;
+  /** Called when a typed answer is wrong. */
+  onWrong?: (i: number) => void;
+  /** Called when a typed answer is right. */
+  onSolved?: (i: number) => void;
+  /** Shows where a task comes from (used when tasks of several lessons are mixed). */
+  source?: (i: number) => string;
 }
 
-const Practice: React.FC<PracticeProps> = ({ items, text, uz, tr, alreadyDone, onAllDone }) => {
+const Practice: React.FC<PracticeProps> = ({ items, text, uz, tr, alreadyDone, onAllDone, onWrong, onSolved, source }) => {
   const qOf = (it: PracticeItem) => (uz && it.uz ? it.uz.q : text(it.q));
   const explainOf = (it: PracticeItem) => (uz && it.uz ? it.uz.explain : text(it.explain));
   const [status, setStatus] = useState<ItemStatus[]>(() => items.map(() => 'idle'));
@@ -383,7 +542,10 @@ const Practice: React.FC<PracticeProps> = ({ items, text, uz, tr, alreadyDone, o
   const check = (i: number, e: React.FormEvent) => {
     e.preventDefault();
     if (!values[i].trim()) return;
-    setStatus((s) => set(s, i, checkAnswer(items[i], values[i]) === 'correct' ? 'correct' : 'wrong'));
+    const right = checkAnswer(items[i], values[i]) === 'correct';
+    setStatus((s) => set(s, i, right ? 'correct' : 'wrong'));
+    if (right) onSolved?.(i);
+    else onWrong?.(i);
   };
 
   return (
@@ -395,6 +557,7 @@ const Practice: React.FC<PracticeProps> = ({ items, text, uz, tr, alreadyDone, o
         return (
           <li key={i}>
             <Card className={`p-5 md:p-6 rounded-[1.5rem] border ${solved ? 'border-emerald-500/30' : 'border-[var(--border)]'} space-y-4`}>
+              {source && <p className="text-xs font-black uppercase tracking-wider text-[var(--muted)]">{source(i)}</p>}
               <p className="font-semibold text-[var(--text)] leading-relaxed whitespace-pre-line">
                 <span className="text-[var(--muted)] mr-2">{i + 1}.</span>
                 {qOf(item)}
