@@ -9,6 +9,7 @@ import {
   setDigestPref,
   unsubscribeToken,
   unsubscribeUrl,
+  verifiedEmail,
   type Mail,
   type Mailer,
 } from '../server/digest';
@@ -209,5 +210,16 @@ describe('account deletion', () => {
     expect(has('family_digest/p1')).toBe(true);
     await deleteAccountData(db as any, 'p1');
     expect(has('family_digest/p1')).toBe(false);
+  });
+});
+
+describe('verifiedEmail', () => {
+  it('gives an address only when it is verified and the account is not disabled', () => {
+    expect(verifiedEmail({ email: 'p@example.com', emailVerified: true })).toBe('p@example.com');
+    expect(verifiedEmail({ email: 'p@example.com', emailVerified: false })).toBeNull();
+    expect(verifiedEmail({ email: 'p@example.com' })).toBeNull();
+    expect(verifiedEmail({ email: 'p@example.com', emailVerified: true, disabled: true })).toBeNull();
+    expect(verifiedEmail({ email: null, emailVerified: true })).toBeNull();
+    expect(verifiedEmail(null)).toBeNull();
   });
 });

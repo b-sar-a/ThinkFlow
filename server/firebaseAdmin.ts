@@ -1,6 +1,7 @@
 import { initializeApp, getApps, cert, type App } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, type Firestore } from "firebase-admin/firestore";
+import { verifiedEmail } from "./digest.js";
 
 // These two values are public (they ship in the web client config), so defaults are safe.
 const PROJECT_ID = process.env.FIREBASE_PROJECT_ID || "gen-lang-client-0029250191";
@@ -50,10 +51,10 @@ export async function accountCreatedAt(uid: string): Promise<number> {
   return new Date(record.metadata.creationTime).getTime();
 }
 
-/** The email of a Firebase Auth account, or null when it has none (anonymous, deleted). */
+/** The verified email of a Firebase Auth account, or null (none, not verified, disabled, deleted). */
 export async function accountEmail(uid: string): Promise<string | null> {
   try {
-    return (await getAuth(adminApp()).getUser(uid)).email ?? null;
+    return verifiedEmail(await getAuth(adminApp()).getUser(uid));
   } catch {
     return null;
   }

@@ -52,9 +52,9 @@ export const DigestToggle: React.FC = () => {
                   "Xatlar yuborish hali sozlanmoqda. Tanlovingiz saqlanadi, tayyor bo'lishi bilan xatlar kela boshlaydi."
                 )
               : tr(
-                  'Once a week: active days, finished lessons, level and streak of each child. Every email has a one-click unsubscribe.',
-                  'Раз в неделю: активные дни, пройденные уроки, уровень и серия каждого ребёнка. В каждом письме есть отписка в один клик.',
-                  "Haftada bir marta: har bir farzandning faol kunlari, tugatilgan darslari, darajasi va seriyasi. Har bir xatda bir bosishda obunani bekor qilish bor."
+                  'Once a week: active days, finished lessons, level and streak of each child. Sent only to a verified email address; every email has a one-click unsubscribe.',
+                  'Раз в неделю: активные дни, пройденные уроки, уровень и серия каждого ребёнка. Письма идут только на подтверждённую почту; в каждом есть отписка в один клик.',
+                  "Haftada bir marta: har bir farzandning faol kunlari, tugatilgan darslari, darajasi va seriyasi. Xatlar faqat tasdiqlangan pochtaga yuboriladi; har bir xatda bir bosishda obunani bekor qilish bor."
                 )}
           </p>
         </div>
