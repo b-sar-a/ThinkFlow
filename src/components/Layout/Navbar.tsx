@@ -115,7 +115,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick, onViewChange }) => 
 
       <div className="flex items-center gap-3 md:gap-6">
         <div ref={searchBoxRef} className="hidden md:block relative">
-          <div className="flex items-center gap-2 bg-[var(--input)] px-4 py-2 rounded-xl border border-[var(--border)] focus-within:border-indigo-500/50 transition-colors">
+          <div className="flex items-center gap-2 bg-[var(--input)] px-4 py-1 rounded-xl border border-[var(--border)] focus-within:border-indigo-500/50 transition-colors">
             <Search className="w-4 h-4 text-[var(--muted)]" aria-hidden="true" />
             <input
               ref={searchRef}
@@ -134,7 +134,7 @@ export const Navbar: React.FC<NavbarProps> = ({ onMenuClick, onViewChange }) => 
                 else if (e.key === 'Escape') { setQuery(''); searchRef.current?.blur(); }
               }}
               autoComplete="off"
-              className="bg-transparent border-none outline-none text-sm font-medium w-48 text-[var(--text)] placeholder:text-[var(--muted)]"
+              className="min-h-9 bg-transparent border-none outline-none text-sm font-medium w-48 text-[var(--text)] placeholder:text-[var(--muted)]"
             />
           </div>
           {text && (

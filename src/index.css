@@ -12,7 +12,7 @@
     --text: #0f172a;
     --border: #f1f5f9;
     --input: #f8fafc;
-    --muted: #64748b;
+    --muted: #566478; /* 4.5:1 or better on the tinted light background (was #64748b, 4.36:1) */
   }
 
   :root.dark {

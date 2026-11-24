@@ -452,9 +452,9 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
                     </div>
                   </div>
                   <div className="space-y-1.5 z-10">
-                    <h4 className="font-black text-sm uppercase tracking-tight text-white leading-tight">
+                    <h2 className="font-black text-sm uppercase tracking-tight text-white leading-tight">
                       {tmpl.title[language]}
-                    </h4>
+                    </h2>
                     <p className="text-xs text-gray-300 font-bold uppercase tracking-wider">
                       {tmpl.nodes.length} {tr('modules', 'модуля', 'modul')} • {tmpl.nodes.reduce((acc, current) => acc + (current.points || 0), 0)} XP
                     </p>
@@ -498,7 +498,7 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
             ].map((item, i) => (
               <div key={i} className="space-y-3 p-6 rounded-3xl bg-white/5 border border-white/5">
                 <item.icon className="w-6 h-6 text-indigo-500 mx-auto" />
-                <h4 className="text-xs font-black uppercase tracking-widest text-white">{item.label}</h4>
+                <h2 className="text-xs font-black uppercase tracking-widest text-white">{item.label}</h2>
                 <p className="text-xs text-gray-400 leading-relaxed">{item.desc}</p>
               </div>
             ))}

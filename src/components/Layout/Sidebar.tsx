@@ -163,7 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
                 <button
                   type="button"
                   onClick={() => go('leaderboard')}
-                  className="font-black uppercase text-indigo-400 hover:text-indigo-300 transition-colors"
+                  className="font-black uppercase text-indigo-400 hover:text-indigo-300 transition-colors py-2.5 -my-2.5 px-2 -mx-2 rounded-lg"
                 >
                   {tr('Get more', 'Получить ещё', 'Ko‘proq olish')}
                 </button>
