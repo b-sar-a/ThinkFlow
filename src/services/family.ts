@@ -34,6 +34,15 @@ export const fetchChildren = async () => (await authedPost<{ children: ChildSumm
 export const fetchParents = async () => (await authedPost<{ parents: LinkedParent[] }>('/api/family/parents', {})).parents;
 export const unlinkFamily = (childUid: string, parentUid: string) => authedPost<{ ok: true }>('/api/family/unlink', { childUid, parentUid });
 
+export interface DigestState {
+  enabled: boolean;
+  lastSentAt: number;
+  /** False until the owner has set the email keys on the server. */
+  available: boolean;
+}
+export const fetchDigest = () => authedPost<DigestState>('/api/family/digest', {});
+export const setDigest = (enabled: boolean, lang: string) => authedPost<DigestState>('/api/family/digest', { enabled, lang });
+
 /** Human message for an API error code, in the caller's language. */
 export function familyErrorText(err: unknown, tr: (en: string, ru: string, uz: string) => string): string {
   switch (String((err as Error)?.message || '')) {

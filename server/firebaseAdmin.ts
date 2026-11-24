@@ -50,6 +50,15 @@ export async function accountCreatedAt(uid: string): Promise<number> {
   return new Date(record.metadata.creationTime).getTime();
 }
 
+/** The email of a Firebase Auth account, or null when it has none (anonymous, deleted). */
+export async function accountEmail(uid: string): Promise<string | null> {
+  try {
+    return (await getAuth(adminApp()).getUser(uid)).email ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** Removes the Firebase Auth account. A missing account counts as done, so retries are safe. */
 export async function deleteAuthUser(uid: string): Promise<void> {
   try {
