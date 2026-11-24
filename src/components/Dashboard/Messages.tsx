@@ -32,7 +32,8 @@ import {
 import { Button } from '../UI/Button';
 import { Card } from '../UI/Card';
 import { useSafety } from '../../lib/safety';
-import { ConfirmDialog, ContentMenu, ReportDialog } from '../Safety/Safety';
+import { ConfirmDialog, ContentMenu, PersonalDataDialog, ReportDialog } from '../Safety/Safety';
+import { detectPersonalData } from '../../lib/personalData';
 
 /** What other students can see about a person: name and photo only (never email or age). */
 interface PublicProfile {
@@ -58,6 +59,8 @@ export const Messages: React.FC = () => {
   const [searchResults, setSearchResults] = useState<PublicProfile[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [dialog, setDialog] = useState<null | 'report' | 'block' | 'unblock'>(null);
+  // Contact details and passwords get a "are you sure?" before they are sent.
+  const [personalPending, setPersonalPending] = useState<(() => void) | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -395,7 +398,7 @@ export const Messages: React.FC = () => {
             ) : (
               <form
                 className="p-4 md:p-6 border-t border-[var(--border)] bg-[var(--bg)]/50 backdrop-blur-md space-y-3"
-                onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }}
+                onSubmit={(e) => { e.preventDefault(); if (detectPersonalData(newMessage).length > 0) setPersonalPending(() => handleSendMessage); else handleSendMessage(); }}
               >
                 {sendError && (
                   <p role="alert" className="flex items-center gap-2 text-sm font-bold text-rose-500">
@@ -436,6 +439,8 @@ export const Messages: React.FC = () => {
           </div>
         )}
       </div>
+
+      {personalPending && <PersonalDataDialog onSend={personalPending} onClose={() => setPersonalPending(null)} />}
 
       {dialog === 'report' && selectedPeer && (
         <ReportDialog

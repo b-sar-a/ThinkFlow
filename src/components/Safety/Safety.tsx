@@ -80,6 +80,25 @@ export const ConfirmDialog: React.FC<{
   );
 };
 
+/** Shown before a text with contact details or a password is posted or sent. */
+export const PersonalDataDialog: React.FC<{ onSend: () => void; onClose: () => void }> = ({ onSend, onClose }) => {
+  const tr = useText();
+  return (
+    <ConfirmDialog
+      title={tr('Share contact details?', 'Поделиться контактами?', "Aloqa ma'lumotlarini yuborasizmi?")}
+      text={tr(
+        'Your text looks like it has a phone number, an email, a social media name or a password. Do not share these with people you do not know in real life. Send it anyway?',
+        'В твоём тексте похоже есть номер телефона, почта, ник в соцсети или пароль. Не делись этим с людьми, которых не знаешь в жизни. Всё равно отправить?',
+        "Matningizda telefon raqami, pochta, ijtimoiy tarmoq nomi yoki parol bor ko'rinadi. Hayotda tanimaydigan odamlarga buni bermang. Baribir yuborasizmi?"
+      )}
+      confirmLabel={tr('Send anyway', 'Всё равно отправить', 'Baribir yuborish')}
+      danger
+      onConfirm={onSend}
+      onClose={onClose}
+    />
+  );
+};
+
 export const ReportDialog: React.FC<{
   subject: string;
   onSubmit: (reason: ReportReason, details: string) => Promise<void>;

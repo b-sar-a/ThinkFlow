@@ -32,7 +32,8 @@ import { Button } from '../UI/Button';
 import { Card } from '../UI/Card';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSafety } from '../../lib/safety';
-import { ConfirmDialog, ContentMenu, ReportDialog } from '../Safety/Safety';
+import { ConfirmDialog, ContentMenu, PersonalDataDialog, ReportDialog } from '../Safety/Safety';
+import { detectPersonalData } from '../../lib/personalData';
 
 type Pending =
   | { kind: 'report'; targetType: 'post' | 'comment'; id: string; postId?: string; userId: string; userName: string; text: string }
@@ -48,6 +49,12 @@ export const Community: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [newPostContent, setNewPostContent] = useState('');
+  // Contact details and passwords get a "are you sure?" before they are posted.
+  const [personalPending, setPersonalPending] = useState<(() => void) | null>(null);
+  const guarded = (text: string, run: () => void) => {
+    if (detectPersonalData(text).length > 0) setPersonalPending(() => run);
+    else run();
+  };
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [postError, setPostError] = useState(false);
   const [activePostId, setActivePostId] = useState<string | null>(null);
@@ -220,7 +227,7 @@ export const Community: React.FC = () => {
             <div className="flex items-center justify-between gap-3 pt-4 border-t border-[var(--border)]">
               <span className="text-xs font-bold text-[var(--muted)] tabular-nums">{newPostContent.length} / 2000</span>
               <Button
-                onClick={handleCreatePost}
+                onClick={() => guarded(newPostContent, handleCreatePost)}
                 disabled={isSubmitting || !newPostContent.trim()}
                 className="rounded-2xl px-8 h-12 bg-indigo-600 hover:bg-indigo-500 gap-2"
               >
@@ -337,7 +344,7 @@ export const Community: React.FC = () => {
 
                         <form
                           className="flex gap-3"
-                          onSubmit={(e) => { e.preventDefault(); handleAddComment(post.id); }}
+                          onSubmit={(e) => { e.preventDefault(); guarded(newComment, () => handleAddComment(post.id)); }}
                         >
                           <textarea
                             aria-label={tr('Your comment', 'Твой комментарий', 'Izohingiz')}
@@ -366,6 +373,8 @@ export const Community: React.FC = () => {
           );
         })}
       </div>
+
+      {personalPending && <PersonalDataDialog onSend={personalPending} onClose={() => setPersonalPending(null)} />}
 
       {pending?.kind === 'report' && (
         <ReportDialog
