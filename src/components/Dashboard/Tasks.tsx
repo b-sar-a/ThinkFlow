@@ -11,38 +11,32 @@ import { Card } from '../UI/Card';
 import { verifyTask } from '../../services/gemini';
 import { levelInfo } from '../../lib/progress';
 import { track } from '../../lib/analytics';
+import { checkAnswer, bi } from '../../data/programs';
+import { TEMPLATES, knownAnswer } from '../../data/taskTemplates';
 
-type Template = { title: string; desc: string; diff: 'Easy' | 'Medium' | 'Challenge'; xp: number };
-
-// The same seven problems in all three languages.
-const TEMPLATES: Record<'ru' | 'en' | 'uz', Template[]> = {
-  en: [
-    { title: "Kinetics: Velocity", desc: "Calculate the velocity (v) if an object travels 150m (d) in 30s (t). Formula: v=d/t. Result in m/s.", diff: "Easy", xp: 30 },
-    { title: "Algebra: Simplify", desc: "Solve for x: 3x + 15 = 45. Give the numeric value.", diff: "Easy", xp: 35 },
-    { title: "Ohm's Law", desc: "A circuit has 10V (V) and 2Ω resistance (R). Calculate the current (I). Formula: I=V/R. Result in Amperes.", diff: "Medium", xp: 60 },
-    { title: "Geometry: Area", desc: "Calculate the area of a circle with radius r=5m. Use π=3.14. Formula: A=πr². Result in m².", diff: "Medium", xp: 65 },
-    { title: "Chemistry: Molar Mass", desc: "Calculate the molar mass of H₂O. (H=1, O=16). Give the total g/mol.", diff: "Medium", xp: 70 },
-    { title: "Logic: Sequence", desc: "Find the missing number: 1, 1, 2, 3, 5, 8, ?. (Fibonacci sequence)", diff: "Medium", xp: 50 },
-    { title: "Physics: Power", desc: "Calculate Power (P) if Work (W) is 500J and time (t) is 10s. Formula: P=W/t. Result in Watts.", diff: "Challenge", xp: 125 },
-  ],
-  uz: [
-    { title: "Kinematika: tezlik", desc: "Jism 30 s (t) da 150 m (d) yo'l o'tsa, uning tezligi (v) nimaga teng? Formula: v = d / t. Javob m/s da.", diff: "Easy", xp: 30 },
-    { title: "Algebra: x ni toping", desc: "Tenglamani yeching: 3x + 15 = 45. Javob son bo'lsin.", diff: "Easy", xp: 35 },
-    { title: "Om qonuni", desc: "Zanjirda kuchlanish 10 V (V), qarshilik 2 Om (R). Tok kuchi (I) ni toping. Formula: I = V / R. Javob amperda.", diff: "Medium", xp: 60 },
-    { title: "Geometriya: yuza", desc: "Radiusi r = 5 m bo'lgan doiraning yuzini toping. π = 3,14 deb oling. Formula: A = πr². Javob m² da.", diff: "Medium", xp: 65 },
-    { title: "Kimyo: molyar massa", desc: "H₂O ning molyar massasini toping (H = 1, O = 16). Javob g/mol da.", diff: "Medium", xp: 70 },
-    { title: "Mantiq: ketma-ketlik", desc: "Yetishmayotgan sonni toping: 1, 1, 2, 3, 5, 8, ? (Fibonachchi sonlari).", diff: "Medium", xp: 50 },
-    { title: "Fizika: quvvat", desc: "Ish (W) 500 J, vaqt (t) 10 s bo'lsa, quvvat (P) ni toping. Formula: P = W / t. Javob vattda.", diff: "Challenge", xp: 125 },
-  ],
-  ru: [
-    { title: "Кинематика: скорость", desc: "Найди скорость (v), если тело проходит 150 м (d) за 30 с (t). Формула: v = d / t. Ответ в м/с.", diff: "Easy", xp: 30 },
-    { title: "Алгебра: найди x", desc: "Реши уравнение: 3x + 15 = 45. Ответ — число.", diff: "Easy", xp: 35 },
-    { title: "Закон Ома", desc: "В цепи напряжение 10 В (V) и сопротивление 2 Ом (R). Найди силу тока (I). Формула: I = V / R. Ответ в амперах.", diff: "Medium", xp: 60 },
-    { title: "Геометрия: площадь", desc: "Найди площадь круга с радиусом r = 5 м. Возьми π = 3,14. Формула: A = πr². Ответ в м².", diff: "Medium", xp: 65 },
-    { title: "Химия: молярная масса", desc: "Найди молярную массу H₂O (H = 1, O = 16). Ответ в г/моль.", diff: "Medium", xp: 70 },
-    { title: "Логика: последовательность", desc: "Найди пропущенное число: 1, 1, 2, 3, 5, 8, ? (числа Фибоначчи).", diff: "Medium", xp: 50 },
-    { title: "Физика: мощность", desc: "Найди мощность (P), если работа (W) равна 500 Дж, а время (t) — 10 с. Формула: P = W / t. Ответ в ваттах.", diff: "Challenge", xp: 125 },
-  ],
+// A built-in problem pays XP once a day, so it cannot be farmed by generating it again and again.
+const paidKey = (uid: string) => `tf_task_paid_${uid}`;
+const localDay = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const readPaid = (uid: string): Record<string, string> => {
+  try {
+    const raw = JSON.parse(localStorage.getItem(paidKey(uid)) || '{}');
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch {
+    return {};
+  }
+};
+const writePaid = (uid: string, title: string) => {
+  try {
+    // Only today's entries matter.
+    const today = localDay();
+    const kept = Object.fromEntries(Object.entries(readPaid(uid)).filter(([, day]) => day === today));
+    localStorage.setItem(paidKey(uid), JSON.stringify({ ...kept, [title]: today }));
+  } catch {
+    /* storage blocked: the daily limit then applies for this visit only */
+  }
 };
 
 export const Tasks: React.FC = () => {
@@ -159,12 +153,28 @@ export const Tasks: React.FC = () => {
     setVerifyingTaskId(task.id);
     setErrorStatus(prev => ({ ...prev, [task.id]: null }));
     try {
-      const result = await verifyTask(task, answer, profile);
-      const reward = task.xpReward + (result.bonusXP || 0);
+      const known = knownAnswer(task.title);
+      let result: { isCorrect: boolean; feedback: string; bonusXP?: number };
+      let reward: number;
+      if (known !== null) {
+        const right = checkAnswer({ q: bi('', ''), explain: bi('', ''), answer: known }, answer) === 'correct';
+        const paidToday = right && readPaid(user.uid)[task.title] === localDay();
+        result = {
+          isCorrect: right,
+          feedback: right
+            ? tr('Correct!', 'Верно!', "To'g'ri!") + (paidToday ? ' ' + tr('(You already earned XP for this problem today.)', '(За эту задачу сегодня XP уже получены.)', "(Bu masala uchun bugun XP allaqachon olingan.)") : '')
+            : tr('Not quite. Check your calculation and try again.', 'Пока неверно. Проверь вычисления и попробуй ещё раз.', "Hali noto'g'ri. Hisoblashni tekshirib, qayta urinib ko'ring."),
+        };
+        reward = right && !paidToday ? task.xpReward : 0;
+        if (right && !paidToday) writePaid(user.uid, task.title);
+      } else {
+        result = await verifyTask(task, answer, profile);
+        reward = task.xpReward + (result.bonusXP || 0);
+      }
 
       setTaskFeedback(prev => ({
         ...prev,
-        [task.id]: { isCorrect: result.isCorrect, text: result.isCorrect ? `${result.feedback} +${reward} XP` : result.feedback }
+        [task.id]: { isCorrect: result.isCorrect, text: result.isCorrect && reward > 0 ? `${result.feedback} +${reward} XP` : result.feedback }
       }));
 
       if (result.isCorrect) {
