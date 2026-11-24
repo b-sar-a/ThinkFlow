@@ -596,6 +596,16 @@ const Practice: React.FC<PracticeProps> = ({ items, text, uz, tr, alreadyDone, o
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allDone]);
 
+  // Multiple choice: tapping an option checks it at once; a wrong pick can be changed.
+  const pick = (i: number, choice: string) => {
+    if (status[i] === 'correct') return;
+    setValues((v) => set(v, i, choice));
+    const right = checkAnswer(items[i], choice) === 'correct';
+    setStatus((st) => set(st, i, right ? 'correct' : 'wrong'));
+    if (right) onSolved?.(i);
+    else onWrong?.(i);
+  };
+
   const check = (i: number, e: React.FormEvent) => {
     e.preventDefault();
     if (!values[i].trim()) return;
@@ -620,7 +630,62 @@ const Practice: React.FC<PracticeProps> = ({ items, text, uz, tr, alreadyDone, o
                 {qOf(item)}
               </p>
 
-              {self ? (
+              {item.choices ? (
+                <div className="space-y-3">
+                  <div role="radiogroup" aria-label={qOf(item)} className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {item.choices.map((choice, k) => {
+                      const picked = values[i] === choice;
+                      const tone =
+                        s === 'correct' && picked
+                          ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-500'
+                          : s === 'wrong' && picked
+                            ? 'border-rose-500/50 bg-rose-500/10 text-rose-500'
+                            : 'border-[var(--border)] bg-[var(--input)] text-[var(--text)] hover:border-indigo-500/50';
+                      return (
+                        <button
+                          key={k}
+                          type="button"
+                          role="radio"
+                          aria-checked={picked}
+                          disabled={s === 'correct'}
+                          onClick={() => pick(i, choice)}
+                          className={`min-h-12 px-4 py-2 rounded-2xl border text-left flex items-center gap-3 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-indigo-500 ${tone}`}
+                        >
+                          <span aria-hidden="true" className="w-6 h-6 rounded-full border border-current text-xs flex items-center justify-center shrink-0 opacity-80">{'ABCDEF'[k]}</span>
+                          <span className="min-w-0 break-words">{choice}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div aria-live="polite">
+                    {s === 'correct' && (
+                      <div className="space-y-2">
+                        <p className="flex items-center gap-2 text-sm font-bold text-emerald-500">
+                          <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
+                          {tr('Correct!', 'Верно!', "To'g'ri!")}
+                        </p>
+                        <p className="text-sm text-[var(--muted)]">{explainOf(item)}</p>
+                      </div>
+                    )}
+                    {(s === 'wrong' || s === 'shown') && (
+                      <div className="space-y-2">
+                        <p className="text-sm font-bold text-rose-500">{tr('Not quite. Pick another answer.', 'Пока неверно. Выберите другой ответ.', "Hali noto'g'ri. Boshqa javobni tanlang.")}</p>
+                        {s === 'shown' ? (
+                          <p className="text-sm text-[var(--text)] p-3 rounded-xl bg-[var(--input)]">{explainOf(item)}</p>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setStatus((st) => set(st, i, 'shown'))}
+                            className="h-10 text-xs font-black uppercase tracking-wider text-[var(--muted)] hover:text-[var(--text)] transition-colors"
+                          >
+                            {tr('Show the solution', 'Показать решение', "Yechimni ko'rsatish")}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : self ? (
                 <div className="space-y-3">
                   {s === 'idle' && (
                     <>

@@ -2,6 +2,8 @@ import { Program, withUzbek } from './types';
 import { algebra } from './algebra';
 import { satMath } from './sat-math';
 import { ieltsWriting } from './ielts-writing';
+import { dtmMath } from './dtm-math';
+import { dtmMathUz } from './uz/dtm-math';
 import { physicsMechanics } from './physics-mechanics';
 import { chemistryBasics } from './chemistry-basics';
 import { pythonBasics } from './python-basics';
@@ -30,5 +32,6 @@ export const PROGRAMS: Program[] = [
   withUzbek(informaticsBasics, informaticsBasicsUz),
   withUzbek(historyUzbekistan, historyUzbekistanUz),
   withUzbek(satMath, satMathUz),
+  withUzbek(dtmMath, dtmMathUz),
   withUzbek(ieltsWriting, ieltsWritingUz),
 ];

@@ -17,6 +17,12 @@ export interface PracticeItem {
    * omitted: self-check, the student compares with the model answer.
    */
   answer?: number | string[];
+  /**
+   * Multiple choice, as in the DTM and similar tests: the student taps one of these options
+   * (the same in every language, so numbers and formulas only). `answer` must then be a one-item
+   * list holding the correct option exactly as written here.
+   */
+  choices?: string[];
   /** Shown after answering: the worked solution or the model answer. */
   explain: Bi<string>;
   /** Uzbek text of the question and of the solution (Russian is shown where this is missing). */
