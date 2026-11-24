@@ -4,6 +4,7 @@ import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
 import { LEARNING_ARTICLES, SUBJECT_LABELS, type LearningArticle, type Subject, type ArticleLang } from '../../data/articles';
+import { ARTICLES_UZ } from '../../data/articlesUz';
 
 export const LAB_TOPIC_KEY = 'tf_lab_topic';
 
@@ -36,9 +37,9 @@ export const Articles: React.FC<ArticlesProps> = ({ onNavigate }) => {
     topRef.current?.scrollIntoView({ block: 'start' });
   }, [openId]);
 
-  // Uzbek has titles and summaries; the full text falls back to Russian.
+  // Uzbek has its own full text; an article without it falls back to Russian for the body.
   const textOf = (a: LearningArticle) => {
-    if (lang === 'uz') return { ...a.ru, title: a.uz.title, summary: a.uz.summary, labTopic: a.uz.labTopic };
+    if (lang === 'uz') return { ...a.ru, ...(ARTICLES_UZ[a.id] ?? {}), title: a.uz.title, summary: a.uz.summary, labTopic: a.uz.labTopic };
     return a[lang === 'ru' ? 'ru' : 'en'];
   };
 
@@ -79,7 +80,7 @@ export const Articles: React.FC<ArticlesProps> = ({ onNavigate }) => {
           <h1 className="text-3xl md:text-5xl font-black tracking-tight text-[var(--text)] leading-tight">{text.title}</h1>
         </header>
 
-        {lang === 'uz' && (
+        {lang === 'uz' && !ARTICLES_UZ[open.id] && (
           <p className="text-sm text-[var(--muted)] p-4 rounded-2xl bg-[var(--input)]">
             O‘zbekcha to‘liq matn tayyorlanmoqda, hozircha maqola rus tilida.
           </p>
