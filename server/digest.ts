@@ -56,6 +56,13 @@ export function resendMailer(fetchImpl: typeof fetch = fetch): Mailer {
   };
 }
 
+/**
+ * The address a digest may go to: only a verified one on an account that is not disabled. Without
+ * this, anyone could sign up with somebody else's email and have summaries sent there.
+ */
+export const verifiedEmail = (record: { email?: string | null; emailVerified?: boolean; disabled?: boolean } | null | undefined): string | null =>
+  record && record.email && record.emailVerified === true && record.disabled !== true ? record.email : null;
+
 // ---------- unsubscribe links ----------
 
 const secretOf = () => process.env.DIGEST_SECRET || process.env.CRON_SECRET || "";
