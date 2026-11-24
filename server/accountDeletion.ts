@@ -82,6 +82,7 @@ export async function deleteAccountData(db: DeletionDb, uid: string): Promise<De
   if (threads.size >= 500) report.skipped.push("chats");
 
   await db.doc(`referrals/${uid}`).delete();
+  await db.doc(`family_digest/${uid}`).delete();
   await db.doc(`teachers/${uid}`).delete();
   await db.doc(`teacher_requests/${uid}`).delete();
   await db.doc(`publicProfiles/${uid}`).delete();

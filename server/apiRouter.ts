@@ -1,12 +1,14 @@
 import express, { Router, type Request, type Response, type NextFunction } from "express";
 import { GoogleGenAI, Type } from "@google/genai";
 import { FieldPath, FieldValue } from "firebase-admin/firestore";
-import { accountCreatedAt, adminDb, deleteAuthUser, hasAdminDb, verifyIdToken } from "./firebaseAdmin.js";
+import { timingSafeEqual } from "node:crypto";
+import { accountCreatedAt, accountEmail, adminDb, deleteAuthUser, hasAdminDb, verifyIdToken } from "./firebaseAdmin.js";
 import { deleteAccountData, type DeletionDb } from "./accountDeletion.js";
 import { cleanEvent, computeFunnel, recordEvent, type StoredEvent } from "./analytics.js";
 import * as classes from "./classes.js";
 import { QuotaError, createMemoryQuota } from "./quota.js";
 import { FamilyError, createCode, linkWithCode, listChildren, listParents, unlink, type Db } from "./family.js";
+import { cronConfigured, emailConfigured, getDigestPref, isValidUnsubscribe, resendMailer, runWeeklyDigest, setDigestPref } from "./digest.js";
 
 /**
  * Single source of truth for every /api route. Used by both the local dev server
@@ -238,7 +240,7 @@ export function createApiRouter(): Router {
   router.use(express.json({ limit: "6mb" }));
 
   router.get("/api/health", (_req, res) => {
-    res.json({ status: "ok", node: process.version, aiKeyLoaded: !!getApiKey(), quotaEnforced: hasAdminDb() });
+    res.json({ status: "ok", node: process.version, aiKeyLoaded: !!getApiKey(), quotaEnforced: hasAdminDb(), emailConfigured: emailConfigured(), cronConfigured: cronConfigured() });
   });
 
   const guarded = [requireAuth, rateLimit];
@@ -504,6 +506,39 @@ Write "feedback" in one short sentence.`;
   router.post("/api/family/unlink", requireAuth, rateLimit, async (req, res) => {
     await unlink(familyDb(), (req as any).uid, req.body?.childUid, req.body?.parentUid);
     res.json({ ok: true });
+  });
+
+  // Weekly summary email: the parent turns it on or off here (the sending is in server/digest.ts).
+  router.post("/api/family/digest", requireAuth, rateLimit, async (req, res) => {
+    const db = familyDb();
+    const uid: string = (req as any).uid;
+    const pref =
+      typeof req.body?.enabled === "boolean"
+        ? await setDigestPref(db, uid, req.body.enabled, req.body?.lang)
+        : await getDigestPref(db, uid);
+    res.json({ ...pref, available: emailConfigured() });
+  });
+
+  // One-click unsubscribe from the link in every email (signed, so it needs no sign-in).
+  router.get("/api/digest/unsubscribe", async (req, res) => {
+    const uid = req.query.u;
+    if (!isValidUnsubscribe(uid, req.query.t)) {
+      return res.status(400).type("html").send("<p>This link is not valid.</p>");
+    }
+    await setDigestPref(familyDb(), String(uid), false, undefined);
+    res.type("html").send("<p>Done: you will not get the weekly summary any more. / Готово: недельная сводка отключена. / Tayyor: haftalik xulosa o'chirildi.</p>");
+  });
+
+  // Called by the daily Vercel cron (vercel.json) with "Authorization: Bearer $CRON_SECRET".
+  router.get("/api/cron/digest", async (req, res) => {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return res.status(503).json({ error: "CRON_NOT_CONFIGURED" });
+    const given = String(req.headers.authorization || "");
+    const expected = `Bearer ${secret}`;
+    const same = given.length === expected.length && timingSafeEqual(Buffer.from(given), Buffer.from(expected));
+    if (!same) return res.status(401).json({ error: "UNAUTHORIZED" });
+    if (!emailConfigured()) return res.status(503).json({ error: "EMAIL_NOT_CONFIGURED" });
+    res.json(await runWeeklyDigest(familyDb(), resendMailer(), accountEmail, { delayMs: 550 }));
   });
 
   // ---------- teacher cabinet (see server/classes.ts) ----------

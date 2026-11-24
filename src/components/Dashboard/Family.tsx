@@ -6,6 +6,7 @@ import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
 import { ConfirmDialog } from '../Safety/Safety';
 import { fetchChildren, linkChild, unlinkFamily, familyErrorText, type ChildSummary } from '../../services/family';
+import { DigestToggle } from '../Family/DigestToggle';
 import { track } from '../../lib/analytics';
 import { GRADE_LABEL, GOAL_LABEL, type Grade, type Goal } from '../../lib/profileOptions';
 
@@ -135,6 +136,8 @@ export const Family: React.FC = () => {
           </div>
         </form>
       </Card>
+
+      {children !== null && children.length > 0 && <DigestToggle />}
 
       {children === null ? (
         <div className="py-10 flex justify-center" role="status" aria-label={tr('Loading', 'Загрузка', 'Yuklanmoqda')}>

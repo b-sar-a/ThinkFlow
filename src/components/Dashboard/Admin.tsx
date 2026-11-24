@@ -760,6 +760,8 @@ interface Health {
   node?: string;
   aiKeyLoaded: boolean;
   quotaEnforced: boolean;
+  emailConfigured?: boolean;
+  cronConfigured?: boolean;
 }
 
 /** What the server can do right now, read from /api/health, with the exact next step for anything that is off. */
@@ -826,6 +828,19 @@ const StatusPanel: React.FC<{ tr: (en: string, ru: string) => string }> = ({ tr 
             <Row ok={health.quotaEnforced} title={tr('Parent access', 'Доступ родителей')} ok_text={tr('Codes and the parent cabinet work.', 'Коды и кабинет родителя работают.')} off_text={needKey} />
             <Row ok={health.quotaEnforced} title={tr('Teacher cabinet', 'Кабинет учителя')} ok_text={tr('Requests, approval and classes work.', 'Заявки, одобрение и классы работают.')} off_text={needKey} />
             <Row ok={health.quotaEnforced} title={tr('Funnel analytics', 'Аналитика воронки')} ok_text={tr('Events are stored; see Analytics.', 'События сохраняются; смотрите «Аналитика».')} off_text={needKey} />
+            <Row
+              ok={Boolean(health.quotaEnforced && health.emailConfigured && health.cronConfigured)}
+              title={tr('Weekly parent email', 'Недельное письмо родителям')}
+              ok_text={tr('Parents who turned it on get a summary every week.', 'Родители, включившие сводку, получают её каждую неделю.')}
+              off_text={
+                !health.quotaEnforced
+                  ? needKey
+                  : tr(
+                      'Add RESEND_API_KEY, DIGEST_FROM and CRON_SECRET in Vercel, then redeploy (docs/LAUNCH.md, section 6в).',
+                      'Добавьте RESEND_API_KEY, DIGEST_FROM и CRON_SECRET в Vercel и перевыкатите сайт (docs/LAUNCH.md, раздел 6в).'
+                    )
+              }
+            />
             <Row ok={health.quotaEnforced} title={tr('Account deletion', 'Удаление аккаунта')} ok_text={tr('Students can delete their account and data.', 'Ученики могут удалить аккаунт и данные.')} off_text={needKey} />
           </ul>
 
