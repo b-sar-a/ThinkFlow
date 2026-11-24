@@ -157,7 +157,7 @@ export const Tips: React.FC = () => {
               }`}
             >
               {x.label}
-              <span className="ml-2 opacity-70">{triedCount(x.id, x.tips.length)}/{x.tips.length}</span>
+              <span className="ml-2 font-bold">{triedCount(x.id, x.tips.length)}/{x.tips.length}</span>
             </button>
           ))}
         </div>
