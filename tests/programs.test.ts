@@ -53,6 +53,33 @@ describe('programs data', () => {
   });
 });
 
+describe('multiple-choice items', () => {
+  const items = PROGRAMS.flatMap((p) => p.lessons.flatMap((l) => l.practice.map((item, i) => ({ item, where: `${p.id}/${l.id}/${i + 1}` }))))
+    .filter((x) => x.item.choices);
+
+  it('exist (the DTM-style program)', () => {
+    expect(items.length).toBeGreaterThanOrEqual(12);
+  });
+
+  it('have 3 to 6 different options and exactly one of them is the stored answer', () => {
+    const norm = (s: string) => s.toLowerCase().replace(/[\s.,;:!?"'`´’()]+/g, '');
+    for (const { item, where } of items) {
+      const choices = item.choices!;
+      expect(choices.length, where).toBeGreaterThanOrEqual(3);
+      expect(choices.length, where).toBeLessThanOrEqual(6);
+      expect(new Set(choices.map(norm)).size, `${where} options are distinct`).toBe(choices.length);
+      expect(Array.isArray(item.answer) && item.answer.length === 1, `${where} answer is one text`).toBe(true);
+      const right = choices.filter((c) => checkAnswer(item, c) === 'correct');
+      expect(right, where).toEqual([(item.answer as string[])[0]]);
+    }
+  });
+
+  it('do not always put the right answer in the same place', () => {
+    const positions = new Set(items.map(({ item }) => item.choices!.indexOf((item.answer as string[])[0])));
+    expect(positions.size).toBeGreaterThanOrEqual(4);
+  });
+});
+
 describe('parseNumber', () => {
   it.each([
     ['5 m/s', 5],
