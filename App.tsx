@@ -57,6 +57,12 @@ const App: React.FC = () => {
     if (isAuthReady && !user) track('landing_view');
   }, [isAuthReady, user]);
 
+  // One signal per device per day when a signed-in student opens the app: it is what shows whether students come back.
+  useEffect(() => {
+    // The demo account is not a student, so it stays out of the numbers.
+    if (isAuthReady && user && user.uid !== 'demo-uid-123') track('active_day');
+  }, [isAuthReady, user?.uid]);
+
   // Close modal when user logs in
   useEffect(() => {
     if (user) {

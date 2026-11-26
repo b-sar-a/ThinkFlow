@@ -669,7 +669,7 @@ Write "feedback" in one short sentence.`;
     const me = await db.doc(`users/${(req as any).uid}`).get();
     if (me.data()?.role !== "admin") throw new HttpError(403, "FORBIDDEN");
 
-    const days = 14;
+    const days = 30; // retention needs a longer look than the funnel alone
     const now = Date.now();
     const snapshot = await db
       .collection("analytics_events")

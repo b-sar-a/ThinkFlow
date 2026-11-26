@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { GraduationCap, Calculator, Target, PenTool, Atom, FlaskConical, Code2, Dna, Landmark, Cpu, RotateCcw, Play, ArrowLeft, ArrowRight, Check, CheckCircle2, Circle, Sparkles, Eye } from 'lucide-react';
+import { GraduationCap, Calculator, Target, PenTool, Atom, FlaskConical, Code2, Dna, Landmark, Cpu, RotateCcw, Play, ThumbsUp, ThumbsDown, Flag, ArrowLeft, ArrowRight, Check, CheckCircle2, Circle, Sparkles, Eye } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../UI/Card';
@@ -126,6 +126,9 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
   const [mistakes, setMistakes] = useState<string[]>(() => readMistakes(user?.uid));
   const [reviewKeys, setReviewKeys] = useState<string[] | null>(null);
   const [reviewFinished, setReviewFinished] = useState(false);
+  // What the student told us about a lesson during this visit (the server keeps one answer per device and lesson).
+  const [lessonVote, setLessonVote] = useState<Record<string, 'up' | 'down'>>({});
+  const [lessonIssue, setLessonIssue] = useState<Record<string, boolean>>({});
   const [daily, setDaily] = useState<Record<string, number>>(() => readDaily(user?.uid));
   const topRef = useRef<HTMLDivElement>(null);
 
@@ -198,6 +201,7 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
     setDaily((d) => cleanDaily({ ...d, [dayKey()]: (d[dayKey()] ?? 0) + 1 }));
     setJustEarned(key);
     track('first_lesson_completed');
+    track('lesson_completed', { lesson: `${p.id}.${l.id}` });
     if (!profile) return;
     try {
       const newXP = (profile.xp || 0) + LESSON_XP;
@@ -332,6 +336,51 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
             {tr(`Lesson complete! +${LESSON_XP} XP`, `Урок пройден! +${LESSON_XP} XP`, `Dars tugadi! +${LESSON_XP} XP`)}
           </div>
         )}
+
+        {(() => {
+          const key = doneKey(program, lesson);
+          const id = `${program.id}.${lesson.id}`;
+          const vote = lessonVote[key];
+          const reported = lessonIssue[key];
+          const round = 'w-11 h-11 rounded-full border border-[var(--border)] bg-[var(--input)] flex items-center justify-center text-[var(--muted)] hover:text-[var(--text)] hover:border-indigo-500/50 transition-colors focus-visible:outline-2 focus-visible:outline-indigo-500';
+          return (
+            <div className="rounded-2xl border border-[var(--border)] p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+              <p className="flex-1 text-sm text-[var(--muted)] leading-relaxed">
+                {tr(
+                  'Lessons are prepared with AI and are being checked by teachers. Was this one useful?',
+                  'Уроки подготовлены с помощью ИИ и проверяются учителями. Был ли этот урок полезен?',
+                  "Darslar AI yordamida tayyorlangan va o'qituvchilar tomonidan tekshirilmoqda. Bu dars foydali bo'ldimi?"
+                )}
+              </p>
+              <div className="flex flex-wrap items-center gap-2" aria-live="polite">
+                {vote ? (
+                  <span role="status" className="text-sm font-bold text-emerald-500">{tr('Thank you!', 'Спасибо!', 'Rahmat!')}</span>
+                ) : (
+                  <>
+                    <button type="button" className={round} aria-label={tr('Useful', 'Полезно', 'Foydali')} onClick={() => { setLessonVote((v) => ({ ...v, [key]: 'up' })); track('lesson_feedback', { lesson: id, vote: 'up' }); }}>
+                      <ThumbsUp className="w-4 h-4" aria-hidden="true" />
+                    </button>
+                    <button type="button" className={round} aria-label={tr('Not useful', 'Не полезно', 'Foydasiz')} onClick={() => { setLessonVote((v) => ({ ...v, [key]: 'down' })); track('lesson_feedback', { lesson: id, vote: 'down' }); }}>
+                      <ThumbsDown className="w-4 h-4" aria-hidden="true" />
+                    </button>
+                  </>
+                )}
+                {reported ? (
+                  <span role="status" className="text-sm font-bold text-emerald-500">{tr('Thanks, we will check it.', 'Спасибо, мы проверим.', 'Rahmat, tekshiramiz.')}</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="h-11 px-4 rounded-full border border-[var(--border)] bg-[var(--input)] flex items-center gap-2 text-xs font-black uppercase tracking-wider text-[var(--muted)] hover:text-[var(--text)] hover:border-rose-500/50 transition-colors focus-visible:outline-2 focus-visible:outline-indigo-500"
+                    onClick={() => { setLessonIssue((v) => ({ ...v, [key]: true })); track('lesson_issue', { lesson: id }); }}
+                  >
+                    <Flag className="w-3.5 h-3.5" aria-hidden="true" />
+                    {tr('Report a mistake', 'Сообщить об ошибке', "Xato haqida xabar berish")}
+                  </button>
+                )}
+              </div>
+            </div>
+          );
+        })()}
 
         <div className="flex flex-col sm:flex-row gap-3">
           {onNavigate && (

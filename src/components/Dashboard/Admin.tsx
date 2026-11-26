@@ -542,6 +542,13 @@ interface FunnelData {
   funnel: { key: string; count: number; fromPrevious: number | null; fromFirst: number | null }[];
   extras: Record<string, number>;
   daily: { day: string; visits: number; signups: number }[];
+  retention?: {
+    devices: number;
+    activeLast7Days: number;
+    d1: { cohort: number; back: number; percent: number | null };
+    w1: { cohort: number; back: number; percent: number | null };
+  };
+  lessons?: { lesson: string; completed: number; up: number; down: number; issues: number }[];
   days: number;
   truncated: boolean;
 }
@@ -617,6 +624,31 @@ const VisitorFunnel: React.FC<{ tr: (en: string, ru: string) => string }> = ({ t
             ))}
           </ul>
 
+          {data.retention && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-black uppercase tracking-wider text-[var(--muted)]">{tr('Do students come back?', 'Возвращаются ли ученики?')}</h3>
+              <dl className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[
+                  { label: tr('Back the next day', 'Вернулись на следующий день'), big: data.retention.d1.percent === null ? '—' : `${data.retention.d1.percent}%`, note: `${data.retention.d1.back} ${tr('of', 'из')} ${data.retention.d1.cohort}` },
+                  { label: tr('Back in week 2', 'Вернулись на второй неделе'), big: data.retention.w1.percent === null ? '—' : `${data.retention.w1.percent}%`, note: `${data.retention.w1.back} ${tr('of', 'из')} ${data.retention.w1.cohort}` },
+                  { label: tr('Active in the last 7 days', 'Активны за 7 дней'), big: String(data.retention.activeLast7Days), note: `${tr('of', 'из')} ${data.retention.devices} ${tr('devices', 'устройств')}` },
+                ].map((m) => (
+                  <div key={m.label} className="p-4 rounded-2xl bg-[var(--input)]">
+                    <dt className="text-xs font-black uppercase tracking-wider text-[var(--muted)]">{m.label}</dt>
+                    <dd className="mt-1 text-2xl font-black text-[var(--text)] tabular-nums">{m.big}</dd>
+                    <dd className="text-xs text-[var(--muted)]">{m.note}</dd>
+                  </div>
+                ))}
+              </dl>
+              <p className="text-xs text-[var(--muted)]">
+                {tr(
+                  'Per device, from the days a signed-in student opened the app. A first number below about 20 devices says little. Rough rule of thumb, not a promise: about 30–40% back the next day and 15–25% in week 2 would be a healthy start.',
+                  'По устройствам, по дням, когда вошедший ученик открывал приложение. Пока устройств меньше 20, цифры почти ничего не говорят. Грубый ориентир, а не обещание: около 30–40% на следующий день и 15–25% на второй неделе были бы хорошим началом.'
+                )}
+              </p>
+            </div>
+          )}
+
           <dl className="grid grid-cols-2 md:grid-cols-5 gap-3">
             {Object.entries(data.extras).map(([key, value]) => (
               <div key={key} className="p-3 rounded-2xl bg-[var(--input)]">
@@ -625,6 +657,37 @@ const VisitorFunnel: React.FC<{ tr: (en: string, ru: string) => string }> = ({ t
               </div>
             ))}
           </dl>
+
+          {data.lessons && data.lessons.length > 0 && (
+            <div className="space-y-2">
+              <h3 className="text-xs font-black uppercase tracking-wider text-[var(--muted)]">{tr('Lessons: what students say', 'Уроки: что говорят ученики')}</h3>
+              <div className="overflow-x-auto rounded-2xl border border-[var(--border)]">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-xs font-black uppercase tracking-wider text-[var(--muted)]">
+                      <th scope="col" className="p-3">{tr('Lesson', 'Урок')}</th>
+                      <th scope="col" className="p-3 text-right">{tr('Finished', 'Прошли')}</th>
+                      <th scope="col" className="p-3 text-right">{tr('Useful', 'Полезно')}</th>
+                      <th scope="col" className="p-3 text-right">{tr('Not useful', 'Не полезно')}</th>
+                      <th scope="col" className="p-3 text-right">{tr('Mistake reports', 'Об ошибке')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.lessons.map((l) => (
+                      <tr key={l.lesson} className="border-t border-[var(--border)]">
+                        <th scope="row" className="p-3 text-left font-bold text-[var(--text)] break-all">{l.lesson}</th>
+                        <td className="p-3 text-right tabular-nums">{l.completed}</td>
+                        <td className="p-3 text-right tabular-nums text-emerald-500">{l.up}</td>
+                        <td className="p-3 text-right tabular-nums">{l.down}</td>
+                        <td className={`p-3 text-right tabular-nums font-black ${l.issues > 0 ? 'text-rose-500' : ''}`}>{l.issues}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="text-xs text-[var(--muted)]">{tr('Lessons with mistake reports come first: give those to the teacher who checks the content.', 'Сначала уроки с сообщениями об ошибках: отдайте их учителю, который проверяет содержание.')}</p>
+            </div>
+          )}
 
           <div className="space-y-2">
             <h3 className="text-xs font-black uppercase tracking-wider text-[var(--muted)]">{tr('Visits and sign-ups per day', 'Визиты и регистрации по дням')}</h3>
