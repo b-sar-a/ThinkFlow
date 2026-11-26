@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cleanEvent, computeFunnel, recordEvent, type StoredEvent } from '../server/analytics';
+import { cleanEvent, computeFunnel, computeLessons, computeRetention, recordEvent, type StoredEvent } from '../server/analytics';
 import { createFakeDb } from './helpers/fakeDb';
 
 const NOW = Date.UTC(2026, 10, 22, 10, 0, 0);
@@ -97,5 +97,81 @@ describe('computeFunnel', () => {
     const { funnel, totalEvents } = computeFunnel([], NOW);
     expect(funnel.map((s) => s.fromPrevious)).toEqual([null, null, null, null, null]);
     expect(totalEvents).toBe(0);
+  });
+});
+
+describe('habit and lesson events', () => {
+  const dayMs = DAY;
+  const at = (offset: number) => NOW - offset * dayMs;
+  const active = (anonId: string, offset: number): StoredEvent => ({ name: 'active_day', anonId, day: new Date(at(offset)).toISOString().slice(0, 10), ts: at(offset) });
+
+  it('store active_day once per device per day and lesson events once per lesson', async () => {
+    const { db, count } = createFakeDb();
+    const day = cleanEvent({ name: 'active_day', anonId: 'device-aaaa-1111' })!;
+    expect(await recordEvent(db, day, 'u1', NOW)).toBe(true);
+    expect(await recordEvent(db, day, 'u1', NOW + 3600_000)).toBe(false);
+    expect(await recordEvent(db, day, 'u1', NOW + DAY)).toBe(true);
+
+    const done = (lesson: string) => cleanEvent({ name: 'lesson_completed', anonId: 'device-aaaa-1111', props: { lesson } })!;
+    expect(await recordEvent(db, done('algebra-7-9.systems'), 'u1', NOW)).toBe(true);
+    expect(await recordEvent(db, done('algebra-7-9.systems'), 'u1', NOW + DAY)).toBe(false);
+    expect(await recordEvent(db, done('algebra-7-9.quadratics'), 'u1', NOW)).toBe(true);
+    expect(count('analytics_events/')).toBe(4);
+  });
+
+  it('refuse lesson events without a lesson and feedback without a valid vote', async () => {
+    const { db, count } = createFakeDb();
+    expect(await recordEvent(db, cleanEvent({ name: 'lesson_completed', anonId: 'device-aaaa-1111' })!, null, NOW)).toBe(false);
+    expect(await recordEvent(db, cleanEvent({ name: 'lesson_feedback', anonId: 'device-aaaa-1111', props: { lesson: 'a.b', vote: 'maybe' } })!, null, NOW)).toBe(false);
+    expect(await recordEvent(db, cleanEvent({ name: 'lesson_feedback', anonId: 'device-aaaa-1111', props: { lesson: 'a.b', vote: 'up' } })!, null, NOW)).toBe(true);
+    expect(count('analytics_events/')).toBe(1);
+  });
+
+  it('accept a lesson id of a long program name', () => {
+    const event = cleanEvent({ name: 'lesson_completed', anonId: 'device-aaaa-1111', props: { lesson: 'history-uzbekistan.independence' } })!;
+    expect(event.props.lesson).toBe('history-uzbekistan.independence');
+  });
+
+  it('count who came back the next day and in week two', () => {
+    const events = [
+      // a: first seen 10 days ago, back the next day and on day 8
+      active('device-a-0001', 10), active('device-a-0001', 9), active('device-a-0001', 2),
+      // b: first seen 10 days ago, never came back
+      active('device-b-0002', 10),
+      // c: first seen 3 days ago, back the next day
+      active('device-c-0003', 3), active('device-c-0003', 2),
+      // d: first seen today: in no cohort yet
+      active('device-d-0004', 0),
+      // e: first seen 10 days ago, back the next day only: counts for d1 but not for week 2
+      active('device-e-0005', 10), active('device-e-0005', 9),
+    ];
+    const r = computeRetention(events, NOW);
+    expect(r.devices).toBe(5);
+    expect(r.d1).toEqual({ cohort: 4, back: 3, percent: 75 });
+    expect(r.w1).toEqual({ cohort: 3, back: 1, percent: 33 });
+    expect(r.activeLast7Days).toBe(3);
+  });
+
+  it('give no percentage for an empty cohort', () => {
+    const r = computeRetention([], NOW);
+    expect(r.d1.percent).toBeNull();
+    expect(r.w1.percent).toBeNull();
+    expect(computeFunnel([], NOW).retention.devices).toBe(0);
+  });
+
+  it('rank lessons with mistake reports first and count devices, not events', () => {
+    const e = (name: string, anonId: string, props: Record<string, string>): StoredEvent => ({ name, anonId, day: '2026-11-20', ts: NOW, props });
+    const lessons = computeLessons([
+      e('lesson_completed', 'device-a-0001', { lesson: 'a.one' }),
+      e('lesson_completed', 'device-b-0002', { lesson: 'a.one' }),
+      e('lesson_feedback', 'device-a-0001', { lesson: 'a.one', vote: 'up' }),
+      e('lesson_completed', 'device-a-0001', { lesson: 'a.two' }),
+      e('lesson_feedback', 'device-a-0001', { lesson: 'a.two', vote: 'down' }),
+      e('lesson_issue', 'device-a-0001', { lesson: 'a.two' }),
+      e('lesson_issue', 'device-a-0001', { lesson: 'a.two' }),
+    ]);
+    expect(lessons.map((l) => l.lesson)).toEqual(['a.two', 'a.one']);
+    expect(lessons[0]).toEqual({ lesson: 'a.two', completed: 1, up: 0, down: 1, issues: 1 });
+    expect(lessons[1]).toEqual({ lesson: 'a.one', completed: 2, up: 1, down: 0, issues: 0 });
   });
 });

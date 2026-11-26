@@ -13,7 +13,11 @@ export type TrackEvent =
   | 'first_task_completed'
   | 'first_lesson_completed'
   | 'referral_claimed'
-  | 'parent_linked';
+  | 'parent_linked'
+  | 'active_day'
+  | 'lesson_completed'
+  | 'lesson_feedback'
+  | 'lesson_issue';
 
 const ID_KEY = 'tf_anon_id';
 const SENT_KEY = 'tf_events_sent';
@@ -61,10 +65,12 @@ export function track(name: TrackEvent, props?: Record<string, string>): void {
     if (!trackingAllowed()) return;
     const id = anonId();
     if (!id) return;
-    if (sessionSent.has(name)) return;
-    // landing_view repeats daily on the server, so only the other milestones are remembered for good.
-    if (name !== 'landing_view' && alreadySent(name)) return;
-    sessionSent.add(name);
+    const key = props?.lesson ? `${name}:${props.lesson}` : name;
+    // landing_view and active_day repeat daily on the server, so only the other events are remembered for good.
+    const daily = name === 'landing_view' || name === 'active_day';
+    if (sessionSent.has(key)) return;
+    if (!daily && alreadySent(key)) return;
+    sessionSent.add(key);
 
     const send = async () => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -79,12 +85,12 @@ export function track(name: TrackEvent, props?: Record<string, string>): void {
       const response = await fetch('/api/track', { method: 'POST', headers, body: JSON.stringify({ name, anonId: id, props }), keepalive: true });
       // Remember only what really went out, so an offline moment does not lose a milestone.
       if (response.ok) {
-        if (name !== 'landing_view') rememberSent(name);
+        if (!daily) rememberSent(key);
       } else {
-        sessionSent.delete(name);
+        sessionSent.delete(key);
       }
     };
-    send().catch(() => sessionSent.delete(name));
+    send().catch(() => sessionSent.delete(key));
   } catch {
     /* analytics must never break the app */
   }
