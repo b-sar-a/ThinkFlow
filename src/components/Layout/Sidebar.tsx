@@ -128,7 +128,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
               `}
             >
               <item.icon className={`w-5 h-5 shrink-0 ${currentView === item.id ? 'text-white' : 'group-hover:text-indigo-500'}`} aria-hidden="true" />
-              <span className="text-xs font-black uppercase tracking-[0.15em] truncate">{item.label}</span>
+              <span className="min-w-0 text-left text-xs font-black uppercase tracking-[0.15em] leading-tight break-words">{item.label}</span>
             </button>
           ))}
         </nav>
