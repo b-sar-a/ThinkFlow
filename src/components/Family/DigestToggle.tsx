@@ -37,9 +37,10 @@ export const DigestToggle: React.FC = () => {
   };
 
   return (
-    <Card className="p-5 md:p-6 rounded-[2rem] border border-[var(--border)]">
+    <Card className="relative overflow-hidden p-5 md:p-6 rounded-[2rem] border border-[var(--border)] transition-all hover:border-rose-500/30 hover:shadow-xl hover:shadow-rose-500/10">
+      <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-rose-400 via-pink-500 to-purple-500" />
       <div className="flex items-center gap-4">
-        <div className="w-11 h-11 rounded-2xl bg-indigo-500/10 text-indigo-500 flex items-center justify-center shrink-0">
+        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-400 to-pink-600 shadow-lg shadow-rose-500/30 text-white flex items-center justify-center shrink-0">
           <Mail className="w-5 h-5" aria-hidden="true" />
         </div>
         <div className="flex-1 min-w-0">
@@ -68,7 +69,7 @@ export const DigestToggle: React.FC = () => {
             aria-labelledby="digest-label"
             disabled={!state || busy}
             onClick={toggle}
-            className={`relative w-14 h-8 rounded-full shrink-0 transition-colors focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:opacity-60 ${state?.enabled ? 'bg-indigo-600' : 'bg-[var(--input)] border border-[var(--border)]'}`}
+            className={`relative w-14 h-8 rounded-full shrink-0 transition-colors focus-visible:outline-2 focus-visible:outline-indigo-500 disabled:opacity-60 ${state?.enabled ? 'bg-gradient-to-r from-rose-500 to-pink-600' : 'bg-[var(--input)] border border-[var(--border)]'}`}
           >
             <span className={`absolute top-1 left-1 w-6 h-6 rounded-full bg-white shadow transition-transform ${state?.enabled ? 'translate-x-6' : ''}`} />
           </button>

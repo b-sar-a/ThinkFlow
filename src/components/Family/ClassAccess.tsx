@@ -1,10 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, GraduationCap } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../UI/Button';
 import { ConfirmDialog } from '../Safety/Safety';
 import { fetchMyClasses, joinClass, leaveClass, classErrorText, type MyClass } from '../../services/classes';
+
+// Each person gets a stable avatar colour (class names written out in full for Tailwind).
+const AVATAR_COLORS = [
+  'from-indigo-400 to-indigo-600 shadow-indigo-500/30',
+  'from-emerald-400 to-emerald-600 shadow-emerald-500/30',
+  'from-amber-400 to-orange-500 shadow-amber-500/30',
+  'from-rose-400 to-pink-600 shadow-rose-500/30',
+  'from-cyan-400 to-sky-600 shadow-cyan-500/30',
+  'from-purple-400 to-fuchsia-600 shadow-purple-500/30',
+  'from-teal-400 to-teal-600 shadow-teal-500/30',
+] as const;
+const avatarColor = (name: string) => {
+  let sum = 0;
+  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
+  return AVATAR_COLORS[sum % AVATAR_COLORS.length];
+};
 
 /** Student side of the teacher cabinet: join a class with its code, see classes, leave any time. */
 export const ClassAccess: React.FC = () => {
@@ -52,7 +68,12 @@ export const ClassAccess: React.FC = () => {
 
   return (
     <div className="space-y-4 pt-2 border-t border-[var(--border)]">
-      <h3 className="text-xs font-black uppercase tracking-wider text-[var(--muted)] pt-4">{tr('Teacher’s class', 'Класс учителя', "O'qituvchi sinfi")}</h3>
+      <h3 className="flex items-center gap-3 text-xs font-black uppercase tracking-wider text-emerald-500 pt-4">
+        <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/30">
+          <GraduationCap className="w-4 h-4" aria-hidden="true" />
+        </span>
+        {tr('Teacher’s class', 'Класс учителя', "O'qituvchi sinfi")}
+      </h3>
       <p className="text-sm text-[var(--muted)] leading-relaxed">
         {tr(
           'If your teacher gave you a class code, enter it. The teacher will see your progress (not your messages or chats). You can leave at any time.',
@@ -72,16 +93,16 @@ export const ClassAccess: React.FC = () => {
           value={code}
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           placeholder="ABCD2345"
-          className="flex-1 min-w-0 h-12 px-4 bg-[var(--input)] border border-[var(--border)] rounded-2xl text-sm font-mono tracking-[0.2em] text-[var(--text)] outline-none focus:border-indigo-500 placeholder:text-[var(--muted)] placeholder:opacity-50"
+          className="flex-1 min-w-0 h-12 px-4 bg-[var(--input)] border border-[var(--border)] rounded-2xl text-sm font-mono tracking-[0.2em] text-[var(--text)] outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 placeholder:text-[var(--muted)] placeholder:opacity-50"
         />
-        <Button type="submit" disabled={!code.trim() || busy} className="h-12 px-5 rounded-2xl shrink-0">
+        <Button type="submit" disabled={!code.trim() || busy} className="h-12 px-5 rounded-2xl shrink-0 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/25">
           {busy ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <span className="font-black uppercase text-xs tracking-wider">{tr('Join', 'Вступить', "Qo'shilish")}</span>}
         </Button>
       </form>
 
       <div role="status" aria-live="polite">
         {error && <p role="alert" className="text-sm font-semibold text-rose-500 bg-rose-500/10 border border-rose-500/20 rounded-xl p-3">{error}</p>}
-        {joined && <p className="text-sm font-semibold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3">{tr(`You joined “${joined}”.`, `Вы вступили в «${joined}».`, `Siz «${joined}» sinfiga qo'shildingiz.`)}</p>}
+        {joined && <p className="text-sm font-semibold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 animate-in fade-in zoom-in-95 duration-300">{tr(`You joined “${joined}”.`, `Вы вступили в «${joined}».`, `Siz «${joined}» sinfiga qo'shildingiz.`)}</p>}
       </div>
 
       {classes === null ? (
@@ -89,10 +110,15 @@ export const ClassAccess: React.FC = () => {
       ) : classes.length > 0 ? (
         <ul className="space-y-3">
           {classes.map((c) => (
-            <li key={c.classId} className="flex items-center justify-between gap-4">
-              <span className="min-w-0">
-                <span className="block font-bold text-[var(--text)] truncate">{c.name}</span>
-                <span className="block text-xs text-[var(--muted)] truncate">{c.teacherName || tr('Teacher', 'Учитель', "O'qituvchi")}</span>
+            <li key={c.classId} className="flex items-center justify-between gap-4 p-3 rounded-2xl bg-[var(--input)]">
+              <span className="flex items-center gap-3 min-w-0">
+                <span className={`w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br shadow-lg flex items-center justify-center font-black text-white ${avatarColor(c.name || 'C')}`} aria-hidden="true">
+                  {(c.name || 'C')[0].toUpperCase()}
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-bold text-[var(--text)] truncate">{c.name}</span>
+                  <span className="block text-xs text-[var(--muted)] truncate">{c.teacherName || tr('Teacher', 'Учитель', "O'qituvchi")}</span>
+                </span>
               </span>
               <Button variant="outline" onClick={() => setLeaving(c)} className="h-11 px-5 rounded-xl shrink-0">
                 <span className="font-black uppercase text-xs tracking-wider">{tr('Leave', 'Выйти', 'Chiqish')}</span>
