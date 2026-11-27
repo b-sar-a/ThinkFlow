@@ -99,7 +99,7 @@ export const PromoHub: React.FC = () => {
 
   return (
     <div className="max-w-5xl mx-auto space-y-8 py-4 animate-in fade-in duration-500">
-      <div className="p-6 md:p-12 rounded-[2.5rem] bg-gradient-to-r from-indigo-950/40 via-purple-950/20 to-[var(--card)] border border-indigo-500/10 relative overflow-hidden shadow-2xl">
+      <div className="p-6 md:p-12 rounded-[2.5rem] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-[var(--card)] border border-indigo-500/15 relative overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-500/10 blur-[150px] rounded-full pointer-events-none" />
 
         <div className="hidden md:flex absolute right-10 top-1/2 -translate-y-1/2 w-32 h-32 rounded-[2.25rem] bg-gradient-to-br from-amber-400 via-orange-500 to-pink-600 text-white items-center justify-center shadow-2xl shadow-orange-500/30 rotate-6 z-10 motion-safe:animate-bounce" aria-hidden="true">
@@ -114,7 +114,7 @@ export const PromoHub: React.FC = () => {
 
           <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)] italic leading-tight">
             {tr('Invite friends, get ', 'Зови друзей, получай ', "Do'stlarni taklif qil, ")}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-amber-400 font-black pr-2 box-decoration-clone">
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 font-black pr-2 box-decoration-clone">
               {tr('more AI tokens', 'больше токенов ИИ', 'ko‘proq AI token ol')}
             </span>
           </h1>

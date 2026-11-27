@@ -23,7 +23,7 @@ const Overlay: React.FC<{ onClose: () => void; labelledBy: string; children: Rea
   }, [onClose]);
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={labelledBy} className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-[2.5rem] border border-white/10 bg-[var(--card)] p-6 md:p-8 shadow-2xl">
+      <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={labelledBy} className="w-full max-w-md max-h-[90dvh] overflow-y-auto rounded-[2.5rem] border border-[var(--border)] bg-[var(--card)] p-6 md:p-8 shadow-2xl">
         {children}
       </div>
     </div>
@@ -63,7 +63,7 @@ export const ConfirmDialog: React.FC<{
         </p>
       )}
       <div className="mt-6 flex flex-col-reverse sm:flex-row gap-3">
-        <button type="button" onClick={onClose} disabled={busy} className="h-12 flex-1 rounded-2xl border border-white/10 text-xs font-black uppercase tracking-widest text-[var(--text)] hover:bg-white/5 transition-colors">
+        <button type="button" onClick={onClose} disabled={busy} className="h-12 flex-1 rounded-2xl border border-[var(--border)] text-xs font-black uppercase tracking-widest text-[var(--text)] hover:bg-[var(--input)] transition-colors">
           {tr('Cancel', 'Отмена', 'Bekor qilish')}
         </button>
         <button
@@ -152,7 +152,7 @@ export const ReportDialog: React.FC<{
       <fieldset className="mt-5 space-y-2">
         <legend className="mb-2 text-xs font-black uppercase tracking-widest text-[var(--muted)]">{tr('What is wrong?', 'Что не так?', 'Nima noto‘g‘ri?')}</legend>
         {REPORT_REASONS.map((r) => (
-          <label key={r} className={`flex items-center gap-3 min-h-12 px-4 rounded-2xl border cursor-pointer transition-colors ${reason === r ? 'border-indigo-500 bg-indigo-600/10' : 'border-white/10 hover:bg-white/5'}`}>
+          <label key={r} className={`flex items-center gap-3 min-h-12 px-4 rounded-2xl border cursor-pointer transition-colors ${reason === r ? 'border-indigo-500 bg-indigo-600/10' : 'border-[var(--border)] hover:bg-[var(--input)]'}`}>
             <input type="radio" name="report-reason" value={r} checked={reason === r} onChange={() => setReason(r)} className="accent-indigo-500 w-4 h-4" />
             <span className="text-sm font-bold text-[var(--text)]">{LABEL[r]}</span>
           </label>
@@ -178,7 +178,7 @@ export const ReportDialog: React.FC<{
       )}
 
       <div className="mt-6 flex flex-col-reverse sm:flex-row gap-3">
-        <button type="button" onClick={onClose} className="h-12 flex-1 rounded-2xl border border-white/10 text-xs font-black uppercase tracking-widest text-[var(--text)] hover:bg-white/5 transition-colors">
+        <button type="button" onClick={onClose} className="h-12 flex-1 rounded-2xl border border-[var(--border)] text-xs font-black uppercase tracking-widest text-[var(--text)] hover:bg-[var(--input)] transition-colors">
           {tr('Cancel', 'Отмена', 'Bekor qilish')}
         </button>
         <button

@@ -150,7 +150,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={percent}
-                className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden"
+                className="h-1.5 w-full bg-[var(--input)] rounded-full overflow-hidden"
               >
                 <div
                   className={`h-full rounded-full transition-all duration-500 ${percent > 85 ? 'bg-rose-500' : 'bg-indigo-600'}`}
@@ -196,7 +196,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
               type="button"
               onClick={() => go('profile')}
               aria-current={currentView === 'profile' ? 'page' : undefined}
-              className={`flex-1 min-w-0 flex items-center gap-3 p-1.5 rounded-xl text-left transition-all hover:bg-white/5 ${currentView === 'profile' ? 'ring-1 ring-indigo-500/50' : ''}`}
+              className={`flex-1 min-w-0 flex items-center gap-3 p-1.5 rounded-xl text-left transition-all hover:bg-[var(--input)] ${currentView === 'profile' ? 'ring-1 ring-indigo-500/50' : ''}`}
             >
               <div className="w-10 h-10 shrink-0 rounded-xl bg-indigo-600 flex items-center justify-center text-white font-black overflow-hidden">
                 {profile?.photoURL ? (
@@ -216,7 +216,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
               aria-label={t.settings}
               title={t.settings}
               aria-current={currentView === 'settings' ? 'page' : undefined}
-              className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-xl transition-all hover:bg-white/5 ${currentView === 'settings' ? 'text-indigo-400 bg-white/5' : 'text-[var(--muted)] hover:text-[var(--text)]'}`}
+              className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-xl transition-all hover:bg-[var(--input)] ${currentView === 'settings' ? 'text-indigo-400 bg-[var(--input)]' : 'text-[var(--muted)] hover:text-[var(--text)]'}`}
             >
               <Settings className="w-5 h-5" aria-hidden="true" />
             </button>
@@ -225,7 +225,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onToggle, currentView,
               onClick={() => signOut()}
               aria-label={t.logout}
               title={t.logout}
-              className="w-10 h-10 shrink-0 flex items-center justify-center rounded-xl text-[var(--muted)] transition-all hover:bg-white/5 hover:text-red-400"
+              className="w-10 h-10 shrink-0 flex items-center justify-center rounded-xl text-[var(--muted)] transition-all hover:bg-[var(--input)] hover:text-red-400"
             >
               <LogOut className="w-5 h-5" aria-hidden="true" />
             </button>
