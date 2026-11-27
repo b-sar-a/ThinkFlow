@@ -42,6 +42,22 @@ interface PublicProfile {
   photoURL?: string | null;
 }
 
+// Each person gets a stable avatar colour (class names written out in full for Tailwind).
+const AVATAR_COLORS = [
+  'from-indigo-400 to-indigo-600 shadow-indigo-500/30',
+  'from-emerald-400 to-emerald-600 shadow-emerald-500/30',
+  'from-amber-400 to-orange-500 shadow-amber-500/30',
+  'from-rose-400 to-pink-600 shadow-rose-500/30',
+  'from-cyan-400 to-sky-600 shadow-cyan-500/30',
+  'from-purple-400 to-fuchsia-600 shadow-purple-500/30',
+  'from-teal-400 to-teal-600 shadow-teal-500/30',
+] as const;
+const avatarColor = (name: string) => {
+  let sum = 0;
+  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
+  return AVATAR_COLORS[sum % AVATAR_COLORS.length];
+};
+
 export const Messages: React.FC = () => {
   const { user, profile } = useAuth();
   const { t, language } = useLanguage();
@@ -220,8 +236,8 @@ export const Messages: React.FC = () => {
     new Date(timestamp).toLocaleTimeString(language === 'ru' ? 'ru-RU' : language === 'uz' ? 'uz-UZ' : 'en-GB', { hour: '2-digit', minute: '2-digit' });
 
   const Avatar: React.FC<{ name: string; photo?: string | null; size: string; light?: boolean }> = ({ name, photo, size, light }) => (
-    <div className={`${size} shrink-0 flex items-center justify-center font-black overflow-hidden shadow-lg shadow-indigo-500/10 ${light ? 'bg-white/20 text-white' : 'bg-indigo-600 text-white'}`} aria-hidden="true">
-      {photo ? <img src={photo} alt="" className="w-full h-full object-cover" /> : name[0]}
+    <div className={`${size} shrink-0 flex items-center justify-center font-black overflow-hidden shadow-lg text-white ${light ? 'bg-white/20' : 'bg-gradient-to-br ' + avatarColor(name)}`} aria-hidden="true">
+      {photo ? <img src={photo} alt="" className="w-full h-full object-cover" /> : (name[0] || 'U').toUpperCase()}
     </div>
   );
 
@@ -246,7 +262,12 @@ export const Messages: React.FC = () => {
         ${selectedThread ? 'hidden md:flex' : 'flex'}
       `}>
         <div className="p-5 md:p-6 border-b border-[var(--border)] space-y-4">
-          <h2 className="text-2xl font-black uppercase tracking-tight text-[var(--text)]">{t.messages}</h2>
+          <div className="flex items-center gap-3">
+            <span className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-600 shadow-lg shadow-indigo-500/30 flex items-center justify-center text-white shrink-0" aria-hidden="true">
+              <MessageSquare className="w-5 h-5" />
+            </span>
+            <h2 className="text-2xl font-black uppercase tracking-tight text-[var(--text)]">{t.messages}</h2>
+          </div>
           <label className="relative block">
             <span className="sr-only">{tr('Find a person by name', 'Найти человека по имени', 'Ism bo‘yicha qidirish')}</span>
             <input
@@ -255,7 +276,7 @@ export const Messages: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               autoComplete="off"
-              className="w-full bg-[var(--input)] border border-[var(--border)] rounded-2xl py-3 pl-10 pr-4 text-sm font-bold text-[var(--text)] focus:outline-none focus:border-indigo-500/50 transition-all"
+              className="w-full bg-[var(--input)] border border-[var(--border)] rounded-2xl py-3 pl-10 pr-4 text-sm font-bold text-[var(--text)] focus:outline-none focus:border-indigo-500/60 focus:ring-4 focus:ring-indigo-500/10 transition-all"
             />
             <Search className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" aria-hidden="true" />
           </label>
@@ -274,7 +295,7 @@ export const Messages: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => startNewChat(u)}
-                    className="w-full p-3 flex items-center gap-3 hover:bg-[var(--input)] transition-all border-b border-[var(--border)] last:border-none"
+                    className="w-full p-3 flex items-center gap-3 hover:bg-indigo-500/10 transition-all border-b border-[var(--border)] last:border-none"
                   >
                     <Avatar name={u.name} photo={u.photoURL} size="w-10 h-10 rounded-xl" />
                     <p className="font-bold text-sm text-[var(--text)] truncate text-left">{u.name}</p>
@@ -306,7 +327,7 @@ export const Messages: React.FC = () => {
                 aria-current={active ? 'true' : undefined}
                 className={`
                   w-full p-4 rounded-[1.5rem] flex items-center gap-3 transition-all
-                  ${active ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-500/20' : 'hover:bg-[var(--input)] text-[var(--text)]'}
+                  ${active ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-xl shadow-indigo-500/25' : 'hover:bg-[var(--input)] motion-safe:hover:translate-x-0.5 text-[var(--text)]'}
                 `}
               >
                 <Avatar name={getOtherParticipantName(thread)} photo={getOtherParticipantPhoto(thread)} size="w-12 h-12 rounded-2xl" light={active} />
@@ -320,9 +341,11 @@ export const Messages: React.FC = () => {
             );
           })}
           {threads.length === 0 && !loadError && (
-            <div className="p-10 text-center opacity-60">
-              <User className="w-12 h-12 mx-auto mb-4" aria-hidden="true" />
-              <p className="text-xs font-black uppercase tracking-widest">{tr('No chats yet', 'Нет активных чатов', 'Hozircha chat yo‘q')}</p>
+            <div className="p-10 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-indigo-400 to-purple-600 text-white flex items-center justify-center shadow-xl shadow-indigo-500/30" aria-hidden="true">
+                <User className="w-8 h-8" />
+              </div>
+              <p className="text-xs font-black uppercase tracking-widest text-[var(--muted)]">{tr('No chats yet', 'Нет активных чатов', 'Hozircha chat yo‘q')}</p>
             </div>
           )}
         </div>
@@ -336,7 +359,7 @@ export const Messages: React.FC = () => {
         {selectedThread ? (
           <>
             {/* Header */}
-            <div className="p-4 md:p-6 border-b border-[var(--border)] flex items-center gap-3 md:gap-4">
+            <div className="p-4 md:p-6 border-b border-[var(--border)] flex items-center gap-3 md:gap-4 rounded-t-[2rem] md:rounded-t-[2.5rem] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent">
               <button
                 type="button"
                 onClick={() => setSelectedThread(null)}
@@ -345,7 +368,7 @@ export const Messages: React.FC = () => {
               >
                 <ArrowLeft className="w-6 h-6" aria-hidden="true" />
               </button>
-              <Avatar name={peerName} photo={getOtherParticipantPhoto(selectedThread)} size="w-10 h-10 rounded-xl" />
+              <Avatar name={peerName} photo={getOtherParticipantPhoto(selectedThread)} size="w-11 h-11 rounded-2xl" />
               <div className="flex-1 min-w-0">
                 <h3 className="font-black text-[var(--text)] truncate">{peerName}</h3>
               </div>
@@ -375,7 +398,7 @@ export const Messages: React.FC = () => {
                   <div className={`
                     max-w-[85%] md:max-w-[70%] p-4 rounded-3xl text-sm leading-relaxed break-words
                     ${msg.senderId === user?.uid
-                      ? 'bg-indigo-600 text-white rounded-tr-none shadow-lg shadow-indigo-500/20'
+                      ? 'bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-tr-none shadow-lg shadow-indigo-500/25'
                       : 'bg-[var(--input)] text-[var(--text)] rounded-tl-none border border-[var(--border)]'}
                   `}>
                     <p className="whitespace-pre-wrap">{msg.text}</p>
@@ -415,13 +438,13 @@ export const Messages: React.FC = () => {
                     onChange={(e) => setNewMessage(e.target.value)}
                     maxLength={2000}
                     autoComplete="off"
-                    className="flex-1 min-w-0 bg-[var(--input)] border border-[var(--border)] rounded-2xl px-5 py-4 text-sm font-bold text-[var(--text)] focus:outline-none focus:border-indigo-500/50 transition-all shadow-inner"
+                    className="flex-1 min-w-0 bg-[var(--input)] border border-[var(--border)] rounded-2xl px-5 py-4 text-sm font-bold text-[var(--text)] focus:outline-none focus:border-indigo-500/60 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-inner"
                   />
                   <Button
                     type="submit"
                     disabled={!newMessage.trim()}
                     aria-label={tr('Send', 'Отправить', 'Yuborish')}
-                    className="w-14 h-14 shrink-0 rounded-2xl bg-indigo-600 hover:bg-indigo-500 p-0 shadow-lg shadow-indigo-500/30 group"
+                    className="w-14 h-14 shrink-0 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 p-0 shadow-lg shadow-indigo-500/30 group"
                   >
                     <Send className="w-6 h-6 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
                   </Button>
@@ -430,12 +453,12 @@ export const Messages: React.FC = () => {
             )}
           </>
         ) : (
-          <div className="h-full flex flex-col items-center justify-center text-center p-10 opacity-60">
-            <div className="w-24 h-24 bg-indigo-600/10 rounded-[3rem] flex items-center justify-center text-indigo-500 mb-8">
+          <div className="h-full flex flex-col items-center justify-center text-center p-10">
+            <div className="w-24 h-24 bg-gradient-to-br from-indigo-400 to-purple-600 shadow-2xl shadow-indigo-500/30 rounded-[2.5rem] flex items-center justify-center text-white mb-8 motion-safe:animate-bounce">
               <MessageSquare className="w-10 h-10" aria-hidden="true" />
             </div>
             <h3 className="text-2xl font-black uppercase tracking-tight text-[var(--text)] mb-2">{tr('Your messages', 'Ваши сообщения', 'Xabarlaringiz')}</h3>
-            <p className="max-w-xs text-sm font-medium">{tr('Choose a chat from the list or find a person by name to start talking.', 'Выберите чат из списка или найдите пользователя по имени, чтобы начать общение.', 'Ro‘yxatdan chatni tanlang yoki ism bo‘yicha odam toping.')}</p>
+            <p className="max-w-xs text-sm font-medium text-[var(--muted)]">{tr('Choose a chat from the list or find a person by name to start talking.', 'Выберите чат из списка или найдите пользователя по имени, чтобы начать общение.', 'Ro‘yxatdan chatni tanlang yoki ism bo‘yicha odam toping.')}</p>
           </div>
         )}
       </div>
