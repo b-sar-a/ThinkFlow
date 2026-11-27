@@ -12,7 +12,7 @@ import { ParentAccess } from '../Family/ParentAccess';
 const TELEGRAM = 'https://t.me/b_sar_a';
 
 /** On/off switch that tells screen readers its state. */
-const Toggle: React.FC<{ checked: boolean; onChange: (value: boolean) => void; label: string; color?: string }> = ({ checked, onChange, label, color = 'bg-indigo-600' }) => (
+const Toggle: React.FC<{ checked: boolean; onChange: (value: boolean) => void; label: string; color?: string }> = ({ checked, onChange, label, color = 'bg-gradient-to-r from-indigo-500 to-purple-600' }) => (
   <button
     type="button"
     role="switch"
@@ -29,7 +29,7 @@ const Toggle: React.FC<{ checked: boolean; onChange: (value: boolean) => void; l
 const Row: React.FC<{ icon: React.ReactNode; tint: string; title: string; hint: string; children: React.ReactNode }> = ({ icon, tint, title, hint, children }) => (
   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
     <div className="flex items-center gap-5 min-w-0">
-      <div className={`w-14 h-14 shrink-0 rounded-2xl flex items-center justify-center ${tint}`} aria-hidden="true">{icon}</div>
+      <div className={`w-14 h-14 shrink-0 rounded-2xl bg-gradient-to-br shadow-lg flex items-center justify-center text-white ${tint}`} aria-hidden="true">{icon}</div>
       <div className="min-w-0">
         <h4 className="font-black uppercase text-sm tracking-tighter text-[var(--text)]">{title}</h4>
         <p className="text-xs font-bold text-[var(--muted)] tracking-wide mt-0.5">{hint}</p>
@@ -79,8 +79,8 @@ export const Settings: React.FC<{ onNavigate?: (view: string) => void }> = ({ on
     }
   };
 
-  const choice = (active: boolean, activeClass = 'bg-indigo-600 text-white') =>
-    `px-4 min-h-11 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${active ? activeClass : 'bg-[var(--input)] text-[var(--muted)] hover:bg-[var(--border)]'}`;
+  const choice = (active: boolean, activeClass = 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25') =>
+    `px-4 min-h-11 rounded-xl text-xs font-black uppercase tracking-widest transition-all motion-safe:active:scale-95 ${active ? activeClass : 'bg-[var(--input)] text-[var(--muted)] hover:bg-[var(--border)]'}`;
 
   return (
     <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-700">
@@ -93,18 +93,19 @@ export const Settings: React.FC<{ onNavigate?: (view: string) => void }> = ({ on
             {tr("Appearance, language and how the AI explains things.", "Внешний вид, язык и то, как ИИ объясняет темы.", "Ko‘rinish, til va AI tushuntirish uslubi.")}
           </p>
         </div>
-        <div className="w-20 h-20 shrink-0 bg-indigo-600/10 rounded-[2rem] flex items-center justify-center text-indigo-500">
+        <div className="w-20 h-20 shrink-0 bg-gradient-to-br from-indigo-400 to-purple-600 shadow-xl shadow-indigo-500/30 rounded-[2rem] flex items-center justify-center text-white" aria-hidden="true">
           <SettingsIcon className="w-10 h-10" />
         </div>
       </div>
 
       <div className="space-y-8">
-        <Card className="p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] border border-[var(--border)] space-y-8">
-          <h3 className="text-xs font-black uppercase tracking-[0.3em] text-indigo-400">{tr('Interface', 'Интерфейс', 'Interfeys')}</h3>
+        <Card className="relative overflow-hidden p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] border border-[var(--border)] space-y-8">
+          <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+          <h3 className="text-xs font-black uppercase tracking-[0.3em] text-indigo-500">{tr('Interface', 'Интерфейс', 'Interfeys')}</h3>
 
           <Row
             icon={theme === 'dark' ? <Moon className="w-6 h-6" /> : <Sun className="w-6 h-6" />}
-            tint="bg-indigo-600/10 text-indigo-500"
+            tint="from-indigo-400 to-indigo-600 shadow-indigo-500/30"
             title={t.theme}
             hint={theme === 'dark' ? tr('Dark mode is on', 'Включена тёмная тема', 'Qorong‘u rejim yoqilgan') : tr('Light mode is on', 'Включена светлая тема', 'Yorug‘ rejim yoqilgan')}
           >
@@ -115,7 +116,7 @@ export const Settings: React.FC<{ onNavigate?: (view: string) => void }> = ({ on
 
           <Row
             icon={<Globe className="w-6 h-6" />}
-            tint="bg-emerald-600/10 text-emerald-500"
+            tint="from-emerald-400 to-teal-600 shadow-emerald-500/30"
             title={t.language}
             hint={tr('For the interface and for AI answers', 'Для интерфейса и ответов ИИ', 'Interfeys va AI javoblari uchun')}
           >
@@ -132,20 +133,21 @@ export const Settings: React.FC<{ onNavigate?: (view: string) => void }> = ({ on
 
           <Row
             icon={<Sparkles className="w-6 h-6" />}
-            tint="bg-amber-600/10 text-amber-500"
+            tint="from-amber-400 to-orange-500 shadow-amber-500/30"
             title={t.geniusMode}
             hint={tr('Animated background and glow effects. Turn it off on a slow device.', 'Анимированный фон и неоновые эффекты. Выключи, если устройство тормозит.', 'Animatsion fon va yorug‘lik effektlari. Sekin qurilmada o‘chiring.')}
           >
-            <Toggle checked={geniusMode} onChange={setGeniusMode} label={t.geniusMode} color="bg-amber-500" />
+            <Toggle checked={geniusMode} onChange={setGeniusMode} label={t.geniusMode} color="bg-gradient-to-r from-amber-400 to-orange-500" />
           </Row>
         </Card>
 
-        <Card className="p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] border border-[var(--border)] space-y-8">
-          <h3 className="text-xs font-black uppercase tracking-[0.3em] text-indigo-400">{tr('How the AI explains', 'Как ИИ объясняет', 'AI qanday tushuntiradi')}</h3>
+        <Card className="relative overflow-hidden p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] border border-[var(--border)] space-y-8">
+          <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-500" />
+          <h3 className="text-xs font-black uppercase tracking-[0.3em] text-purple-500">{tr('How the AI explains', 'Как ИИ объясняет', 'AI qanday tushuntiradi')}</h3>
 
           <Row
             icon={<Layers className="w-6 h-6" />}
-            tint="bg-indigo-600/10 text-indigo-500"
+            tint="from-purple-400 to-fuchsia-600 shadow-purple-500/30"
             title={tr('Depth', 'Глубина объяснений', 'Tushuntirish chuqurligi')}
             hint={tr('How far the AI goes into a concept', 'Насколько подробно ИИ разбирает тему', 'AI mavzuni qanchalik chuqur yoritadi')}
           >
@@ -162,13 +164,13 @@ export const Settings: React.FC<{ onNavigate?: (view: string) => void }> = ({ on
 
           <Row
             icon={<MessageSquareText className="w-6 h-6" />}
-            tint="bg-emerald-600/10 text-emerald-500"
+            tint="from-cyan-400 to-sky-600 shadow-cyan-500/30"
             title={tr('Explanation Style', 'Стиль объяснений', 'Tushuntirish uslubi')}
             hint={tr('Examples from your interests, precise terms, or plain words', 'Примеры из твоих интересов, точные термины или простые слова', 'Qiziqishlaringizdan misollar, aniq atamalar yoki oddiy so‘zlar')}
           >
             <div role="group" aria-label={tr('Style', 'Стиль', 'Uslub')} className="flex flex-wrap gap-2">
               {['Metaphorical', 'Technical', 'Simple'].map((s) => (
-                <button key={s} type="button" aria-pressed={profile?.explanationStyle === s} onClick={() => updateProfileData({ explanationStyle: s as any })} className={choice(profile?.explanationStyle === s, 'bg-emerald-600 text-white')}>
+                <button key={s} type="button" aria-pressed={profile?.explanationStyle === s} onClick={() => updateProfileData({ explanationStyle: s as any })} className={choice(profile?.explanationStyle === s, 'bg-gradient-to-r from-cyan-500 to-sky-600 text-white shadow-lg shadow-cyan-500/25')}>
                   {STYLE_LABEL[s]?.[language] ?? s}
                 </button>
               ))}
@@ -179,8 +181,9 @@ export const Settings: React.FC<{ onNavigate?: (view: string) => void }> = ({ on
         <ParentAccess onNavigate={onNavigate} />
 
         {Object.keys(blocked).length > 0 && (
-          <Card className="p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] border border-[var(--border)] space-y-6">
-            <h3 className="text-xs font-black uppercase tracking-[0.3em] text-indigo-400">{tr('Blocked people', 'Заблокированные', 'Bloklanganlar')}</h3>
+          <Card className="relative overflow-hidden p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] border border-[var(--border)] space-y-6">
+            <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-slate-400 to-slate-600" />
+            <h3 className="text-xs font-black uppercase tracking-[0.3em] text-[var(--muted)]">{tr('Blocked people', 'Заблокированные', 'Bloklanganlar')}</h3>
             <ul className="space-y-3">
               {Object.entries(blocked).map(([uid, name]) => (
                 <li key={uid} className="flex items-center justify-between gap-4">
@@ -194,9 +197,10 @@ export const Settings: React.FC<{ onNavigate?: (view: string) => void }> = ({ on
           </Card>
         )}
 
-        <Card className="p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] border border-rose-500/20 bg-rose-500/5 space-y-6">
+        <Card className="relative overflow-hidden p-6 md:p-10 rounded-[2.5rem] md:rounded-[3.5rem] border border-rose-500/20 bg-rose-500/5 space-y-6">
+          <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-rose-500 to-pink-600" />
           <div className="flex items-center gap-5">
-            <div className="w-14 h-14 shrink-0 bg-rose-600/10 rounded-2xl flex items-center justify-center text-rose-500" aria-hidden="true">
+            <div className="w-14 h-14 shrink-0 bg-gradient-to-br from-rose-400 to-pink-600 shadow-lg shadow-rose-500/30 rounded-2xl flex items-center justify-center text-white" aria-hidden="true">
               <Shield className="w-6 h-6" />
             </div>
             <div>
@@ -233,7 +237,7 @@ export const Settings: React.FC<{ onNavigate?: (view: string) => void }> = ({ on
                   spellCheck={false}
                   value={confirmText}
                   onChange={(e) => setConfirmText(e.target.value)}
-                  className="w-full h-12 px-4 bg-[var(--input)] border border-[var(--border)] rounded-2xl text-sm font-mono tracking-widest text-[var(--text)] outline-none focus:border-rose-500"
+                  className="w-full h-12 px-4 bg-[var(--input)] border border-[var(--border)] rounded-2xl text-sm font-mono tracking-widest text-[var(--text)] outline-none focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10"
                 />
               </div>
               <div role="status" aria-live="polite">
