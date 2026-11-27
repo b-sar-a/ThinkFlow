@@ -14,6 +14,22 @@ import { fetchTeacherAdmin, teacherAction, type TeacherAdminData } from '../../s
 type Tab = 'users' | 'reports' | 'reviews' | 'teachers' | 'analytics' | 'status';
 type ReportFilter = 'open' | 'resolved';
 
+// Each person gets a stable avatar colour (class names written out in full for Tailwind).
+const AVATAR_COLORS = [
+  'from-indigo-400 to-indigo-600 shadow-indigo-500/30',
+  'from-emerald-400 to-emerald-600 shadow-emerald-500/30',
+  'from-amber-400 to-orange-500 shadow-amber-500/30',
+  'from-rose-400 to-pink-600 shadow-rose-500/30',
+  'from-cyan-400 to-sky-600 shadow-cyan-500/30',
+  'from-purple-400 to-fuchsia-600 shadow-purple-500/30',
+  'from-teal-400 to-teal-600 shadow-teal-500/30',
+] as const;
+const avatarColor = (name: string) => {
+  let sum = 0;
+  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
+  return AVATAR_COLORS[sum % AVATAR_COLORS.length];
+};
+
 const USERS_LIMIT = 500;
 const REVIEWS_LIMIT = 200;
 const ACTIVITY_LIMIT = 2000;
@@ -180,7 +196,9 @@ export const Admin: React.FC = () => {
   if (!isAdmin) {
     return (
       <div className="h-full flex flex-col items-center justify-center text-center p-10">
-        <ShieldAlert className="w-16 h-16 text-rose-500 mb-6" aria-hidden="true" />
+        <div className="w-20 h-20 mb-6 rounded-[1.75rem] bg-gradient-to-br from-rose-400 to-pink-600 text-white flex items-center justify-center shadow-xl shadow-rose-500/30" aria-hidden="true">
+          <ShieldAlert className="w-10 h-10" />
+        </div>
         <h1 className="text-3xl font-black uppercase tracking-tighter text-[var(--text)]">{tr('Access denied', 'Нет доступа')}</h1>
         <p className="text-[var(--muted)] mt-2">{tr('You do not have administrator rights.', 'У вас нет прав администратора.')}</p>
       </div>
@@ -188,19 +206,24 @@ export const Admin: React.FC = () => {
   }
 
   const tabs: { id: Tab; label: string; count?: number; active: string }[] = [
-    { id: 'users', label: tr('Users', 'Ученики'), count: users.length, active: 'bg-indigo-600' },
-    { id: 'reports', label: tr('Reports', 'Жалобы'), count: openReports.length, active: 'bg-rose-600' },
-    { id: 'reviews', label: tr('Reviews', 'Отзывы'), count: reviews.length, active: 'bg-indigo-600' },
-    { id: 'teachers', label: tr('Teachers', 'Учителя'), active: 'bg-indigo-600' },
-    { id: 'analytics', label: tr('Analytics', 'Аналитика'), active: 'bg-emerald-600' },
-    { id: 'status', label: tr('Status', 'Состояние'), active: 'bg-emerald-600' },
+    { id: 'users', label: tr('Users', 'Ученики'), count: users.length, active: 'from-indigo-500 to-indigo-600 shadow-indigo-500/30' },
+    { id: 'reports', label: tr('Reports', 'Жалобы'), count: openReports.length, active: 'from-rose-500 to-pink-600 shadow-rose-500/30' },
+    { id: 'reviews', label: tr('Reviews', 'Отзывы'), count: reviews.length, active: 'from-amber-400 to-orange-500 shadow-amber-500/30' },
+    { id: 'teachers', label: tr('Teachers', 'Учителя'), active: 'from-purple-500 to-fuchsia-600 shadow-purple-500/30' },
+    { id: 'analytics', label: tr('Analytics', 'Аналитика'), active: 'from-emerald-500 to-teal-600 shadow-emerald-500/30' },
+    { id: 'status', label: tr('Status', 'Состояние'), active: 'from-cyan-500 to-sky-600 shadow-cyan-500/30' },
   ];
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700">
-      <div className="space-y-2">
-        <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)]">{tr('Admin panel', 'Админ-панель')}</h1>
-        <p className="text-[var(--muted)] font-medium">{tr('Students, reports, reviews and product health.', 'Ученики, жалобы, отзывы и состояние продукта.')}</p>
+      <div className="flex items-center justify-between gap-6">
+        <div className="space-y-2 min-w-0">
+          <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)]">{tr('Admin panel', 'Админ-панель')}</h1>
+          <p className="text-[var(--muted)] font-medium">{tr('Students, reports, reviews and product health.', 'Ученики, жалобы, отзывы и состояние продукта.')}</p>
+        </div>
+        <div className="hidden sm:flex w-16 h-16 bg-gradient-to-br from-indigo-400 to-purple-600 shadow-xl shadow-indigo-500/30 rounded-[1.5rem] items-center justify-center text-white shrink-0" aria-hidden="true">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
       </div>
 
       <div role="tablist" aria-label={tr('Admin sections', 'Разделы админки')} className="flex gap-2 overflow-x-auto pb-1 -mx-1 px-1">
@@ -213,12 +236,12 @@ export const Admin: React.FC = () => {
             aria-selected={activeTab === tab.id}
             aria-controls="admin-panel"
             onClick={() => setActiveTab(tab.id)}
-            className={`h-11 px-5 shrink-0 rounded-2xl font-black uppercase text-xs tracking-wider transition-colors ${
-              activeTab === tab.id ? `${tab.active} text-white shadow-lg` : 'bg-[var(--input)] text-[var(--muted)] hover:text-[var(--text)]'
+            className={`h-11 pl-5 pr-3 shrink-0 rounded-2xl font-black uppercase text-xs tracking-wider transition-all motion-safe:active:scale-95 ${
+              activeTab === tab.id ? `bg-gradient-to-r ${tab.active} text-white shadow-lg` : 'bg-[var(--input)] text-[var(--muted)] hover:text-[var(--text)]'
             }`}
           >
-            {tab.label}
-            {tab.count !== undefined && <span className="ml-2 opacity-70">{tab.count}</span>}
+            <span className={tab.count === undefined ? 'pr-2' : undefined}>{tab.label}</span>
+            {tab.count !== undefined && <span className={`ml-2 px-2 py-0.5 rounded-full tabular-nums ${activeTab === tab.id ? 'bg-white/20' : 'bg-[var(--card)]'}`}>{tab.count}</span>}
           </button>
         ))}
       </div>
@@ -244,7 +267,7 @@ export const Admin: React.FC = () => {
                 onChange={(e) => setSearch(e.target.value)}
                 aria-label={tr('Search by name or email', 'Поиск по имени или email')}
                 placeholder={tr('Search by name or email', 'Поиск по имени или email')}
-                className="w-full h-12 pl-11 pr-4 bg-[var(--input)] border border-[var(--border)] rounded-2xl text-sm text-[var(--text)] outline-none focus:border-indigo-500 placeholder:text-[var(--muted)] placeholder:opacity-60"
+                className="w-full h-12 pl-11 pr-4 bg-[var(--input)] border border-[var(--border)] rounded-2xl text-sm text-[var(--text)] outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 placeholder:text-[var(--muted)] placeholder:opacity-60"
               />
             </div>
             {users.length >= USERS_LIMIT && (
@@ -258,9 +281,9 @@ export const Admin: React.FC = () => {
                 const self = u.uid === user?.uid;
                 return (
                   <li key={u.uid}>
-                    <Card className="p-4 md:p-5 rounded-3xl border border-[var(--border)] flex flex-col sm:flex-row sm:items-center gap-4">
+                    <Card className="p-4 md:p-5 rounded-3xl border border-[var(--border)] flex flex-col sm:flex-row sm:items-center gap-4 transition-all hover:border-indigo-500/30 hover:shadow-lg hover:shadow-indigo-500/10">
                       <div className="flex items-center gap-4 min-w-0 flex-1">
-                        <div className="w-11 h-11 bg-indigo-500/10 rounded-xl flex items-center justify-center font-black text-indigo-500 border border-indigo-500/25 shrink-0" aria-hidden="true">
+                        <div className={`w-11 h-11 bg-gradient-to-br shadow-lg rounded-xl flex items-center justify-center font-black text-white shrink-0 ${avatarColor(u.name || 'S')}`} aria-hidden="true">
                           {u.name?.[0]?.toUpperCase() || 'S'}
                         </div>
                         <div className="min-w-0">
@@ -275,7 +298,7 @@ export const Admin: React.FC = () => {
                       </div>
                       <div className="flex items-center justify-between sm:justify-end gap-4">
                         <div className="text-left sm:text-right">
-                          <p className="text-sm font-black text-[var(--text)]">{u.xp || 0} XP</p>
+                          <p className="inline-block px-2.5 py-0.5 rounded-full bg-amber-500/15 text-sm font-black tabular-nums text-[var(--text)]">{u.xp || 0} XP</p>
                           <p className="text-xs text-[var(--muted)]">{tr('Level', 'Уровень')} {u.level || 1}{u.streakDays ? ` · ${u.streakDays} ${tr('d streak', 'дн. серия')}` : ''}</p>
                         </div>
                         <Button
@@ -305,7 +328,7 @@ export const Admin: React.FC = () => {
                   aria-pressed={reportFilter === f}
                   onClick={() => setReportFilter(f)}
                   className={`h-10 px-4 rounded-xl text-xs font-black uppercase tracking-wider transition-colors ${
-                    reportFilter === f ? 'bg-[var(--text)] text-[var(--bg)]' : 'bg-[var(--input)] text-[var(--muted)] hover:text-[var(--text)]'
+                    reportFilter === f ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/25' : 'bg-[var(--input)] text-[var(--muted)] hover:text-[var(--text)]'
                   }`}
                 >
                   {f === 'open' ? tr('Open', 'Открытые') : tr('Handled', 'Обработанные')} ({f === 'open' ? openReports.length : handledReports.length})
@@ -315,14 +338,17 @@ export const Admin: React.FC = () => {
 
             {shownReports.length === 0 ? (
               <div className="text-center py-12 border border-dashed border-[var(--border)] rounded-[2rem] text-[var(--muted)]">
-                <ShieldAlert className="w-10 h-10 text-indigo-500/50 mx-auto mb-3" aria-hidden="true" />
+                <div className="w-14 h-14 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white flex items-center justify-center shadow-lg shadow-emerald-500/30" aria-hidden="true">
+                  <ShieldAlert className="w-7 h-7" />
+                </div>
                 <p className="text-sm font-semibold">
                   {reportFilter === 'open' ? tr('No open reports.', 'Открытых жалоб нет.') : tr('No handled reports yet.', 'Обработанных жалоб пока нет.')}
                 </p>
               </div>
             ) : (
               shownReports.map((r) => (
-                <Card key={r.id} className="p-5 md:p-6 rounded-3xl border border-[var(--border)] space-y-4">
+                <Card key={r.id} className="relative overflow-hidden p-5 md:p-6 rounded-3xl border border-[var(--border)] space-y-4">
+                  <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${r.status === 'resolved' ? 'from-emerald-400 to-teal-500' : 'from-rose-500 to-pink-600'}`} />
                   <div className="flex flex-wrap items-center gap-3">
                     <span className="px-3 py-1 rounded-full bg-rose-500/10 text-rose-500 text-xs font-black uppercase tracking-wider">{r.reason}</span>
                     <span className="text-xs font-bold text-[var(--muted)] uppercase tracking-wider">{r.targetType}</span>
@@ -380,7 +406,7 @@ export const Admin: React.FC = () => {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-3 mb-2">
                       <span className="font-black text-sm text-[var(--text)] truncate">{r.userName}</span>
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-yellow-500" aria-label={`${r.rating} / 5`}>
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-500 px-2 py-0.5 rounded-full bg-amber-400/15" aria-label={`${r.rating} / 5`}>
                         <Star className="w-3.5 h-3.5 fill-current" aria-hidden="true" /> {r.rating}
                       </span>
                     </div>
@@ -414,12 +440,18 @@ export const Admin: React.FC = () => {
                 <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-500/5 blur-[80px] rounded-full pointer-events-none" />
                 <div className="relative shrink-0 flex items-center justify-center">
                   <svg className="w-40 h-40" viewBox="0 0 176 176" role="img" aria-label={`${retention.rate}%`}>
+                    <defs>
+                      <linearGradient id="retention-ring" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0%" stopColor="#34d399" />
+                        <stop offset="100%" stopColor="#6366f1" />
+                      </linearGradient>
+                    </defs>
                     <circle cx="88" cy="88" r="76" stroke="var(--border)" strokeWidth="12" fill="transparent" />
                     <circle
                       cx="88"
                       cy="88"
                       r="76"
-                      className="stroke-emerald-500"
+                      stroke="url(#retention-ring)"
                       strokeWidth="12"
                       fill="transparent"
                       strokeDasharray={2 * Math.PI * 76}
@@ -447,10 +479,13 @@ export const Admin: React.FC = () => {
                 </div>
               </Card>
 
-              <Card className="p-6 rounded-[2rem] border border-indigo-500/20 flex flex-col justify-between gap-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-xs font-black text-indigo-400 tracking-wider uppercase">{tr('Accounts', 'Аккаунтов')}</span>
-                  <Users className="w-4 h-4 text-indigo-400" aria-hidden="true" />
+              <Card className="relative overflow-hidden p-6 rounded-[2rem] border border-indigo-500/20 flex flex-col justify-between gap-4">
+                <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-indigo-500 to-purple-500" />
+                <div className="flex justify-between items-center pt-1">
+                  <span className="text-xs font-black text-indigo-500 tracking-wider uppercase">{tr('Accounts', 'Аккаунтов')}</span>
+                  <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/30" aria-hidden="true">
+                    <Users className="w-4 h-4" />
+                  </span>
                 </div>
                 <div>
                   <p className="text-4xl font-black text-[var(--text)]">{users.length}</p>
@@ -461,9 +496,12 @@ export const Admin: React.FC = () => {
 
             <VisitorFunnel tr={tr} />
 
-            <Card className="p-6 md:p-8 rounded-[2rem] border border-[var(--border)] space-y-5">
-              <h2 className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-indigo-400">
-                <TrendingUp className="w-4 h-4" aria-hidden="true" />
+            <Card className="relative overflow-hidden p-6 md:p-8 rounded-[2rem] border border-[var(--border)] space-y-5">
+              <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+              <h2 className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.2em] text-indigo-500 pt-1">
+                <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/30">
+                  <TrendingUp className="w-4 h-4" aria-hidden="true" />
+                </span>
                 {tr('Student funnel (from profiles)', 'Воронка учеников (по профилям)')}
               </h2>
               <ul className="space-y-4">
@@ -473,8 +511,8 @@ export const Admin: React.FC = () => {
                       <span className="font-bold text-[var(--text)]">{s.label}</span>
                       <span className="text-[var(--muted)]">{s.count} · {s.pct}%</span>
                     </div>
-                    <div className="h-2 rounded-full bg-[var(--input)] overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full" style={{ width: `${s.pct}%` }} />
+                    <div className="h-3 rounded-full bg-[var(--input)] overflow-hidden">
+                      <div className="h-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 rounded-full transition-all duration-500" style={{ width: `${s.pct}%` }} />
                     </div>
                   </li>
                 ))}
@@ -497,7 +535,7 @@ export const Admin: React.FC = () => {
                       <li key={row.uid}>
                         <Card className="p-4 rounded-3xl border border-[var(--border)] flex items-center justify-between gap-4">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black shrink-0 ${row.retained ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-[var(--input)] text-[var(--muted)]'}`} aria-hidden="true">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black shrink-0 ${row.retained ? 'bg-gradient-to-br from-emerald-400 to-teal-600 text-white shadow-md shadow-emerald-500/30' : 'bg-[var(--input)] text-[var(--muted)]'}`} aria-hidden="true">
                               {name[0]?.toUpperCase()}
                             </div>
                             <div className="min-w-0">
@@ -595,9 +633,12 @@ const VisitorFunnel: React.FC<{ tr: (en: string, ru: string) => string }> = ({ t
   const max = data ? Math.max(1, ...data.daily.map((d) => d.visits)) : 1;
 
   return (
-    <Card className="p-6 md:p-8 rounded-[2rem] border border-[var(--border)] space-y-5">
-      <h2 className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-indigo-400">
-        <TrendingUp className="w-4 h-4" aria-hidden="true" />
+    <Card className="relative overflow-hidden p-6 md:p-8 rounded-[2rem] border border-[var(--border)] space-y-5">
+      <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-emerald-400 via-teal-500 to-indigo-500" />
+      <h2 className="flex items-center gap-3 text-xs font-black uppercase tracking-[0.2em] text-emerald-500 pt-1">
+        <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 text-white flex items-center justify-center shadow-md shadow-emerald-500/30">
+          <TrendingUp className="w-4 h-4" aria-hidden="true" />
+        </span>
         {tr('Visitor funnel', 'Воронка посетителей')}{data ? ` · ${data.days} ${tr('days', 'дн.')}` : ''}
       </h2>
 
@@ -617,8 +658,8 @@ const VisitorFunnel: React.FC<{ tr: (en: string, ru: string) => string }> = ({ t
                     {s.fromPrevious !== null && <> · {s.fromPrevious}% {tr('of previous', 'от прошлого шага')}</>}
                   </span>
                 </div>
-                <div className="h-2 rounded-full bg-[var(--input)] overflow-hidden">
-                  <div className="h-full bg-gradient-to-r from-emerald-500 to-indigo-500 rounded-full" style={{ width: `${s.fromFirst ?? 100}%` }} />
+                <div className="h-3 rounded-full bg-[var(--input)] overflow-hidden">
+                  <div className="h-full bg-gradient-to-r from-emerald-500 to-indigo-500 rounded-full transition-all duration-500" style={{ width: `${s.fromFirst ?? 100}%` }} />
                 </div>
               </li>
             ))}
@@ -770,15 +811,16 @@ const TeacherApprovals: React.FC<{ tr: (en: string, ru: string) => string }> = (
           <ul className="space-y-3">
             {data.requests.map((r) => (
               <li key={r.uid}>
-                <Card className="p-5 rounded-3xl border border-[var(--border)] space-y-3">
-                  <div>
+                <Card className="relative overflow-hidden p-5 rounded-3xl border border-amber-500/30 bg-amber-500/5 space-y-3">
+                  <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-amber-400 to-orange-500" />
+                  <div className="pt-1">
                     <p className="font-black text-[var(--text)]">{r.name || r.uid}</p>
                     <p className="text-xs text-[var(--muted)] break-all">{r.email}</p>
                   </div>
                   <p className="text-sm text-[var(--text)]"><span className="font-bold">{tr('School', 'Школа')}:</span> {r.school}</p>
                   {r.note && <p className="text-sm text-[var(--muted)] whitespace-pre-wrap break-words">{r.note}</p>}
                   <div className="flex flex-wrap gap-3">
-                    <Button size="sm" onClick={() => ask('approve', r.uid, r.name)} className="rounded-xl h-11"><span className="font-black uppercase text-xs tracking-wider">{tr('Approve', 'Подтвердить')}</span></Button>
+                    <Button size="sm" onClick={() => ask('approve', r.uid, r.name)} className="rounded-xl h-11 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 shadow-lg shadow-emerald-500/25"><span className="font-black uppercase text-xs tracking-wider">{tr('Approve', 'Подтвердить')}</span></Button>
                     <Button variant="outline" size="sm" onClick={() => ask('decline', r.uid, r.name)} className="rounded-xl h-11"><span className="font-black uppercase text-xs tracking-wider">{tr('Decline', 'Отклонить')}</span></Button>
                   </div>
                 </Card>
@@ -843,11 +885,11 @@ const StatusPanel: React.FC<{ tr: (en: string, ru: string) => string }> = ({ tr 
   useEffect(load, []);
 
   const Row: React.FC<{ ok: boolean; title: string; ok_text: string; off_text: string }> = ({ ok, title, ok_text, off_text }) => (
-    <li className="flex items-start gap-3 p-4 rounded-2xl bg-[var(--input)]">
-      <span className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${ok ? 'bg-emerald-500' : 'bg-rose-500'}`} aria-hidden="true" />
+    <li className="flex items-start gap-3 p-4 rounded-2xl bg-[var(--input)] border border-transparent transition-all hover:border-indigo-500/20">
+      <span className={`mt-1.5 w-2.5 h-2.5 rounded-full shrink-0 ${ok ? 'bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.8)]' : 'bg-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.8)]'}`} aria-hidden="true" />
       <div className="min-w-0">
         <p className="font-black text-[var(--text)]">
-          {title} <span className={`text-xs uppercase tracking-wider ${ok ? 'text-emerald-500' : 'text-rose-500'}`}>{ok ? tr('works', 'работает') : tr('off', 'выключено')}</span>
+          {title} <span className={`ml-1 px-2 py-0.5 rounded-full text-xs uppercase tracking-wider ${ok ? 'bg-emerald-500/15 text-emerald-500' : 'bg-rose-500/15 text-rose-500'}`}>{ok ? tr('works', 'работает') : tr('off', 'выключено')}</span>
         </p>
         <p className="text-sm text-[var(--muted)] leading-relaxed">{ok ? ok_text : off_text}</p>
       </div>
