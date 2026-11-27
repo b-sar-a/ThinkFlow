@@ -10,7 +10,7 @@ import { Button } from '../UI/Button';
 import { Card } from '../UI/Card';
 import { GOALS, GOAL_LABEL, GRADES, GRADE_LABEL, MAX_INTERESTS, interestLabel } from '../../lib/profileOptions';
 
-const FIELD = 'w-full bg-[var(--input)] border border-[var(--border)] rounded-2xl p-5 text-[var(--text)] outline-none focus:border-indigo-500 transition-colors';
+const FIELD = 'w-full bg-[var(--input)] border border-[var(--border)] rounded-2xl p-5 text-[var(--text)] outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-colors';
 const LABEL = 'text-xs font-black uppercase text-[var(--muted)] tracking-widest group-focus-within:text-indigo-500 transition-colors';
 
 export const ProfileEditor: React.FC = () => {
@@ -134,11 +134,11 @@ export const ProfileEditor: React.FC = () => {
           <p className="text-xs font-bold text-[var(--muted)] tracking-wide mt-1 truncate">{profile.email}</p>
         </div>
         <div className="relative group shrink-0">
-          <div className="w-24 h-24 bg-indigo-600 rounded-[2rem] flex items-center justify-center text-white text-4xl font-black shadow-2xl overflow-hidden relative">
+          <div className="w-24 h-24 bg-gradient-to-br from-indigo-400 via-purple-500 to-pink-500 rounded-[2rem] flex items-center justify-center text-white text-4xl font-black shadow-2xl shadow-indigo-500/30 ring-4 ring-indigo-500/20 overflow-hidden relative">
             {photoURL ? (
               <img src={photoURL} alt={profile.name} className="w-full h-full object-cover" />
             ) : (
-              profile.name[0]
+              (profile.name[0] || 'U').toUpperCase()
             )}
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" aria-hidden="true">
               <Camera className="w-8 h-8 text-white" />
@@ -153,9 +153,9 @@ export const ProfileEditor: React.FC = () => {
           />
           <label
             htmlFor="avatar-upload"
-            className="absolute -bottom-2 -right-2 bg-[var(--card)] p-3 rounded-xl shadow-xl border border-[var(--border)] group-hover:scale-110 peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-400 transition-transform cursor-pointer"
+            className="absolute -bottom-2 -right-2 bg-gradient-to-br from-indigo-500 to-purple-600 p-3 rounded-xl shadow-xl shadow-indigo-500/30 border border-white/20 group-hover:scale-110 peer-focus-visible:ring-2 peer-focus-visible:ring-indigo-400 transition-transform cursor-pointer"
           >
-            <Camera className="w-4 h-4 text-indigo-500" aria-hidden="true" />
+            <Camera className="w-4 h-4 text-white" aria-hidden="true" />
             <span className="sr-only">{tr('Change photo', 'Сменить фото', 'Rasmni almashtirish')}</span>
           </label>
         </div>
@@ -163,6 +163,7 @@ export const ProfileEditor: React.FC = () => {
 
       <form onSubmit={handleSubmit} className="space-y-8">
         <Card className="p-6 md:p-14 rounded-[2.5rem] md:rounded-[4rem] border border-[var(--border)] shadow-2xl overflow-hidden relative">
+          <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
             <div className="space-y-6">
               <div className="group space-y-2">
@@ -202,7 +203,7 @@ export const ProfileEditor: React.FC = () => {
           <fieldset className="mt-10 space-y-4">
             <legend className="flex w-full items-baseline justify-between gap-4">
               <span className="text-xs font-black uppercase text-[var(--muted)] tracking-widest">{tr('My Interests', 'Мои интересы', 'Qiziqishlarim')}</span>
-              <span className="text-xs font-bold text-[var(--muted)] tabular-nums">{selectedInterests.length} / {MAX_INTERESTS}</span>
+              <span className={`px-3 py-0.5 rounded-full text-xs font-black tabular-nums ${selectedInterests.length >= MAX_INTERESTS ? 'bg-amber-400/20 text-amber-500' : 'bg-indigo-500/15 text-[var(--text)]'}`}>{selectedInterests.length} / {MAX_INTERESTS}</span>
             </legend>
             <p className="text-sm text-[var(--muted)]">{tr('The AI explains topics through these.', 'ИИ объясняет темы через них.', 'AI mavzularni shular orqali tushuntiradi.')}</p>
             <div className="p-5 md:p-8 bg-[var(--input)] rounded-[2rem] md:rounded-[2.5rem] border border-[var(--border)] grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4">
@@ -219,8 +220,8 @@ export const ProfileEditor: React.FC = () => {
                     className={`
                       relative flex items-center justify-center p-4 min-h-14 rounded-2xl border cursor-pointer transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40
                       ${isSelected
-                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20'
-                        : 'bg-black/20 border-white/5 text-[var(--muted)] hover:border-white/20 hover:text-[var(--text)]'
+                        ? 'bg-gradient-to-br from-indigo-500 to-purple-600 border-indigo-400 text-white shadow-lg shadow-indigo-500/30 motion-safe:scale-[1.03]'
+                        : 'bg-[var(--card)] border-[var(--border)] text-[var(--muted)] hover:border-indigo-500/40 hover:text-[var(--text)] motion-safe:hover:-translate-y-0.5'
                       }
                     `}
                   >
@@ -241,7 +242,7 @@ export const ProfileEditor: React.FC = () => {
           <Button
             type="submit"
             disabled={isSaving}
-            className="flex-1 h-20 rounded-[2rem] gap-3 text-lg relative overflow-hidden group"
+            className="flex-1 h-20 rounded-[2rem] gap-3 text-lg relative overflow-hidden group bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-xl shadow-indigo-500/30"
           >
             <motion.div
               className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"
@@ -251,7 +252,7 @@ export const ProfileEditor: React.FC = () => {
           </Button>
           <div role="status" aria-live="polite" className="min-h-6">
             {status && (
-              <div className={`flex items-start gap-2 font-black uppercase tracking-widest text-xs max-w-xs ${status.ok ? 'text-emerald-500' : 'text-rose-500'}`}>
+              <div className={`flex items-start gap-2 px-4 py-2.5 rounded-2xl font-black uppercase tracking-widest text-xs max-w-xs animate-in fade-in zoom-in-95 duration-300 ${status.ok ? 'bg-emerald-500/10 text-emerald-500' : 'bg-rose-500/10 text-rose-500'}`}>
                 {status.ok ? <CheckCircle2 className="w-5 h-5 shrink-0" aria-hidden="true" /> : <AlertCircle className="w-5 h-5 shrink-0" aria-hidden="true" />}
                 {status.text}
               </div>
