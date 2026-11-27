@@ -231,7 +231,7 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
       setReviewFinished(false);
     };
     return (
-      <div ref={topRef} className="max-w-3xl mx-auto space-y-8 animate-in fade-in duration-500 scroll-mt-4">
+      <div ref={topRef} className="w-full max-w-3xl mx-auto space-y-8 animate-in fade-in duration-500 scroll-mt-4">
         <button type="button" onClick={leave} className="inline-flex items-center gap-2 h-11 px-1 text-sm font-bold text-[var(--muted)] hover:text-[var(--text)] transition-colors">
           <ArrowLeft className="w-4 h-4" aria-hidden="true" />
           {tr('All programs', 'Все программы', 'Barcha dasturlar')}
@@ -277,7 +277,7 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
     const next = program.lessons[idx + 1];
     const accent = ACCENT[program.accent];
     return (
-      <div ref={topRef} className="max-w-3xl mx-auto space-y-8 animate-in fade-in duration-500 scroll-mt-4">
+      <div ref={topRef} className="w-full max-w-3xl mx-auto space-y-8 animate-in fade-in duration-500 scroll-mt-4">
         <button
           type="button"
           onClick={() => setLessonId(null)}
@@ -417,7 +417,7 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
     const accent = ACCENT[program.accent];
     const count = progressOf(program);
     return (
-      <div ref={topRef} className="max-w-3xl mx-auto space-y-8 animate-in fade-in duration-500 scroll-mt-4">
+      <div ref={topRef} className="w-full max-w-3xl mx-auto space-y-8 animate-in fade-in duration-500 scroll-mt-4">
         <button
           type="button"
           onClick={() => setProgramId(null)}
@@ -503,7 +503,7 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
   const weekDays = week.filter((d) => d.n > 0).length;
   const finished = PROGRAMS.filter((p) => progressOf(p) === p.lessons.length).length;
   return (
-    <div ref={topRef} className="max-w-5xl mx-auto space-y-10 animate-in fade-in duration-700 scroll-mt-4">
+    <div ref={topRef} className="w-full max-w-5xl mx-auto space-y-10 animate-in fade-in duration-700 scroll-mt-4">
       <div className="flex items-center justify-between gap-6">
         <div className="min-w-0">
           <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)]">{tr('Programs', 'Программы', 'Dasturlar')}</h1>

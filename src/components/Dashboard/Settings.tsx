@@ -83,7 +83,7 @@ export const Settings: React.FC<{ onNavigate?: (view: string) => void }> = ({ on
     `px-4 min-h-11 rounded-xl text-xs font-black uppercase tracking-widest transition-all motion-safe:active:scale-95 ${active ? activeClass : 'bg-[var(--input)] text-[var(--muted)] hover:bg-[var(--border)]'}`;
 
   return (
-    <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-700">
+    <div className="w-full max-w-4xl mx-auto space-y-12 animate-in fade-in duration-700">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)]">

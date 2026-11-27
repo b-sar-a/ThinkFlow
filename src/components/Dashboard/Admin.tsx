@@ -215,7 +215,7 @@ export const Admin: React.FC = () => {
   ];
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700">
+    <div className="w-full max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700">
       <div className="flex items-center justify-between gap-6">
         <div className="space-y-2 min-w-0">
           <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)]">{tr('Admin panel', 'Админ-панель')}</h1>
