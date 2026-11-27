@@ -1,10 +1,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence, useReducedMotion } from 'framer-motion';
-import { Brain, Sparkles, Target, Zap, ArrowRight, Loader2, CheckCircle2, ChevronRight, MessageSquare, Star, AlertCircle, Play, Atom, Code2, Landmark } from 'lucide-react';
+import { Brain, Sparkles, Target, Zap, ArrowRight, Loader2, CheckCircle2, ChevronRight, MessageSquare, Star, AlertCircle, Play, Atom, Code2, Landmark, Trophy } from 'lucide-react';
 import { generateKnowledgeTree, verifyTask } from '../../services/gemini';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
+import { useTheme } from '../../context/ThemeContext';
 import { KnowledgeTree, KnowledgeNode } from '../../types';
 import { Card } from '../UI/Card';
 import { Button } from '../UI/Button';
@@ -53,6 +54,19 @@ const INTEREST_LABEL: Record<string, Record<string, string>> = {
   uz: { Sports: 'Sport', Football: 'Futbol', Chess: 'Shaxmat', Anime: 'Anime', Music: 'Musiqa', Design: 'Dizayn', Coding: 'Dasturlash', Cooking: 'Pazandachilik', Cars: 'Mashinalar', Business: 'Biznes', Gaming: 'O‘yinlar', Movies: 'Kino', Art: 'San’at', Fitness: 'Fitnes', Science: 'Fan' },
 };
 
+// The Lab is a dark "scene" (white text on glass). In the light theme it used to wash out, so there it
+// sits on its own dark panel and gets the dark colour variables (the chat inside reads them too).
+const DARK_SCENE_VARS = {
+  '--bg': '#020204',
+  '--card': '#0a0a0b',
+  '--text': '#f8fafc',
+  '--border': 'rgba(255, 255, 255, 0.05)',
+  '--input': '#121214',
+  '--muted': '#94a3b8',
+  color: '#f8fafc',
+} as React.CSSProperties;
+const SCENE_PANEL = 'rounded-[2.5rem] bg-[#07081a] border border-indigo-500/20 shadow-2xl shadow-indigo-500/10';
+
 interface GeniusLabProps {
   /** Lets the Lab link to other screens (profile, bonuses). */
   onNavigate?: (view: string) => void;
@@ -63,6 +77,9 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
   const { language, t } = useLanguage();
   const tr = (en: string, ru: string, uz: string) => (language === 'ru' ? ru : language === 'uz' ? uz : en);
   const reduceMotion = useReducedMotion();
+  const { theme } = useTheme();
+  const light = theme === 'light';
+  const sceneStyle = light ? DARK_SCENE_VARS : undefined;
   const interestName = (value: string) => INTEREST_LABEL[language]?.[value] ?? value;
   const interests = profile?.interests ?? [];
   // A topic sent from an article ("Explore in the Lab"). Read in the initializer, cleared on mount.
@@ -350,7 +367,7 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
 
   if (!tree) {
     return (
-      <div className="max-w-5xl mx-auto flex flex-col items-center px-6 pt-8 md:pt-14 pb-16 relative">
+      <div style={sceneStyle} className={`max-w-5xl mx-auto flex flex-col items-center px-6 pt-8 md:pt-14 pb-16 relative ${light ? SCENE_PANEL : ''}`}>
         <motion.div 
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -373,8 +390,8 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
             </div>
 
               <h1 className="relative inline-block text-5xl md:text-7xl font-black uppercase tracking-tighter italic">
-                <span className="relative z-10 text-white mix-blend-overlay">Genius</span>
-                <span className="text-indigo-500 drop-shadow-[0_0_50px_rgba(99,102,241,0.8)] px-4">Lab</span>
+                <span className={`relative z-10 text-white ${light ? '' : 'mix-blend-overlay'}`}>Genius</span>
+                <span className="bg-gradient-to-r from-indigo-400 via-purple-400 to-emerald-400 bg-clip-text text-transparent px-4">Lab</span>
                 
               </h1>
             
@@ -400,7 +417,7 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
                 <Button 
                   onClick={handleInitialize}
                   disabled={isLoading || !topic.trim()}
-                  className="h-auto py-6 px-10 rounded-[2.5rem] text-lg gap-4 bg-indigo-600 hover:bg-indigo-500 shadow-2xl shadow-indigo-500/40 relative overflow-hidden group"
+                  className="h-auto py-6 px-10 rounded-[2.5rem] text-lg gap-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 shadow-2xl shadow-indigo-500/40 relative overflow-hidden group"
                 >
                   <motion.div
                     className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"
@@ -445,7 +462,11 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
                   <div className="flex justify-between items-start">
                     {(() => {
                       const PresetIcon = PRESET_ICON[tmpl.id] ?? Atom;
-                      return <PresetIcon className="w-9 h-9" aria-hidden="true" />;
+                      return (
+                        <span className="w-14 h-14 rounded-2xl bg-current/15 ring-1 ring-current/25 flex items-center justify-center shadow-lg">
+                          <PresetIcon className="w-8 h-8" aria-hidden="true" />
+                        </span>
+                      );
                     })()}
                     <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-current opacity-70 group-hover:opacity-100 group-hover:scale-110 transition-all">
                       <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
@@ -455,8 +476,12 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
                     <h2 className="font-black text-sm uppercase tracking-tight text-white leading-tight">
                       {tmpl.title[language]}
                     </h2>
-                    <p className="text-xs text-gray-300 font-bold uppercase tracking-wider">
-                      {tmpl.nodes.length} {tr('modules', 'модуля', 'modul')} • {tmpl.nodes.reduce((acc, current) => acc + (current.points || 0), 0)} XP
+                    <p className="flex flex-wrap items-center gap-2 text-xs text-gray-300 font-bold uppercase tracking-wider">
+                      <span>{tmpl.nodes.length} {tr('modules', 'модуля', 'modul')}</span>
+                      <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-400/15 text-amber-300">
+                        <Zap className="w-3 h-3" aria-hidden="true" />
+                        {tmpl.nodes.reduce((acc, current) => acc + (current.points || 0), 0)} XP
+                      </span>
                     </p>
                   </div>
                 </motion.button>
@@ -492,12 +517,14 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-12">
             {[
-              { icon: Brain, label: t.deepUnderstanding, desc: t.deepUnderstandingDesc },
-              { icon: Sparkles, label: t.personalizedMetaphors, desc: t.personalizedMetaphorsDesc },
-              { icon: Target, label: t.skillMastery, desc: t.skillMasteryDesc }
+              { icon: Brain, label: t.deepUnderstanding, desc: t.deepUnderstandingDesc, tile: 'from-indigo-400 to-indigo-600 shadow-indigo-500/30' },
+              { icon: Sparkles, label: t.personalizedMetaphors, desc: t.personalizedMetaphorsDesc, tile: 'from-purple-400 to-fuchsia-600 shadow-purple-500/30' },
+              { icon: Target, label: t.skillMastery, desc: t.skillMasteryDesc, tile: 'from-emerald-400 to-emerald-600 shadow-emerald-500/30' }
             ].map((item, i) => (
               <div key={i} className="space-y-3 p-6 rounded-3xl bg-white/5 border border-white/5">
-                <item.icon className="w-6 h-6 text-indigo-500 mx-auto" />
+                <span className={`w-12 h-12 mx-auto rounded-2xl bg-gradient-to-br shadow-lg flex items-center justify-center text-white ${item.tile}`}>
+                  <item.icon className="w-6 h-6" aria-hidden="true" />
+                </span>
                 <h2 className="text-xs font-black uppercase tracking-widest text-white">{item.label}</h2>
                 <p className="text-xs text-gray-400 leading-relaxed">{item.desc}</p>
               </div>
@@ -512,7 +539,7 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
   const currentIndex = selectedNode ? tree.nodes.findIndex((n) => n.id === selectedNode.id) : -1;
 
   return (
-    <div className="h-full flex flex-col lg:flex-row gap-8 p-4 md:p-8 relative">
+    <div style={sceneStyle} className={`h-full flex flex-col lg:flex-row gap-8 p-4 md:p-8 relative ${light ? SCENE_PANEL : ''}`}>
       {/* Background Neural Overlay for Lab */}
       <div className="absolute inset-0 pointer-events-none opacity-20">
         <div className="absolute top-0 left-0 w-full h-full bg-[radial-gradient(circle_at_20%_30%,_rgba(79,70,229,0.1)_0%,_transparent_50%)]" />
@@ -539,7 +566,7 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
         <div className="p-5 rounded-3xl bg-indigo-500/5 border border-indigo-500/20 backdrop-blur-xl mb-4">
           <div className="flex items-baseline justify-between gap-3">
             <span className="text-xs font-black uppercase tracking-widest text-indigo-300">{tr('Course progress', 'Прогресс курса', 'Kurs jarayoni')}</span>
-            <span className="text-sm font-black text-white tabular-nums">{doneCount} / {tree.nodes.length}</span>
+            <span className="px-3 py-0.5 rounded-full bg-indigo-500/20 text-sm font-black text-white tabular-nums">{doneCount} / {tree.nodes.length}</span>
           </div>
           <div
             role="progressbar"
@@ -547,13 +574,13 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
             aria-valuemin={0}
             aria-valuemax={tree.nodes.length}
             aria-valuenow={doneCount}
-            className="mt-3 h-2 rounded-full bg-white/10 overflow-hidden"
+            className="mt-3 h-3 rounded-full bg-white/10 overflow-hidden"
           >
-            <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-emerald-400 transition-all duration-500" style={{ width: `${(doneCount / tree.nodes.length) * 100}%` }} />
+            <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 via-purple-500 to-emerald-400 transition-all duration-500" style={{ width: `${(doneCount / tree.nodes.length) * 100}%` }} />
           </div>
           {doneCount === tree.nodes.length && (
             <p className="mt-3 flex items-center gap-2 text-sm font-bold text-emerald-400">
-              <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
+              <Trophy className="w-4 h-4 text-amber-400" aria-hidden="true" />
               {tr('Course completed', 'Курс пройден', 'Kurs yakunlandi')}
             </p>
           )}
@@ -590,7 +617,7 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
               className={`
                 w-full p-6 rounded-[2.2rem] border text-left transition-all relative overflow-hidden group z-10
                 ${selectedNode?.id === node.id 
-                  ? 'bg-indigo-600 border-indigo-400 text-white shadow-[0_25px_50px_rgba(79,70,229,0.4)] scale-[1.03]' 
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 border-indigo-400 text-white shadow-[0_25px_50px_rgba(79,70,229,0.4)] scale-[1.03]' 
                   : 'bg-white/5 border-white/5 text-gray-400 hover:bg-white/10 hover:border-white/10 hover:scale-[1.01] backdrop-blur-md'}
               `}
             >
@@ -602,14 +629,14 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
               <div className="flex items-center gap-5 relative z-10">
                 <div className={`
                   w-11 h-11 rounded-2xl flex items-center justify-center text-sm font-black transition-all duration-500
-                  ${selectedNode?.id === node.id ? 'bg-white text-indigo-600 rotate-12' : 'bg-indigo-600/20 text-indigo-400'}
+                  ${selectedNode?.id === node.id ? 'bg-white text-indigo-600 rotate-12' : node.completed ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white shadow-lg shadow-emerald-500/30' : 'bg-gradient-to-br from-indigo-500/30 to-purple-500/30 text-indigo-300'}
                   shadow-[inset_0_2px_4px_rgba(255,255,255,0.1)]
                 `}>
-                  {String(i + 1).padStart(2, '0')}
+                  {node.completed ? <CheckCircle2 className="w-5 h-5" aria-hidden="true" /> : String(i + 1).padStart(2, '0')}
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="font-black text-sm tracking-tight truncate uppercase italic">{node.label}</span>
-                  {node.points && <span className={`text-xs font-bold tracking-widest ${selectedNode?.id === node.id ? 'text-white/80' : 'text-indigo-300'}`}>+{node.points} XP</span>}
+                  {node.points && <span className={`text-xs font-bold tracking-widest ${selectedNode?.id === node.id ? 'text-white/80' : 'text-amber-300'}`}>+{node.points} XP</span>}
                 </div>
                 {selectedNode?.id === node.id && (
                   <motion.div
@@ -621,11 +648,7 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
                   </motion.div>
                 )}
               </div>
-              {node.completed && (
-                <div className="absolute top-4 right-4">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-400 drop-shadow-[0_0_12px_rgba(52,211,153,0.8)]" />
-                </div>
-              )}
+              {node.completed && <span className="sr-only">{t.complete}</span>}
             </motion.button>
           ))}
         </div>
@@ -751,8 +774,9 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
                               <span className="text-xs font-black uppercase tracking-[0.3em]">{t.geniusChallenge}</span>
                             </div>
                             {selectedNode.points && (
-                              <div className="px-5 py-2 rounded-full bg-emerald-400/10 text-emerald-400 text-xs font-black tracking-widest border border-emerald-400/20 shadow-lg shadow-emerald-500/10">
-                                {t.rewardLabel} <span className="text-white ml-2">+{selectedNode.points} XP</span>
+                              <div className="inline-flex items-center gap-2 px-5 py-2 rounded-full bg-amber-400/15 text-amber-300 text-xs font-black tracking-widest border border-amber-400/30 shadow-lg shadow-amber-500/10">
+                                <Zap className="w-4 h-4" aria-hidden="true" />
+                                {t.rewardLabel} <span className="text-white">+{selectedNode.points} XP</span>
                               </div>
                             )}
                           </div>
@@ -803,7 +827,7 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
                               <Button 
                                 onClick={handleCompleteChallenge}
                                 disabled={isVerifying || !challengeAnswer.trim()}
-                                className="w-full h-16 gap-3 bg-emerald-600 hover:bg-emerald-500 shadow-2xl shadow-emerald-600/30 rounded-[2rem] text-lg font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 disabled:scale-100"
+                                className="w-full h-16 gap-3 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 shadow-2xl shadow-emerald-600/30 rounded-[2rem] text-lg font-black uppercase tracking-widest transition-all hover:scale-[1.02] active:scale-95 disabled:scale-100"
                               >
                                 {isVerifying ? (
                                   <><Loader2 className="w-6 h-6 animate-spin" /> {t.verifyingAI}</>
@@ -864,7 +888,7 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
                     variant="ghost"
                     disabled={currentIndex === -1 || currentIndex >= tree.nodes.length - 1}
                     onClick={() => handleNodeClick(tree.nodes[currentIndex + 1])}
-                    className="rounded-2xl px-8 h-12 bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-400 text-xs font-black tracking-widest uppercase border border-indigo-500/20 gap-3"
+                    className="rounded-2xl px-8 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-400 hover:to-purple-500 text-white shadow-lg shadow-indigo-500/30 text-xs font-black tracking-widest uppercase border border-indigo-400/30 gap-3"
                   >
                     {t.next} <ArrowRight className="w-5 h-5" />
                   </Button>
