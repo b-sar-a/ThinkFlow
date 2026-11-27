@@ -10,6 +10,22 @@ import { Card } from '../UI/Card';
 
 const MAX_LENGTH = 1000;
 
+// Each person gets a stable avatar colour (class names written out in full for Tailwind).
+const AVATAR_COLORS = [
+  'from-indigo-400 to-indigo-600 shadow-indigo-500/30',
+  'from-emerald-400 to-emerald-600 shadow-emerald-500/30',
+  'from-amber-400 to-orange-500 shadow-amber-500/30',
+  'from-rose-400 to-pink-600 shadow-rose-500/30',
+  'from-cyan-400 to-sky-600 shadow-cyan-500/30',
+  'from-purple-400 to-fuchsia-600 shadow-purple-500/30',
+  'from-teal-400 to-teal-600 shadow-teal-500/30',
+] as const;
+const avatarColor = (name: string) => {
+  let sum = 0;
+  for (let i = 0; i < name.length; i++) sum += name.charCodeAt(i);
+  return AVATAR_COLORS[sum % AVATAR_COLORS.length];
+};
+
 interface StarsProps {
   rating: number;
   label: string;
@@ -19,11 +35,11 @@ interface StarsProps {
 
 // Read-only stars are one image with a text label; the picker is a radio group.
 const Stars: React.FC<StarsProps> = ({ rating, label, onSelect, starLabel }) => {
-  const star = (s: number) => <Star className={`w-5 h-5 ${s <= rating ? 'fill-yellow-500' : ''}`} aria-hidden="true" />;
+  const star = (s: number) => <Star className={`w-5 h-5 ${s <= rating ? 'fill-amber-400' : ''}`} aria-hidden="true" />;
 
   if (!onSelect) {
     return (
-      <div role="img" aria-label={label} className="flex gap-1 text-yellow-500 shrink-0">
+      <div role="img" aria-label={label} className="flex gap-1 text-amber-400 shrink-0">
         {[1, 2, 3, 4, 5].map((s) => (
           <span key={s} className={s <= rating ? '' : 'text-[var(--border)]'}>{star(s)}</span>
         ))}
@@ -41,7 +57,7 @@ const Stars: React.FC<StarsProps> = ({ rating, label, onSelect, starLabel }) => 
           aria-checked={s === rating}
           aria-label={starLabel?.(s)}
           onClick={() => onSelect(s)}
-          className={`w-11 h-11 flex items-center justify-center rounded-xl transition-colors hover:bg-[var(--input)] focus-visible:outline-2 focus-visible:outline-indigo-500 ${s <= rating ? 'text-yellow-500' : 'text-[var(--border)]'}`}
+          className={`w-11 h-11 flex items-center justify-center rounded-xl transition-all hover:bg-amber-400/10 motion-safe:hover:scale-110 motion-safe:active:scale-95 focus-visible:outline-2 focus-visible:outline-indigo-500 ${s <= rating ? 'text-amber-400' : 'text-[var(--border)]'}`}
         >
           {star(s)}
         </button>
@@ -146,19 +162,27 @@ export const Reviews: React.FC = () => {
             )}
           </p>
         </div>
-        {reviews.length > 0 && (
-          <div className="hidden sm:flex flex-col items-center justify-center w-24 h-24 bg-indigo-600/10 rounded-[1.5rem] text-indigo-500 shrink-0">
+        {reviews.length > 0 ? (
+          <div className="hidden sm:flex flex-col items-center justify-center w-24 h-24 bg-gradient-to-br from-amber-400 to-orange-500 shadow-xl shadow-amber-500/30 rounded-[1.5rem] text-white shrink-0">
             <span className="text-2xl font-black leading-none">{average.toFixed(1)}</span>
-            <Star className="w-4 h-4 fill-yellow-500 text-yellow-500 mt-1" aria-hidden="true" />
-            <span className="text-xs font-bold text-[var(--muted)] mt-1">{reviews.length}</span>
+            <Star className="w-4 h-4 fill-white text-white mt-1" aria-hidden="true" />
+            <span className="text-xs font-bold text-white/85 mt-1">{reviews.length}</span>
+          </div>
+        ) : (
+          <div className="hidden sm:flex w-20 h-20 bg-gradient-to-br from-amber-400 to-orange-500 shadow-xl shadow-amber-500/30 rounded-[1.5rem] items-center justify-center text-white shrink-0" aria-hidden="true">
+            <Star className="w-9 h-9 fill-white" />
           </div>
         )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-10 items-start">
-        <Card className="order-1 lg:order-2 p-6 md:p-8 rounded-[2rem] border border-[var(--border)] lg:sticky lg:top-24">
-          <form onSubmit={submitReview} className="space-y-6">
-            <h2 className="text-xl font-black text-[var(--text)] uppercase tracking-tight">
+        <Card className="relative overflow-hidden order-1 lg:order-2 p-6 md:p-8 rounded-[2rem] border border-[var(--border)] lg:sticky lg:top-24">
+          <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500" />
+          <form onSubmit={submitReview} className="space-y-6 pt-1">
+            <h2 className="flex items-center gap-3 text-xl font-black text-[var(--text)] uppercase tracking-tight">
+              <span className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-600 shadow-lg shadow-indigo-500/30 flex items-center justify-center text-white" aria-hidden="true">
+                <MessageCircle className="w-5 h-5" />
+              </span>
               {tr('Share your experience', 'Поделитесь впечатлениями', "Taassurotlaringiz bilan bo'lishing")}
             </h2>
 
@@ -166,12 +190,15 @@ export const Reviews: React.FC = () => {
               <span id="rating-label" className="text-xs font-black uppercase text-[var(--muted)] tracking-wider block">
                 {tr('Your rating', 'Ваша оценка', 'Sizning bahoyingiz')}
               </span>
-              <Stars
-                rating={rating}
-                label={tr('Your rating', 'Ваша оценка', 'Sizning bahoyingiz')}
-                onSelect={setRating}
-                starLabel={ratingWord}
-              />
+              <div className="flex flex-wrap items-center gap-3">
+                <Stars
+                  rating={rating}
+                  label={tr('Your rating', 'Ваша оценка', 'Sizning bahoyingiz')}
+                  onSelect={setRating}
+                  starLabel={ratingWord}
+                />
+                <span aria-hidden="true" className="px-3 py-1 rounded-full bg-amber-400/15 text-xs font-black tabular-nums text-[var(--text)]">{ratingWord(rating)}</span>
+              </div>
             </div>
 
             <div className="space-y-2">
@@ -187,7 +214,7 @@ export const Reviews: React.FC = () => {
                   setPosted(false);
                 }}
                 placeholder={tr('What helped you? What would you change?', 'Что помогло? Что бы вы изменили?', "Nima yordam berdi? Nimani o'zgartirgan bo'lardingiz?")}
-                className="w-full bg-[var(--input)] border border-[var(--border)] rounded-2xl p-4 text-sm outline-none focus:border-indigo-500 transition-colors h-36 resize-none text-[var(--text)] placeholder:text-[var(--muted)] placeholder:opacity-60"
+                className="w-full bg-[var(--input)] border border-[var(--border)] rounded-2xl p-4 text-sm outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-colors h-36 resize-none text-[var(--text)] placeholder:text-[var(--muted)] placeholder:opacity-60"
               />
               <div className="text-xs text-[var(--muted)] text-right">{reviewInput.length}/{MAX_LENGTH}</div>
             </div>
@@ -203,7 +230,7 @@ export const Reviews: React.FC = () => {
               )}
             </div>
 
-            <Button type="submit" disabled={!reviewInput.trim() || isSubmitting} className="w-full h-14 rounded-2xl gap-3">
+            <Button type="submit" disabled={!reviewInput.trim() || isSubmitting} className="w-full h-14 rounded-2xl gap-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-lg shadow-indigo-500/25">
               {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" /> : <Send className="w-5 h-5" aria-hidden="true" />}
               {t.submit}
             </Button>
@@ -217,7 +244,9 @@ export const Reviews: React.FC = () => {
             </div>
           ) : reviews.length === 0 ? (
             <div className="py-12 px-6 text-center rounded-[2rem] border border-dashed border-[var(--border)]">
-              <MessageCircle className="w-10 h-10 mx-auto mb-4 text-indigo-500/60" aria-hidden="true" />
+              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-indigo-400 to-purple-600 text-white flex items-center justify-center shadow-xl shadow-indigo-500/30 motion-safe:animate-bounce" aria-hidden="true">
+                <MessageCircle className="w-8 h-8" />
+              </div>
               <p className="font-black text-[var(--text)]">{tr('No reviews yet', 'Отзывов пока нет', "Hali sharhlar yo'q")}</p>
               <p className="text-sm text-[var(--muted)] mt-1">
                 {tr('Be the first to share how ThinkFlow works for you.', 'Станьте первым, кто расскажет, как ThinkFlow работает для вас.', "ThinkFlow siz uchun qanday ishlashini birinchi bo'lib aytib bering.")}
@@ -228,14 +257,17 @@ export const Reviews: React.FC = () => {
               const mine = !!user && review.userId === user.uid;
               const name = review.userName?.trim() || '?';
               return (
-                <Card key={review.id} className="p-6 md:p-7 rounded-[2rem] border border-[var(--border)]">
+                <Card key={review.id} className={`p-6 md:p-7 rounded-[2rem] border transition-all hover:shadow-xl hover:shadow-indigo-500/10 motion-safe:hover:-translate-y-0.5 ${mine ? 'border-indigo-500/30 bg-indigo-500/5' : 'border-[var(--border)] hover:border-indigo-500/30'}`}>
                   <div className="flex justify-between items-start gap-4 mb-4">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-11 h-11 bg-indigo-600 rounded-xl flex items-center justify-center text-white font-black text-lg shrink-0" aria-hidden="true">
+                      <div className={`w-11 h-11 bg-gradient-to-br shadow-lg rounded-xl flex items-center justify-center text-white font-black text-lg shrink-0 ${avatarColor(name)}`} aria-hidden="true">
                         {name[0].toUpperCase()}
                       </div>
                       <div className="min-w-0">
-                        <h3 className="font-black text-sm text-[var(--text)] truncate">{name}</h3>
+                        <h3 className="font-black text-sm text-[var(--text)] flex items-center gap-2">
+                          <span className="truncate">{name}</span>
+                          {mine && <span className="shrink-0 px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-500 text-[10px] font-black uppercase tracking-widest">{tr('You', 'Вы', 'Siz')}</span>}
+                        </h3>
                         <p className="text-xs text-[var(--muted)]">
                           {new Date(review.timestamp).toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' })}
                         </p>
