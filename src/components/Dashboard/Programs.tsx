@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { GraduationCap, Calculator, Target, PenTool, Atom, FlaskConical, Code2, Dna, Landmark, Cpu, RotateCcw, Play, ThumbsUp, ThumbsDown, Flag, ArrowLeft, ArrowRight, Check, CheckCircle2, Circle, Sparkles, Eye } from 'lucide-react';
+import { GraduationCap, Calculator, Target, PenTool, Atom, FlaskConical, Code2, Dna, Landmark, Cpu, RotateCcw, Play, ThumbsUp, ThumbsDown, Flag, ArrowLeft, ArrowRight, Check, CheckCircle2, Circle, Sparkles, Eye, Flame, Star, Trophy, Zap } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../UI/Card';
@@ -11,15 +11,15 @@ import { PROGRAMS, LESSON_XP, checkAnswer, Bi, Lesson, Program, PracticeItem } f
 const ICONS = { calculator: Calculator, target: Target, pen: PenTool, atom: Atom, flask: FlaskConical, code: Code2, dna: Dna, landmark: Landmark, cpu: Cpu } as const;
 
 const ACCENT = {
-  indigo: { text: 'text-indigo-500', soft: 'bg-indigo-500/10', border: 'border-indigo-500/30' },
-  emerald: { text: 'text-emerald-500', soft: 'bg-emerald-500/10', border: 'border-emerald-500/30' },
-  amber: { text: 'text-amber-500', soft: 'bg-amber-500/10', border: 'border-amber-500/30' },
-  rose: { text: 'text-rose-500', soft: 'bg-rose-500/10', border: 'border-rose-500/30' },
-  cyan: { text: 'text-cyan-500', soft: 'bg-cyan-500/10', border: 'border-cyan-500/30' },
-  purple: { text: 'text-purple-500', soft: 'bg-purple-500/10', border: 'border-purple-500/30' },
-  teal: { text: 'text-teal-500', soft: 'bg-teal-500/10', border: 'border-teal-500/30' },
-  orange: { text: 'text-orange-500', soft: 'bg-orange-500/10', border: 'border-orange-500/30' },
-  sky: { text: 'text-sky-500', soft: 'bg-sky-500/10', border: 'border-sky-500/30' },
+  indigo: { text: 'text-indigo-500', soft: 'bg-indigo-500/10', border: 'border-indigo-500/30', grad: 'from-indigo-400 to-indigo-600', glow: 'shadow-indigo-500/30', bar: 'from-indigo-500 to-indigo-400', solid: 'bg-indigo-500', hoverBorder: 'hover:border-indigo-500/50', hoverGlow: 'hover:shadow-indigo-500/25' },
+  emerald: { text: 'text-emerald-500', soft: 'bg-emerald-500/10', border: 'border-emerald-500/30', grad: 'from-emerald-400 to-emerald-600', glow: 'shadow-emerald-500/30', bar: 'from-emerald-500 to-emerald-400', solid: 'bg-emerald-500', hoverBorder: 'hover:border-emerald-500/50', hoverGlow: 'hover:shadow-emerald-500/25' },
+  amber: { text: 'text-amber-500', soft: 'bg-amber-500/10', border: 'border-amber-500/30', grad: 'from-amber-400 to-amber-600', glow: 'shadow-amber-500/30', bar: 'from-amber-500 to-amber-400', solid: 'bg-amber-500', hoverBorder: 'hover:border-amber-500/50', hoverGlow: 'hover:shadow-amber-500/25' },
+  rose: { text: 'text-rose-500', soft: 'bg-rose-500/10', border: 'border-rose-500/30', grad: 'from-rose-400 to-rose-600', glow: 'shadow-rose-500/30', bar: 'from-rose-500 to-rose-400', solid: 'bg-rose-500', hoverBorder: 'hover:border-rose-500/50', hoverGlow: 'hover:shadow-rose-500/25' },
+  cyan: { text: 'text-cyan-500', soft: 'bg-cyan-500/10', border: 'border-cyan-500/30', grad: 'from-cyan-400 to-cyan-600', glow: 'shadow-cyan-500/30', bar: 'from-cyan-500 to-cyan-400', solid: 'bg-cyan-500', hoverBorder: 'hover:border-cyan-500/50', hoverGlow: 'hover:shadow-cyan-500/25' },
+  purple: { text: 'text-purple-500', soft: 'bg-purple-500/10', border: 'border-purple-500/30', grad: 'from-purple-400 to-purple-600', glow: 'shadow-purple-500/30', bar: 'from-purple-500 to-purple-400', solid: 'bg-purple-500', hoverBorder: 'hover:border-purple-500/50', hoverGlow: 'hover:shadow-purple-500/25' },
+  teal: { text: 'text-teal-500', soft: 'bg-teal-500/10', border: 'border-teal-500/30', grad: 'from-teal-400 to-teal-600', glow: 'shadow-teal-500/30', bar: 'from-teal-500 to-teal-400', solid: 'bg-teal-500', hoverBorder: 'hover:border-teal-500/50', hoverGlow: 'hover:shadow-teal-500/25' },
+  orange: { text: 'text-orange-500', soft: 'bg-orange-500/10', border: 'border-orange-500/30', grad: 'from-orange-400 to-orange-600', glow: 'shadow-orange-500/30', bar: 'from-orange-500 to-orange-400', solid: 'bg-orange-500', hoverBorder: 'hover:border-orange-500/50', hoverGlow: 'hover:shadow-orange-500/25' },
+  sky: { text: 'text-sky-500', soft: 'bg-sky-500/10', border: 'border-sky-500/30', grad: 'from-sky-400 to-sky-600', glow: 'shadow-sky-500/30', bar: 'from-sky-500 to-sky-400', solid: 'bg-sky-500', hoverBorder: 'hover:border-sky-500/50', hoverGlow: 'hover:shadow-sky-500/25' },
 } as const;
 
 type ItemStatus = 'idle' | 'correct' | 'wrong' | 'shown' | 'selfdone';
@@ -331,9 +331,17 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
         </section>
 
         {justEarned === doneKey(program, lesson) && (
-          <div role="status" className="p-5 rounded-[1.5rem] bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 font-bold flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 shrink-0" aria-hidden="true" />
-            {tr(`Lesson complete! +${LESSON_XP} XP`, `Урок пройден! +${LESSON_XP} XP`, `Dars tugadi! +${LESSON_XP} XP`)}
+          <div role="status" className="p-5 md:p-6 rounded-[1.5rem] bg-gradient-to-br from-emerald-500/15 via-[var(--card)] to-amber-500/15 border border-emerald-500/40 flex items-center gap-4 animate-in fade-in zoom-in-95 duration-500">
+            <span className="w-14 h-14 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/30">
+              <Trophy className="w-7 h-7" aria-hidden="true" />
+            </span>
+            <span className="flex-1 min-w-0">
+              <span className="block text-lg md:text-xl font-black text-[var(--text)]">{tr('Lesson complete!', 'Урок пройден!', 'Dars tugadi!')}</span>
+              <span className="block text-sm text-[var(--muted)]">{tr('Nice work. Come back tomorrow to keep your days going.', 'Отличная работа. Приходите завтра, чтобы не прерывать серию дней.', 'Barakalla. Kunlar ketma-ketligi uzilmasligi uchun ertaga qaytib keling.')}</span>
+            </span>
+            <span className="inline-flex items-center gap-1.5 h-10 px-4 rounded-full bg-amber-500/15 text-[var(--text)] font-black text-sm shrink-0">
+              <Zap className="w-4 h-4 text-amber-500" aria-hidden="true" />+{LESSON_XP} XP
+            </span>
           </div>
         )}
 
@@ -420,8 +428,8 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
         </button>
 
         <header className="flex items-start gap-5">
-          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 ${accent.soft}`}>
-            <Icon className={`w-8 h-8 ${accent.text}`} aria-hidden="true" />
+          <div className={`w-16 h-16 rounded-2xl flex items-center justify-center shrink-0 bg-gradient-to-br ${accent.grad} shadow-lg ${accent.glow}`}>
+            <Icon className="w-8 h-8 text-white" aria-hidden="true" />
           </div>
           <div className="space-y-2 min-w-0">
             <h1 className="text-3xl md:text-4xl font-black tracking-tight text-[var(--text)] leading-tight">{program.title[language]}</h1>
@@ -429,30 +437,50 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
             <p className="text-xs font-black uppercase tracking-wider text-[var(--muted)]">
               {program.audience[language]} · {count}/{program.lessons.length} {tr('lessons done', 'уроков пройдено', 'dars tugagan')}
             </p>
+            <div className="h-2 rounded-full bg-[var(--input)] overflow-hidden" role="progressbar" aria-valuemin={0} aria-valuemax={program.lessons.length} aria-valuenow={count} aria-label={tr('Program progress', 'Прогресс по программе', 'Dastur bo\'yicha progress')}>
+              <div className={`h-full rounded-full bg-gradient-to-r ${accent.bar} transition-all duration-700`} style={{ width: `${(count / program.lessons.length) * 100}%` }} />
+            </div>
           </div>
         </header>
 
-        <ol className="space-y-3">
-          {program.lessons.map((l, i) => {
-            const isDone = done.includes(doneKey(program, l));
-            return (
-              <li key={l.id}>
-                <button
-                  type="button"
-                  onClick={() => setLessonId(l.id)}
-                  className="w-full text-left flex items-center gap-4 p-5 rounded-[1.5rem] bg-[var(--card)] border border-[var(--border)] hover:border-indigo-500/40 transition-colors focus-visible:outline-2 focus-visible:outline-indigo-500"
-                >
-                  {isDone ? <CheckCircle2 className="w-6 h-6 text-emerald-500 shrink-0" aria-label={tr('Done', 'Пройден', 'Tugagan')} /> : <Circle className="w-6 h-6 text-[var(--border)] shrink-0" aria-hidden="true" />}
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-xs font-black uppercase tracking-wider text-[var(--muted)]">{tr('Lesson', 'Урок', 'Dars')} {i + 1}</span>
-                    <span className="block font-black text-[var(--text)]">{language === 'uz' && l.title.uz ? l.title.uz : text(l.title)}</span>
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-indigo-500 shrink-0" aria-hidden="true" />
-                </button>
-              </li>
-            );
-          })}
-        </ol>
+        {(() => {
+          const currentIdx = program.lessons.findIndex((x) => !done.includes(doneKey(program, x)));
+          return (
+            <ol className="space-y-3">
+              {program.lessons.map((l, i) => {
+                const isDone = done.includes(doneKey(program, l));
+                const isCurrent = i === currentIdx;
+                const last = i === program.lessons.length - 1;
+                return (
+                  <li key={l.id} className="relative">
+                    {!last && <span aria-hidden="true" className={`absolute left-[2.3rem] top-full h-3 w-0.5 ${isDone ? 'bg-emerald-500/60' : 'bg-[var(--border)]'}`} />}
+                    <button
+                      type="button"
+                      onClick={() => setLessonId(l.id)}
+                      className={`group w-full text-left flex items-center gap-4 p-4 rounded-[1.5rem] border transition-all motion-safe:active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-indigo-500 ${isCurrent ? `bg-[var(--card)] ${accent.border} shadow-lg ${accent.glow}` : `bg-[var(--card)] border-[var(--border)] ${accent.hoverBorder}`}`}
+                    >
+                      <span
+                        className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 font-black text-sm ${isDone ? 'bg-emerald-500 text-white' : isCurrent ? `${accent.solid} text-white` : 'bg-[var(--input)] text-[var(--muted)]'}`}
+                      >
+                        {isDone ? <Check className="w-5 h-5" strokeWidth={3} aria-label={tr('Done', 'Пройден', 'Tugagan')} /> : i + 1}
+                      </span>
+                      <span className="flex-1 min-w-0">
+                        <span className="block text-xs font-black uppercase tracking-wider text-[var(--muted)]">{tr('Lesson', 'Урок', 'Dars')} {i + 1}</span>
+                        <span className="block font-black text-[var(--text)]">{language === 'uz' && l.title.uz ? l.title.uz : text(l.title)}</span>
+                      </span>
+                      {!isDone && (
+                        <span className="hidden sm:inline-flex items-center gap-1 text-xs font-black text-[var(--text)] bg-amber-500/15 px-2.5 py-1 rounded-full shrink-0">
+                          <Zap className="w-3 h-3 text-amber-500" aria-hidden="true" />+{LESSON_XP} XP
+                        </span>
+                      )}
+                      <ArrowRight className="w-4 h-4 text-indigo-500 shrink-0 motion-safe:group-hover:translate-x-0.5 transition-transform" aria-hidden="true" />
+                    </button>
+                  </li>
+                );
+              })}
+            </ol>
+          );
+        })()}
       </div>
     );
   }
@@ -473,6 +501,7 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
   const todayCount = daily[dayKey()] ?? 0;
   const week = Array.from({ length: 7 }, (_, i) => 6 - i).map((offset) => ({ key: dayKey(offset), n: daily[dayKey(offset)] ?? 0 }));
   const weekDays = week.filter((d) => d.n > 0).length;
+  const finished = PROGRAMS.filter((p) => progressOf(p) === p.lessons.length).length;
   return (
     <div ref={topRef} className="max-w-5xl mx-auto space-y-10 animate-in fade-in duration-700 scroll-mt-4">
       <div className="flex items-center justify-between gap-6">
@@ -490,6 +519,21 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
           <GraduationCap className="w-8 h-8" aria-hidden="true" />
         </div>
       </div>
+
+      <ul className="flex flex-wrap gap-3 -mt-4" aria-label={tr('Your progress', 'Ваш прогресс', 'Sizning natijangiz')}>
+        <li className="inline-flex items-center gap-2 h-10 px-4 rounded-full bg-[var(--card)] border border-[var(--border)] text-sm font-black text-[var(--text)]">
+          <Flame className="w-4 h-4 text-orange-500" aria-hidden="true" />
+          {tr(`${weekDays} of 7 days`, `${weekDays} из 7 дней`, `7 kundan ${weekDays}`)}
+        </li>
+        <li className="inline-flex items-center gap-2 h-10 px-4 rounded-full bg-[var(--card)] border border-[var(--border)] text-sm font-black text-[var(--text)]">
+          <Star className="w-4 h-4 text-amber-500" aria-hidden="true" />
+          {totalDone * LESSON_XP} XP
+        </li>
+        <li className="inline-flex items-center gap-2 h-10 px-4 rounded-full bg-[var(--card)] border border-[var(--border)] text-sm font-black text-[var(--text)]">
+          <Trophy className="w-4 h-4 text-indigo-500" aria-hidden="true" />
+          {tr(`${finished} of ${PROGRAMS.length} programs`, `${finished} из ${PROGRAMS.length} программ`, `${PROGRAMS.length} dasturdan ${finished} tasi`)}
+        </li>
+      </ul>
 
       {(nextUp || missed.length > 0) && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
@@ -513,8 +557,8 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
                     role="img"
                     aria-label={tr(`Lessons on ${weekDays} of the last 7 days`, `Уроки в ${weekDays} из последних 7 дней`, `So'nggi 7 kunning ${weekDays} tasida darslar`)}
                   >
-                    {week.map((d) => (
-                      <span key={d.key} className={`w-2.5 h-2.5 rounded-full ${d.n > 0 ? 'bg-emerald-500' : 'bg-[var(--input)]'}`} />
+                    {week.map((d, idx) => (
+                      <span key={d.key} className={`w-3 h-3 rounded-full ${d.n > 0 ? 'bg-emerald-500' : 'bg-[var(--input)]'} ${idx === 6 ? 'ring-2 ring-indigo-500/50 ring-offset-2 ring-offset-[var(--card)]' : ''}`} />
                     ))}
                   </span>
                   <span className={`text-xs font-bold ${todayCount >= DAILY_GOAL ? 'text-emerald-500' : 'text-[var(--muted)]'}`}>
@@ -568,13 +612,13 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
                     <button
                       type="button"
                       onClick={() => setProgramId(p.id)}
-                      className="group w-full text-left flex flex-col gap-4 p-6 md:p-7 rounded-[2rem] bg-[var(--card)] border border-[var(--border)] hover:border-indigo-500/40 hover:shadow-xl hover:shadow-indigo-500/5 transition-all focus-visible:outline-2 focus-visible:outline-indigo-500"
+                      className={`group w-full text-left flex flex-col gap-4 p-6 md:p-7 rounded-[2rem] bg-[var(--card)] border border-[var(--border)] ${accent.hoverBorder} hover:shadow-xl ${accent.hoverGlow} transition-all motion-safe:hover:-translate-y-0.5 motion-safe:active:scale-[0.99] focus-visible:outline-2 focus-visible:outline-indigo-500`}
                     >
                       <div className="flex items-center justify-between">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${accent.soft}`}>
-                          <Icon className={`w-6 h-6 ${accent.text}`} aria-hidden="true" />
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center bg-gradient-to-br ${accent.grad} shadow-lg ${accent.glow}`}>
+                          <Icon className="w-6 h-6 text-white" aria-hidden="true" />
                         </div>
-                        <span className="text-xs font-black uppercase tracking-wider text-[var(--muted)] bg-[var(--input)] px-3 py-1.5 rounded-full">{p.audience[language]}</span>
+                        <span className="inline-flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-[var(--muted)] bg-[var(--input)] px-3 py-1.5 rounded-full">{count === p.lessons.length && <Trophy className="w-3.5 h-3.5 text-amber-500" aria-label={tr('Finished', 'Завершено', 'Tugallangan')} />}{p.audience[language]}</span>
                       </div>
                       <div className="flex-1 space-y-1">
                         <h3 className="text-xl font-black text-[var(--text)] leading-snug group-hover:text-indigo-500 transition-colors">{p.title[language]}</h3>
@@ -589,7 +633,7 @@ export const Programs: React.FC<ProgramsProps> = ({ onNavigate }) => {
                           </span>
                         </div>
                         <div className="h-1.5 rounded-full bg-[var(--input)] overflow-hidden">
-                          <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500" style={{ width: `${pct}%` }} />
+                          <div className={`h-full rounded-full bg-gradient-to-r ${accent.bar} transition-all duration-700`} style={{ width: `${pct}%` }} />
                         </div>
                       </div>
                     </button>
@@ -664,7 +708,25 @@ const Practice: React.FC<PracticeProps> = ({ items, text, uz, tr, alreadyDone, o
     else onWrong?.(i);
   };
 
+  const solvedCount = status.filter((x) => x === 'correct' || x === 'selfdone').length;
+
   return (
+    <div className="space-y-4">
+    <div className="flex items-center gap-3">
+      <div
+        role="progressbar"
+        aria-valuemin={0}
+        aria-valuemax={items.length}
+        aria-valuenow={solvedCount}
+        aria-label={tr('Tasks solved', 'Решено заданий', 'Yechilgan topshiriqlar')}
+        className="flex flex-1 gap-1.5"
+      >
+        {items.map((_, k) => (
+          <span key={k} className={`h-2 flex-1 rounded-full transition-colors duration-500 ${status[k] === 'correct' || status[k] === 'selfdone' ? 'bg-emerald-500' : 'bg-[var(--input)]'}`} />
+        ))}
+      </div>
+      <span className="text-xs font-black text-[var(--muted)] tabular-nums">{solvedCount}/{items.length}</span>
+    </div>
     <ol className="space-y-4">
       {items.map((item, i) => {
         const s = status[i];
@@ -689,7 +751,7 @@ const Practice: React.FC<PracticeProps> = ({ items, text, uz, tr, alreadyDone, o
                           ? 'border-emerald-500/60 bg-emerald-500/10 text-emerald-500'
                           : s === 'wrong' && picked
                             ? 'border-rose-500/50 bg-rose-500/10 text-rose-500'
-                            : 'border-[var(--border)] bg-[var(--input)] text-[var(--text)] hover:border-indigo-500/50';
+                            : 'border-[var(--border)] bg-[var(--input)] text-[var(--text)] hover:border-indigo-500/60 hover:bg-indigo-500/5';
                       return (
                         <button
                           key={k}
@@ -698,9 +760,9 @@ const Practice: React.FC<PracticeProps> = ({ items, text, uz, tr, alreadyDone, o
                           aria-checked={picked}
                           disabled={s === 'correct'}
                           onClick={() => pick(i, choice)}
-                          className={`min-h-12 px-4 py-2 rounded-2xl border text-left flex items-center gap-3 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-indigo-500 ${tone}`}
+                          className={`min-h-12 px-4 py-2 rounded-2xl border text-left flex items-center gap-3 text-sm font-bold transition-all motion-safe:active:scale-[0.98] focus-visible:outline-2 focus-visible:outline-indigo-500 ${tone}`}
                         >
-                          <span aria-hidden="true" className="w-6 h-6 rounded-full border border-current text-xs flex items-center justify-center shrink-0 opacity-80">{'ABCDEF'[k]}</span>
+                          <span aria-hidden="true" className="w-6 h-6 rounded-full border border-current text-xs flex items-center justify-center shrink-0 opacity-80">{s === 'correct' && picked ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : 'ABCDEF'[k]}</span>
                           <span className="min-w-0 break-words">{choice}</span>
                         </button>
                       );
@@ -819,5 +881,6 @@ const Practice: React.FC<PracticeProps> = ({ items, text, uz, tr, alreadyDone, o
         );
       })}
     </ol>
+    </div>
   );
 };
