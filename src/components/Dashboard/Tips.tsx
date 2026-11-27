@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Lightbulb, Clock, BookOpen, CheckCircle2, Star, Target, Zap, FileText, BarChart3, Quote, Sparkles, Users, Brain, Check } from 'lucide-react';
+import { Lightbulb, Clock, BookOpen, CheckCircle2, Star, Target, Zap, FileText, BarChart3, Quote, Sparkles, Users, Brain, Check, Trophy } from 'lucide-react';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../UI/Card';
 
@@ -121,13 +121,15 @@ export const Tips: React.FC = () => {
   ];
 
 
-  const tabs: { id: TabId; label: string; hint: string; tips: typeof satTips; accent: string; activeBg: string }[] = [
-    { id: 'sat', label: 'SAT', hint: t.satTips, tips: satTips, accent: 'text-indigo-500', activeBg: 'bg-indigo-600' },
-    { id: 'ielts', label: 'IELTS', hint: t.ieltsTips, tips: ieltsTips, accent: 'text-emerald-500', activeBg: 'bg-emerald-600' },
-    { id: 'gen', label: tr('General', 'Общие', 'Umumiy'), hint: t.generalTipsSub, tips: generalTips, accent: 'text-purple-500', activeBg: 'bg-purple-600' },
+  const tabs: { id: TabId; label: string; hint: string; tips: typeof satTips; activeBg: string; tile: string; bar: string; hover: string }[] = [
+    { id: 'sat', label: 'SAT', hint: t.satTips, tips: satTips, activeBg: 'from-indigo-500 to-indigo-600 shadow-indigo-500/30', tile: 'from-indigo-400 to-indigo-600 shadow-indigo-500/30', bar: 'from-indigo-400 to-indigo-600', hover: 'hover:border-indigo-500/40 hover:shadow-indigo-500/15' },
+    { id: 'ielts', label: 'IELTS', hint: t.ieltsTips, tips: ieltsTips, activeBg: 'from-emerald-500 to-teal-600 shadow-emerald-500/30', tile: 'from-emerald-400 to-teal-600 shadow-emerald-500/30', bar: 'from-emerald-400 to-teal-500', hover: 'hover:border-emerald-500/40 hover:shadow-emerald-500/15' },
+    { id: 'gen', label: tr('General', 'Общие', 'Umumiy'), hint: t.generalTipsSub, tips: generalTips, activeBg: 'from-purple-500 to-fuchsia-600 shadow-purple-500/30', tile: 'from-purple-400 to-fuchsia-600 shadow-purple-500/30', bar: 'from-purple-400 to-fuchsia-500', hover: 'hover:border-purple-500/40 hover:shadow-purple-500/15' },
   ];
   const current = tabs.find((x) => x.id === tab)!;
   const triedCount = (id: TabId, n: number) => Array.from({ length: n }).filter((_, i) => tried.includes(id + ':' + i)).length;
+  const currentTried = triedCount(current.id, current.tips.length);
+  const allTried = currentTried === current.tips.length;
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 md:space-y-10 animate-in fade-in duration-700">
@@ -136,7 +138,7 @@ export const Tips: React.FC = () => {
           <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)]">{t.tips}</h1>
           <p className="text-[var(--muted)] font-medium max-w-2xl">{t.tipsSub}</p>
         </div>
-        <div className="hidden sm:flex w-16 h-16 bg-indigo-600/10 rounded-[1.5rem] items-center justify-center text-indigo-500 shrink-0">
+        <div className="hidden sm:flex w-16 h-16 bg-gradient-to-br from-amber-400 to-orange-500 shadow-xl shadow-amber-500/30 rounded-[1.5rem] items-center justify-center text-white shrink-0">
           <Lightbulb className="w-8 h-8" aria-hidden="true" />
         </div>
       </div>
@@ -152,18 +154,37 @@ export const Tips: React.FC = () => {
               aria-selected={tab === x.id}
               aria-controls="tips-panel"
               onClick={() => setTab(x.id)}
-              className={`h-11 px-5 rounded-2xl text-xs font-black uppercase tracking-wider transition-colors ${
-                tab === x.id ? x.activeBg + ' text-white shadow-lg' : 'bg-[var(--input)] text-[var(--muted)] hover:text-[var(--text)]'
+              className={`h-11 pl-5 pr-3 rounded-2xl text-xs font-black uppercase tracking-wider transition-all motion-safe:active:scale-95 ${
+                tab === x.id ? 'bg-gradient-to-r text-white shadow-lg ' + x.activeBg : 'bg-[var(--input)] text-[var(--muted)] hover:text-[var(--text)]'
               }`}
             >
               {x.label}
-              <span className="ml-2 font-bold">{triedCount(x.id, x.tips.length)}/{x.tips.length}</span>
+              <span className={`ml-2 px-2 py-0.5 rounded-full font-bold tabular-nums ${tab === x.id ? 'bg-white/20' : 'bg-[var(--card)]'}`}>{triedCount(x.id, x.tips.length)}/{x.tips.length}</span>
             </button>
           ))}
         </div>
         <p className="text-sm text-[var(--muted)]">
           {current.hint} {tr('Tap "I tried it" on tips you have used.', 'Нажимайте «Попробовал» на советах, которые уже применили.', "Qo'llagan maslahatlaringizda «Sinadim» tugmasini bosing.")}
         </p>
+        <div className="flex items-center gap-3">
+          <div
+            role="progressbar"
+            aria-valuemin={0}
+            aria-valuemax={current.tips.length}
+            aria-valuenow={currentTried}
+            aria-label={tr('Tips tried', 'Применено советов', 'Sinalgan maslahatlar')}
+            className="h-3 flex-1 rounded-full bg-[var(--input)] overflow-hidden"
+          >
+            <div
+              className={`h-full rounded-full bg-gradient-to-r transition-all duration-500 ${current.bar}`}
+              style={{ width: `${(currentTried / current.tips.length) * 100}%` }}
+            />
+          </div>
+          <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full bg-[var(--input)] text-xs font-black tabular-nums text-[var(--text)]">
+            {allTried && <Trophy className="w-3.5 h-3.5 text-amber-500" aria-hidden="true" />}
+            {currentTried}/{current.tips.length}
+          </span>
+        </div>
       </div>
 
       <div id="tips-panel" role="tabpanel" aria-labelledby={'tips-tab-' + tab} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5">
@@ -171,9 +192,20 @@ export const Tips: React.FC = () => {
           const id = tab + ':' + i;
           const done = tried.includes(id);
           return (
-            <Card key={id} className={`p-6 rounded-[2rem] flex flex-col ${done ? 'border-emerald-500/30' : ''}`}>
-              <div className="w-12 h-12 bg-[var(--input)] rounded-2xl flex items-center justify-center mb-5">
-                <tip.icon className={`w-6 h-6 ${current.accent}`} aria-hidden="true" />
+            <Card
+              key={id}
+              className={`relative overflow-hidden p-6 rounded-[2rem] flex flex-col transition-all hover:shadow-xl motion-safe:hover:-translate-y-0.5 ${
+                done ? 'border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/40 hover:shadow-emerald-500/15' : current.hover
+              }`}
+            >
+              <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${done ? 'from-emerald-400 to-emerald-600' : current.bar}`} />
+              <div className="flex items-start justify-between mb-5 pt-1">
+                <div className={`w-12 h-12 bg-gradient-to-br shadow-lg rounded-2xl flex items-center justify-center text-white ${done ? 'from-emerald-400 to-emerald-600 shadow-emerald-500/30' : current.tile}`}>
+                  <tip.icon className="w-6 h-6" aria-hidden="true" />
+                </div>
+                <span aria-hidden="true" className="px-2.5 py-1 rounded-full bg-[var(--input)] text-[10px] font-black tabular-nums tracking-widest text-[var(--muted)]">
+                  {String(i + 1).padStart(2, '0')}
+                </span>
               </div>
               <h2 className="text-lg font-black mb-2 text-[var(--text)] leading-snug">{tip.title}</h2>
               <p className="text-[var(--muted)] text-sm leading-relaxed mb-5 flex-1">{tip.desc}</p>
@@ -181,10 +213,10 @@ export const Tips: React.FC = () => {
                 type="button"
                 aria-pressed={done}
                 onClick={() => toggleTried(id)}
-                className={`inline-flex items-center justify-center gap-2 h-11 rounded-xl text-xs font-black uppercase tracking-wider border transition-colors ${
+                className={`inline-flex items-center justify-center gap-2 h-11 rounded-xl text-xs font-black uppercase tracking-wider border transition-all motion-safe:active:scale-95 ${
                   done
-                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500'
-                    : 'border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:border-indigo-500/40'
+                    ? 'bg-gradient-to-r from-emerald-500 to-teal-500 border-transparent text-white shadow-lg shadow-emerald-500/25'
+                    : 'border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)] hover:border-indigo-500/40 hover:bg-indigo-500/5'
                 }`}
               >
                 {done && <Check className="w-4 h-4" aria-hidden="true" />}
@@ -195,11 +227,13 @@ export const Tips: React.FC = () => {
         })}
       </div>
 
-      <div className="bg-gradient-to-br from-indigo-600 to-purple-700 p-8 md:p-12 rounded-[2.5rem] flex flex-col md:flex-row items-start md:items-center gap-6 md:gap-10 text-white shadow-2xl shadow-indigo-500/20">
-        <div className="w-20 h-20 md:w-28 md:h-28 bg-white/10 rounded-[2rem] shrink-0 flex items-center justify-center">
+      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-600 p-8 md:p-12 rounded-[2.5rem] flex flex-col md:flex-row items-start md:items-center gap-6 md:gap-10 text-white shadow-2xl shadow-indigo-500/25">
+        <span aria-hidden="true" className="pointer-events-none absolute -top-16 -right-16 w-56 h-56 rounded-full bg-white/10 blur-2xl" />
+        <span aria-hidden="true" className="pointer-events-none absolute -bottom-20 left-1/3 w-48 h-48 rounded-full bg-pink-300/20 blur-3xl" />
+        <div className="relative w-20 h-20 md:w-28 md:h-28 bg-white/15 ring-1 ring-white/30 rounded-[2rem] shrink-0 flex items-center justify-center shadow-xl">
           <Lightbulb className="w-10 h-10 md:w-14 md:h-14" aria-hidden="true" />
         </div>
-        <div className="space-y-4">
+        <div className="relative space-y-4">
           <h2 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">{t.proTipTitle}</h2>
           <p className="text-white/85 leading-relaxed text-base md:text-lg font-medium">{t.proTipDesc}</p>
         </div>
