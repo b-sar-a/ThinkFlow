@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Zap, CheckCircle2, Trophy, Clock, Plus, Loader2, Trash2, AlertCircle } from 'lucide-react';
+import { Zap, CheckCircle2, Target, Clock, Plus, Loader2, Trash2, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Task } from '../../types';
@@ -38,6 +38,26 @@ const writePaid = (uid: string, title: string) => {
     /* storage blocked: the daily limit then applies for this visit only */
   }
 };
+
+// Colours per difficulty. Class names are written out in full so Tailwind can see them.
+const DIFF = {
+  Easy: {
+    pill: 'from-emerald-400 to-emerald-600 shadow-emerald-500/30',
+    bar: 'from-emerald-400 to-emerald-600',
+    hover: 'hover:border-emerald-500/40 hover:shadow-emerald-500/15',
+  },
+  Medium: {
+    pill: 'from-amber-500 to-orange-600 shadow-amber-500/30',
+    bar: 'from-amber-400 to-orange-500',
+    hover: 'hover:border-amber-500/40 hover:shadow-amber-500/15',
+  },
+  Hard: {
+    pill: 'from-rose-500 to-pink-600 shadow-rose-500/30',
+    bar: 'from-rose-500 to-pink-600',
+    hover: 'hover:border-rose-500/40 hover:shadow-rose-500/15',
+  },
+} as const;
+const diffStyle = (value: string) => (value === 'Easy' ? DIFF.Easy : value === 'Medium' ? DIFF.Medium : DIFF.Hard);
 
 export const Tasks: React.FC = () => {
   const { user, profile, updateProfileData } = useAuth();
@@ -222,27 +242,26 @@ export const Tasks: React.FC = () => {
     );
   }
 
-  const renderTask = (task: Task) => (
+  const renderTask = (task: Task) => {
+    const d = diffStyle(task.difficulty);
+    const isDone = task.status === 'completed';
+    return (
     <Card
       key={task.id}
       hover
       className={`
-        relative overflow-hidden group
-        ${task.status === 'completed' ? 'opacity-75' : ''}
+        relative overflow-hidden group motion-safe:hover:-translate-y-0.5 hover:shadow-xl
+        ${isDone ? 'border-emerald-500/30 bg-emerald-500/5 hover:border-emerald-500/40 hover:shadow-emerald-500/15' : d.hover}
       `}
     >
-      <div className="flex justify-between items-start mb-6">
-        <div className={`
-          px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest
-          ${task.difficulty === 'Easy' ? 'bg-emerald-500/10 text-emerald-500' :
-            task.difficulty === 'Medium' ? 'bg-amber-500/10 text-amber-500' :
-            'bg-rose-500/10 text-rose-500'}
-        `}>
+      <span aria-hidden="true" className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${isDone ? 'from-emerald-400 to-emerald-600' : d.bar}`} />
+      <div className="flex justify-between items-start mb-6 pt-1">
+        <div className={`px-4 py-1.5 rounded-full text-xs font-black uppercase tracking-widest text-white bg-gradient-to-r shadow-md ${d.pill}`}>
           {difficultyLabel(task.difficulty)}
         </div>
-        <div className="flex items-center gap-2 text-indigo-500 font-black">
-          <Trophy className="w-4 h-4" aria-hidden="true" />
-          <span className="text-sm">{task.xpReward} XP</span>
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/15 text-[var(--text)] font-black tabular-nums">
+          <Zap className="w-4 h-4 text-amber-500" aria-hidden="true" />
+          <span className="text-sm">+{task.xpReward} XP</span>
         </div>
       </div>
 
@@ -261,7 +280,7 @@ export const Tasks: React.FC = () => {
             placeholder={t.taskAnswerPlaceholder}
             aria-label={`${t.taskAnswerPlaceholder} — ${task.title}`}
             maxLength={1000}
-            className="w-full h-20 bg-[var(--input)] border border-[var(--border)] rounded-2xl p-4 text-sm text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:border-indigo-500/50 transition-colors custom-scrollbar resize-none font-bold"
+            className="w-full h-20 bg-[var(--input)] border border-[var(--border)] rounded-2xl p-4 text-sm text-[var(--text)] placeholder:text-[var(--muted)] focus:outline-none focus:border-indigo-500/60 focus:ring-4 focus:ring-indigo-500/10 transition-colors custom-scrollbar resize-none font-bold"
           />
 
           {errorStatus[task.id] && (
@@ -272,11 +291,10 @@ export const Tasks: React.FC = () => {
           )}
 
           <Button
-            variant="outline"
             size="sm"
             onClick={() => completeTask(task)}
             disabled={verifyingTaskId === task.id || !taskAnswers[task.id]?.trim()}
-            className="w-full h-12 gap-2 rounded-2xl border-indigo-500/20 text-indigo-500 hover:bg-indigo-500 hover:text-white"
+            className="w-full h-12 gap-2 rounded-2xl bg-gradient-to-r from-indigo-500 to-indigo-600 text-white shadow-lg shadow-indigo-500/25 hover:from-indigo-600 hover:to-indigo-700"
           >
             {verifyingTaskId === task.id ? (
               <Loader2 className="w-5 h-5 animate-spin" />
@@ -306,17 +324,19 @@ export const Tasks: React.FC = () => {
         </div>
 
         {task.status === 'completed' && (
-          <div className="flex items-center gap-2 text-emerald-500 font-black uppercase text-xs tracking-widest">
-            <CheckCircle2 className="w-5 h-5" aria-hidden="true" />
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/15 text-emerald-500 font-black uppercase text-xs tracking-widest">
+            <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
             {t.complete}
           </div>
         )}
       </div>
     </Card>
-  );
+    );
+  };
 
   const pending = tasks.filter((task) => task.status !== 'completed');
   const done = tasks.filter((task) => task.status === 'completed');
+  const xpAvailable = pending.reduce((sum, task) => sum + (task.xpReward || 0), 0);
 
   return (
     <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in duration-700">
@@ -361,7 +381,7 @@ export const Tasks: React.FC = () => {
               <Button
                 onClick={generateTask}
                 disabled={isGenerating}
-                className="gap-3 h-16 px-8 rounded-3xl bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_20px_rgba(79,70,229,0.3)]"
+                className="gap-3 h-16 px-8 rounded-3xl bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-lg shadow-indigo-500/30"
               >
                 {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
                 <span className="font-black uppercase text-xs tracking-widest">{t.generateNewTask}</span>
@@ -370,6 +390,26 @@ export const Tasks: React.FC = () => {
           )}
         </div>
       </div>
+
+      {tasks.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {[
+            { icon: Target, value: pending.length, label: tr('To do', 'Нужно решить', 'Bajarish kerak'), tile: 'from-amber-400 to-orange-500 shadow-amber-500/30' },
+            { icon: CheckCircle2, value: done.length, label: tr('Completed', 'Выполнено', 'Bajarilgan'), tile: 'from-emerald-400 to-emerald-600 shadow-emerald-500/30' },
+            { icon: Zap, value: xpAvailable.toLocaleString(), label: tr('XP to earn', 'XP можно получить', 'Olish mumkin XP'), tile: 'from-indigo-400 to-indigo-600 shadow-indigo-500/30' },
+          ].map((stat) => (
+            <div key={stat.label} className="flex items-center gap-3 pl-2.5 pr-5 py-2.5 rounded-2xl bg-[var(--card)] border border-[var(--border)]">
+              <span className={`w-10 h-10 rounded-xl bg-gradient-to-br shadow-md flex items-center justify-center text-white ${stat.tile}`}>
+                <stat.icon className="w-5 h-5" aria-hidden="true" />
+              </span>
+              <div className="leading-tight">
+                <p className="text-xl font-black tabular-nums text-[var(--text)]">{stat.value}</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-[var(--muted)]">{stat.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {loadError && (
         <div role="alert" className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-500 text-sm font-bold flex items-center gap-3">
@@ -380,14 +420,16 @@ export const Tasks: React.FC = () => {
 
       {tasks.length === 0 && !loadError ? (
         <div className="py-16 text-center space-y-6">
-          <Zap className="w-16 h-16 mx-auto text-indigo-500/40" aria-hidden="true" />
+          <div className="w-24 h-24 mx-auto rounded-[2rem] bg-gradient-to-br from-indigo-400 to-purple-600 text-white flex items-center justify-center shadow-xl shadow-indigo-500/30 motion-safe:animate-bounce" aria-hidden="true">
+            <Zap className="w-12 h-12" />
+          </div>
           <div className="space-y-2">
             <p className="text-xl font-black uppercase tracking-widest text-[var(--text)]">{t.noTasks}</p>
             <p className="text-sm text-[var(--muted)] max-w-sm mx-auto">
               {tr('Get a short problem, enter your answer and earn XP.', 'Получи короткую задачу, введи ответ и заработай XP.', 'Qisqa masala oling, javobni kiriting va XP to‘plang.')}
             </p>
           </div>
-          <Button onClick={generateTask} disabled={isGenerating} className="h-14 px-8 rounded-2xl gap-3 bg-indigo-600 hover:bg-indigo-500 shadow-[0_0_20px_rgba(79,70,229,0.3)]">
+          <Button onClick={generateTask} disabled={isGenerating} className="h-14 px-8 rounded-2xl gap-3 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-lg shadow-indigo-500/30">
             {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
             <span className="font-black uppercase text-xs tracking-widest">{t.generateNewTask}</span>
           </Button>
@@ -396,13 +438,21 @@ export const Tasks: React.FC = () => {
         <>
           {pending.length > 0 && (
             <section aria-label={tr('To do', 'Нужно решить', 'Bajarish kerak')} className="space-y-4">
-              <h3 className="text-xs font-black uppercase tracking-[0.3em] text-[var(--muted)]">{tr('To do', 'Нужно решить', 'Bajarish kerak')} · {pending.length}</h3>
+              <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em] text-[var(--muted)]">
+                <Target className="w-4 h-4 text-amber-500" aria-hidden="true" />
+                {tr('To do', 'Нужно решить', 'Bajarish kerak')}
+                <span className="px-2 py-0.5 rounded-full bg-amber-500/15 text-[var(--text)] tracking-normal tabular-nums">{pending.length}</span>
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">{pending.map(renderTask)}</div>
             </section>
           )}
           {done.length > 0 && (
             <section aria-label={tr('Completed', 'Выполнено', 'Bajarilgan')} className="space-y-4">
-              <h3 className="text-xs font-black uppercase tracking-[0.3em] text-[var(--muted)]">{tr('Completed', 'Выполнено', 'Bajarilgan')} · {done.length}</h3>
+              <h3 className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.3em] text-[var(--muted)]">
+                <CheckCircle2 className="w-4 h-4 text-emerald-500" aria-hidden="true" />
+                {tr('Completed', 'Выполнено', 'Bajarilgan')}
+                <span className="px-2 py-0.5 rounded-full bg-emerald-500/15 text-[var(--text)] tracking-normal tabular-nums">{done.length}</span>
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">{done.map(renderTask)}</div>
             </section>
           )}
