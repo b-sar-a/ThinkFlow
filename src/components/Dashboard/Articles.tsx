@@ -98,7 +98,7 @@ export const Articles: React.FC<ArticlesProps> = ({ onNavigate }) => {
     const text = textOf(open);
     const { icon: Icon, chip, tile, bar } = SUBJECT_STYLE[open.subject];
     return (
-      <article ref={topRef} className="max-w-3xl mx-auto space-y-8 animate-in fade-in duration-500 scroll-mt-4">
+      <article ref={topRef} className="w-full max-w-3xl mx-auto space-y-8 animate-in fade-in duration-500 scroll-mt-4">
         <button
           type="button"
           onClick={() => setOpenId(null)}
@@ -186,7 +186,7 @@ export const Articles: React.FC<ArticlesProps> = ({ onNavigate }) => {
   }
 
   return (
-    <div ref={topRef} className="max-w-6xl mx-auto space-y-8 md:space-y-10 animate-in fade-in duration-700 scroll-mt-4">
+    <div ref={topRef} className="w-full max-w-6xl mx-auto space-y-8 md:space-y-10 animate-in fade-in duration-700 scroll-mt-4">
       <div className="flex items-center justify-between gap-6">
         <div className="min-w-0">
           <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)]">

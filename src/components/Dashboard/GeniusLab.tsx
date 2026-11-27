@@ -367,7 +367,7 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
 
   if (!tree) {
     return (
-      <div style={sceneStyle} className={`max-w-5xl mx-auto flex flex-col items-center px-6 pt-8 md:pt-14 pb-16 relative ${light ? SCENE_PANEL : ''}`}>
+      <div style={sceneStyle} className={`w-full max-w-5xl mx-auto flex flex-col items-center px-6 pt-8 md:pt-14 pb-16 relative ${light ? SCENE_PANEL : ''}`}>
         <motion.div 
           initial={{ opacity: 0, y: 30 }}
           animate={{ opacity: 1, y: 0 }}
@@ -412,7 +412,7 @@ export const GeniusLab: React.FC<GeniusLabProps> = ({ onNavigate }) => {
                   aria-label={t.masterTopic}
                   maxLength={200}
                   autoComplete="off"
-                  className="flex-1 bg-transparent px-8 py-6 outline-none text-xl md:text-2xl font-black text-white placeholder:text-gray-500"
+                  className="flex-1 min-w-0 bg-transparent px-5 sm:px-8 py-5 sm:py-6 outline-none text-base sm:text-xl md:text-2xl font-black text-white placeholder:text-gray-500"
                 />
                 <Button 
                   onClick={handleInitialize}

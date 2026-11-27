@@ -132,7 +132,7 @@ export const Tips: React.FC = () => {
   const allTried = currentTried === current.tips.length;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 md:space-y-10 animate-in fade-in duration-700">
+    <div className="w-full max-w-6xl mx-auto space-y-8 md:space-y-10 animate-in fade-in duration-700">
       <div className="flex items-center justify-between gap-6">
         <div className="min-w-0 space-y-2">
           <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)]">{t.tips}</h1>

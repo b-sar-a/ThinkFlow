@@ -98,7 +98,7 @@ export const PromoHub: React.FC = () => {
   const progressPct = Math.min(100, (invited / MAX_REWARDED_INVITES) * 100);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-8 py-4 animate-in fade-in duration-500">
+    <div className="w-full max-w-5xl mx-auto space-y-8 py-4 animate-in fade-in duration-500">
       <div className="p-6 md:p-12 rounded-[2.5rem] bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-[var(--card)] border border-indigo-500/15 relative overflow-hidden shadow-2xl">
         <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-500/10 blur-[150px] rounded-full pointer-events-none" />
 

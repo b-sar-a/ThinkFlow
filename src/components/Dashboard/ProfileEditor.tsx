@@ -121,7 +121,7 @@ export const ProfileEditor: React.FC = () => {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="max-w-4xl mx-auto space-y-12 pb-20"
+      className="w-full max-w-4xl mx-auto space-y-12 pb-20"
     >
       <div className="flex items-center justify-between gap-4">
         <div className="min-w-0">

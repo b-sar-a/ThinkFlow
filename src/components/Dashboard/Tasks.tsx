@@ -339,7 +339,7 @@ export const Tasks: React.FC = () => {
   const xpAvailable = pending.reduce((sum, task) => sum + (task.xpReward || 0), 0);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in duration-700">
+    <div className="w-full max-w-5xl mx-auto space-y-12 animate-in fade-in duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)]">

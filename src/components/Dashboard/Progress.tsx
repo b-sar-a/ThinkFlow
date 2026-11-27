@@ -92,7 +92,7 @@ export const Progress: React.FC<ProgressProps> = ({ onNavigate }) => {
   ];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-12 animate-in fade-in duration-700">
+    <div className="w-full max-w-5xl mx-auto space-y-12 animate-in fade-in duration-700">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)]">

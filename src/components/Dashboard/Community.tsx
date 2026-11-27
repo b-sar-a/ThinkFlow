@@ -208,7 +208,7 @@ export const Community: React.FC = () => {
   );
 
   return (
-    <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-700">
+    <div className="w-full max-w-4xl mx-auto space-y-12 animate-in fade-in duration-700">
       <div className="flex items-center gap-5">
         <div className="hidden sm:flex w-16 h-16 rounded-3xl bg-gradient-to-br from-purple-400 to-indigo-600 text-white items-center justify-center shrink-0 shadow-xl shadow-indigo-500/30" aria-hidden="true">
           <Users className="w-8 h-8" />
