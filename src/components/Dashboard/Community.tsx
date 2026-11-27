@@ -35,6 +35,23 @@ import { useSafety } from '../../lib/safety';
 import { ConfirmDialog, ContentMenu, PersonalDataDialog, ReportDialog } from '../Safety/Safety';
 import { detectPersonalData } from '../../lib/personalData';
 
+// Each person gets a stable avatar colour (class names written out in full for Tailwind).
+const AVATAR_COLORS = [
+  'from-indigo-400 to-indigo-600 shadow-indigo-500/30',
+  'from-emerald-400 to-emerald-600 shadow-emerald-500/30',
+  'from-amber-400 to-orange-500 shadow-amber-500/30',
+  'from-rose-400 to-pink-600 shadow-rose-500/30',
+  'from-cyan-400 to-sky-600 shadow-cyan-500/30',
+  'from-purple-400 to-fuchsia-600 shadow-purple-500/30',
+  'from-teal-400 to-teal-600 shadow-teal-500/30',
+] as const;
+const avatarColor = (name?: string) => {
+  const text = name || 'U';
+  let sum = 0;
+  for (let i = 0; i < text.length; i++) sum += text.charCodeAt(i);
+  return AVATAR_COLORS[sum % AVATAR_COLORS.length];
+};
+
 type Pending =
   | { kind: 'report'; targetType: 'post' | 'comment'; id: string; postId?: string; userId: string; userName: string; text: string }
   | { kind: 'block'; userId: string; userName: string }
@@ -164,8 +181,8 @@ export const Community: React.FC = () => {
     });
 
   const Avatar: React.FC<{ name?: string; photo?: string | null; size?: string }> = ({ name, photo, size = 'w-12 h-12 rounded-2xl' }) => (
-    <div className={`${size} bg-indigo-600 flex items-center justify-center text-white font-black flex-shrink-0 overflow-hidden shadow-lg shadow-indigo-500/10`} aria-hidden="true">
-      {photo ? <img src={photo} alt="" className="w-full h-full object-cover" /> : name?.[0] || 'U'}
+    <div className={`${size} bg-gradient-to-br ${avatarColor(name)} flex items-center justify-center text-white font-black flex-shrink-0 overflow-hidden shadow-lg`} aria-hidden="true">
+      {photo ? <img src={photo} alt="" className="w-full h-full object-cover" /> : (name?.[0] || 'U').toUpperCase()}
     </div>
   );
 
@@ -192,18 +209,24 @@ export const Community: React.FC = () => {
 
   return (
     <div className="max-w-4xl mx-auto space-y-12 animate-in fade-in duration-700">
-      <div className="flex flex-col gap-2">
-        <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)]">
-          {t.community}
-        </h2>
-        <p className="text-[var(--muted)] font-medium">
-          {tr('Share ideas and questions with other students.', 'Делись идеями и вопросами с другими учениками.', 'G‘oya va savollaringizni boshqa o‘quvchilar bilan bo‘lishing.')}
-        </p>
+      <div className="flex items-center gap-5">
+        <div className="hidden sm:flex w-16 h-16 rounded-3xl bg-gradient-to-br from-purple-400 to-indigo-600 text-white items-center justify-center shrink-0 shadow-xl shadow-indigo-500/30" aria-hidden="true">
+          <Users className="w-8 h-8" />
+        </div>
+        <div className="flex flex-col gap-2">
+          <h2 className="text-4xl md:text-5xl font-black uppercase tracking-tighter text-[var(--text)]">
+            {t.community}
+          </h2>
+          <p className="text-[var(--muted)] font-medium">
+            {tr('Share ideas and questions with other students.', 'Делись идеями и вопросами с другими учениками.', 'G‘oya va savollaringizni boshqa o‘quvchilar bilan bo‘lishing.')}
+          </p>
+        </div>
       </div>
 
       {/* Create Post */}
-      <Card className="p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-[var(--border)] bg-[var(--card)] shadow-xl relative overflow-hidden group">
-        <div className="flex gap-4">
+      <Card className="p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-[var(--border)] bg-[var(--card)] shadow-xl relative overflow-hidden group focus-within:border-indigo-500/40 focus-within:shadow-indigo-500/10">
+        <span aria-hidden="true" className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
+        <div className="flex gap-4 pt-1">
           <Avatar name={profile?.name} photo={profile?.photoURL} />
           <div className="flex-1 min-w-0 space-y-4">
             <textarea
@@ -229,7 +252,7 @@ export const Community: React.FC = () => {
               <Button
                 onClick={() => guarded(newPostContent, handleCreatePost)}
                 disabled={isSubmitting || !newPostContent.trim()}
-                className="rounded-2xl px-8 h-12 bg-indigo-600 hover:bg-indigo-500 gap-2"
+                className="rounded-2xl px-8 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 shadow-lg shadow-indigo-500/25 gap-2"
               >
                 {isSubmitting ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                 <span className="font-black uppercase text-xs tracking-widest">{tr('Post', 'Опубликовать', 'Joylash')}</span>
@@ -248,7 +271,9 @@ export const Community: React.FC = () => {
 
       {visiblePosts.length === 0 && !loadError && (
         <div className="py-16 text-center space-y-4">
-          <Users className="w-14 h-14 mx-auto text-indigo-500/40" aria-hidden="true" />
+          <div className="w-20 h-20 mx-auto rounded-[1.75rem] bg-gradient-to-br from-purple-400 to-indigo-600 text-white flex items-center justify-center shadow-xl shadow-indigo-500/30 motion-safe:animate-bounce" aria-hidden="true">
+            <Users className="w-10 h-10" />
+          </div>
           <p className="text-xl font-black uppercase tracking-widest text-[var(--text)]">{tr('No posts yet', 'Пока нет записей', 'Hozircha yozuvlar yo‘q')}</p>
           <p className="text-sm text-[var(--muted)] max-w-sm mx-auto">{tr('Write the first one: a question, a tip, or something you just learned.', 'Напиши первую: вопрос, совет или то, что только что узнал.', 'Birinchisini yozing: savol, maslahat yoki hozirgina o‘rgangan narsa.')}</p>
         </div>
@@ -266,12 +291,15 @@ export const Community: React.FC = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <Card className="p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-[var(--border)] hover:border-indigo-500/20 transition-all group">
+              <Card className="p-5 md:p-8 rounded-[2rem] md:rounded-[2.5rem] border border-[var(--border)] hover:border-indigo-500/30 hover:shadow-xl hover:shadow-indigo-500/10 motion-safe:hover:-translate-y-0.5 transition-all group">
                 <div className="flex justify-between items-start mb-6 gap-3">
                   <div className="flex items-center gap-4 min-w-0">
                     <Avatar name={post.userName} photo={post.userPhoto} />
                     <div className="min-w-0">
-                      <h4 className="font-black text-[var(--text)] tracking-tight truncate">{post.userName}</h4>
+                      <h4 className="font-black text-[var(--text)] tracking-tight truncate flex items-center gap-2">
+                        <span className="truncate">{post.userName}</span>
+                        {mine && <span className="shrink-0 px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-500 text-[10px] font-black uppercase tracking-widest">{tr('You', 'Вы', 'Siz')}</span>}
+                      </h4>
                       <p className="text-xs font-bold text-[var(--muted)] tracking-wide">{formatDate(post.createdAt)}</p>
                     </div>
                   </div>
@@ -299,7 +327,7 @@ export const Community: React.FC = () => {
                     onClick={() => toggleLike(post)}
                     aria-pressed={liked}
                     aria-label={tr('Like', 'Нравится', 'Yoqdi')}
-                    className={`min-h-11 px-3 flex items-center gap-2 rounded-xl transition-colors hover:bg-[var(--input)] ${liked ? 'text-rose-500' : 'text-[var(--muted)] hover:text-rose-500'}`}
+                    className={`min-h-11 px-4 flex items-center gap-2 rounded-full transition-all motion-safe:active:scale-95 ${liked ? 'bg-rose-500/15 text-rose-500' : 'text-[var(--muted)] hover:bg-rose-500/10 hover:text-rose-500'}`}
                   >
                     <Heart className={`w-5 h-5 ${liked ? 'fill-current' : ''}`} aria-hidden="true" />
                     <span className="text-sm font-black tabular-nums">{post.likes.length}</span>
@@ -310,7 +338,7 @@ export const Community: React.FC = () => {
                     onClick={() => loadComments(post.id)}
                     aria-expanded={open}
                     aria-label={tr('Comments', 'Комментарии', 'Izohlar')}
-                    className={`min-h-11 px-3 flex items-center gap-2 rounded-xl transition-colors hover:bg-[var(--input)] ${open ? 'text-indigo-500' : 'text-[var(--muted)] hover:text-indigo-500'}`}
+                    className={`min-h-11 px-4 flex items-center gap-2 rounded-full transition-all motion-safe:active:scale-95 ${open ? 'bg-indigo-500/15 text-indigo-500' : 'text-[var(--muted)] hover:bg-indigo-500/10 hover:text-indigo-500'}`}
                   >
                     <MessageCircle className="w-5 h-5" aria-hidden="true" />
                     <span className="text-sm font-black tabular-nums">{post.commentsCount}</span>
@@ -353,13 +381,13 @@ export const Community: React.FC = () => {
                             onChange={(e) => setNewComment(e.target.value)}
                             maxLength={1000}
                             rows={1}
-                            className="flex-1 bg-[var(--input)] border border-[var(--border)] rounded-2xl p-4 text-sm text-[var(--text)] focus:outline-none focus:border-indigo-500/50 resize-none min-h-12 leading-tight"
+                            className="flex-1 bg-[var(--input)] border border-[var(--border)] rounded-2xl p-4 text-sm text-[var(--text)] focus:outline-none focus:border-indigo-500/60 focus:ring-4 focus:ring-indigo-500/10 resize-none min-h-12 leading-tight"
                           />
                           <Button
                             type="submit"
                             disabled={!newComment.trim()}
                             aria-label={tr('Send comment', 'Отправить комментарий', 'Izohni yuborish')}
-                            className="w-12 h-12 shrink-0 rounded-2xl bg-indigo-600 p-0 flex items-center justify-center"
+                            className="w-12 h-12 shrink-0 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg shadow-indigo-500/25 p-0 flex items-center justify-center"
                           >
                             <Send className="w-5 h-5" />
                           </Button>
