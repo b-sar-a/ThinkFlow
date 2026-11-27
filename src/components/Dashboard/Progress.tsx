@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { BarChart3, Trophy, Zap, Target, Star, FlaskConical, ListChecks, MessageSquare, GraduationCap, ArrowRight } from 'lucide-react';
+import { BarChart3, Trophy, Zap, Target, Flame, FlaskConical, ListChecks, MessageSquare, GraduationCap, ArrowRight } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useLanguage } from '../../context/LanguageContext';
 import { Card } from '../UI/Card';
@@ -9,6 +9,19 @@ import { db } from '../../lib/firebase';
 import { collection, query, where, getCountFromServer } from 'firebase/firestore';
 import { levelInfo } from '../../lib/progress';
 import { PROGRAMS, LESSON_XP } from '../../data/programs';
+
+/** Bar colour of each program, the same colours as on the Programs screen. */
+const BAR = {
+  indigo: 'from-indigo-500 to-indigo-400',
+  emerald: 'from-emerald-500 to-emerald-400',
+  amber: 'from-amber-500 to-amber-400',
+  rose: 'from-rose-500 to-rose-400',
+  cyan: 'from-cyan-500 to-cyan-400',
+  purple: 'from-purple-500 to-purple-400',
+  teal: 'from-teal-500 to-teal-400',
+  orange: 'from-orange-500 to-orange-400',
+  sky: 'from-sky-500 to-sky-400',
+} as const;
 
 interface ProgressProps {
   /** Lets the page send the student on to the Lab or the tasks. */
@@ -47,14 +60,14 @@ export const Progress: React.FC<ProgressProps> = ({ onNavigate }) => {
   const bestStreak = Math.max(profile.longestStreak ?? 0, streak);
 
   const stats = [
-    { label: t.totalXP, value: total.toLocaleString(), icon: Zap, color: "text-indigo-500" },
-    { label: t.currentLevelLabel, value: level, icon: Trophy, color: "text-yellow-500" },
-    { label: t.tasksDone, value: completedTasksCount !== null ? completedTasksCount : "…", icon: Target, color: "text-emerald-500" },
+    { label: t.totalXP, value: total.toLocaleString(), icon: Zap, tile: "from-indigo-400 to-indigo-600 shadow-indigo-500/30" },
+    { label: t.currentLevelLabel, value: level, icon: Trophy, tile: "from-amber-400 to-orange-500 shadow-amber-500/30" },
+    { label: t.tasksDone, value: completedTasksCount !== null ? completedTasksCount : "…", icon: Target, tile: "from-emerald-400 to-emerald-600 shadow-emerald-500/30" },
     {
       label: t.dailyStreak,
       value: streak,
-      icon: Star,
-      color: "text-purple-500",
+      icon: Flame,
+      tile: "from-orange-400 to-rose-500 shadow-orange-500/30",
       note: bestStreak > streak ? `${tr('Best', 'Рекорд', 'Rekord')}: ${bestStreak}` : undefined,
     },
   ];
@@ -63,6 +76,7 @@ export const Progress: React.FC<ProgressProps> = ({ onNavigate }) => {
   const lessonsDone = new Set(Array.isArray(profile.lessonsDone) ? profile.lessonsDone : []);
   const programRows = PROGRAMS.map((p) => ({
     id: p.id,
+    accent: p.accent,
     title: p.title[language],
     done: p.lessons.filter((l) => lessonsDone.has(`${p.id}/${l.id}`)).length,
     total: p.lessons.length,
@@ -96,8 +110,8 @@ export const Progress: React.FC<ProgressProps> = ({ onNavigate }) => {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         {stats.map((stat, i) => (
           <Card key={i} className="p-6 md:p-8 rounded-[2.5rem] border border-[var(--border)] flex flex-col items-center text-center">
-            <div className={`w-14 h-14 rounded-2xl bg-[var(--input)] flex items-center justify-center mb-4 ${stat.color}`}>
-              <stat.icon className="w-6 h-6" />
+            <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br shadow-lg flex items-center justify-center mb-4 text-white ${stat.tile}`}>
+              <stat.icon className="w-6 h-6" aria-hidden="true" />
             </div>
             <p className="text-xs font-black uppercase text-[var(--muted)] tracking-widest mb-1">{stat.label}</p>
             <p className="text-3xl font-black text-[var(--text)] tabular-nums">{stat.value}</p>
@@ -118,7 +132,10 @@ export const Progress: React.FC<ProgressProps> = ({ onNavigate }) => {
               <>
                 <span className="flex justify-between gap-3 text-sm font-bold text-[var(--text)]">
                   <span className="truncate">{r.title}</span>
-                  <span className="text-[var(--muted)] tabular-nums shrink-0">{r.done}/{r.total}</span>
+                  <span className="inline-flex items-center gap-1.5 text-[var(--muted)] tabular-nums shrink-0">
+                    {r.total > 0 && r.done === r.total && <Trophy className="w-3.5 h-3.5 text-amber-500" aria-label={tr('Finished', 'Завершено', 'Tugallangan')} />}
+                    {r.done}/{r.total}
+                  </span>
                 </span>
                 <span
                   role="progressbar"
@@ -128,7 +145,7 @@ export const Progress: React.FC<ProgressProps> = ({ onNavigate }) => {
                   aria-valuenow={r.done}
                   className="mt-2 block h-2 rounded-full bg-[var(--input)] overflow-hidden"
                 >
-                  <span className="block h-full rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 transition-all duration-700" style={{ width: `${pct}%` }} />
+                  <span className={`block h-full rounded-full bg-gradient-to-r ${BAR[r.accent]} transition-all duration-700`} style={{ width: `${pct}%` }} />
                 </span>
               </>
             );
@@ -158,9 +175,14 @@ export const Progress: React.FC<ProgressProps> = ({ onNavigate }) => {
 
         <div className="relative z-10 space-y-10">
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-            <div className="space-y-2">
-              <h3 className="text-4xl font-black uppercase tracking-tighter text-[var(--text)]">{t.levelLabel} {level}</h3>
-              <p className="text-[var(--muted)] font-medium">{t.nextLevel}: {level + 1}</p>
+            <div className="flex items-center gap-5">
+              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white flex items-center justify-center shrink-0 shadow-xl shadow-amber-500/30 ring-4 ring-amber-500/20" aria-hidden="true">
+                <span className="text-3xl font-black tabular-nums">{level}</span>
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-3xl md:text-4xl font-black uppercase tracking-tighter text-[var(--text)]">{t.levelLabel} {level}</h3>
+                <p className="text-[var(--muted)] font-medium">{t.nextLevel}: {level + 1}</p>
+              </div>
             </div>
             <div className="md:text-right">
               <p className="text-4xl md:text-5xl font-black text-indigo-500 font-mono tracking-tighter tabular-nums">{into.toLocaleString()} / {span.toLocaleString()}</p>
@@ -177,22 +199,24 @@ export const Progress: React.FC<ProgressProps> = ({ onNavigate }) => {
             className="h-6 bg-[var(--input)] rounded-full overflow-hidden border border-[var(--border)] p-1"
           >
             <div
-              className="h-full bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full transition-all duration-1000 shadow-lg shadow-indigo-500/40"
+              className="h-full bg-gradient-to-r from-amber-400 via-orange-500 to-rose-500 rounded-full transition-all duration-1000 shadow-lg shadow-orange-500/40"
               style={{ width: `${percent}%` }}
             />
           </div>
 
           <p className="text-lg font-bold text-[var(--text)]">
-            {tr('Next level in', 'До следующего уровня', 'Keyingi darajagacha')} <span className="text-indigo-500 tabular-nums">{remaining.toLocaleString()} XP</span>
+            {tr('Next level in', 'До следующего уровня', 'Keyingi darajagacha')} <span className="inline-flex items-center gap-1 align-middle px-3 py-0.5 rounded-full bg-amber-500/15 text-[var(--text)] tabular-nums"><Zap className="w-4 h-4 text-amber-500" aria-hidden="true" />{remaining.toLocaleString()} XP</span>
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 pt-4 border-t border-[var(--border)]">
             {ways.map((way) => (
               <div key={way.text} className="flex items-start gap-3 p-4 rounded-2xl bg-[var(--input)] border border-[var(--border)]">
-                <way.icon className="w-5 h-5 mt-0.5 shrink-0 text-indigo-500" aria-hidden="true" />
+                <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-400 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-md shadow-indigo-500/25">
+                  <way.icon className="w-5 h-5" aria-hidden="true" />
+                </span>
                 <div className="min-w-0">
                   <p className="text-sm font-bold text-[var(--text)] leading-snug">{way.text}</p>
-                  <p className="text-xs font-black tracking-widest text-emerald-500 mt-1">{way.xp}</p>
+                  <p className="inline-flex items-center gap-1 text-xs font-black tracking-widest text-[var(--text)] bg-amber-500/15 rounded-full px-2 py-0.5 mt-1.5"><Zap className="w-3 h-3 text-amber-500" aria-hidden="true" />{way.xp}</p>
                 </div>
               </div>
             ))}
